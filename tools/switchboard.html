@@ -219,6 +219,7 @@ group("grid").append(userFont.row);
 
 // per-widget state 0..1, persisted in the same blob; resized to the grid on every render
 p.st = Array.isArray(saved.st) ? saved.st : [];
+p.order = Array.isArray(saved.order) ? saved.order : [];
 {
   const row = document.createElement("label");
   row.style.cssText = "display:flex;gap:6px";
@@ -244,11 +245,12 @@ function mulberry32(s) {
   };
 }
 const FAMILY = {
-  buttons: ["button", "toggle", "checkbox"],
-  dials:   ["slider", "knob"],
-  lights:  ["led", "meter", "counter"],
-  form:    ["chip", "field", "dropdown"],
+  buttons: ["button", "toggle", "checkbox", "radio", "segmented", "stepper"],
+  dials:   ["slider", "range", "knob", "gauge"],
+  lights:  ["led", "meter", "vu", "counter", "progress"],
+  form:    ["chip", "badge", "field", "dropdown"],
 };
+const measureCtx = document.createElement("canvas").getContext("2d");
 // binary kinds flip on click; the rest step through 0 … 1 in quarters
 const BINARY = new Set(["button", "toggle", "checkbox", "led", "chip", "field", "dropdown"]);
 
@@ -282,15 +284,18 @@ function makeSVG(time = null) {
   const cw = W / p.cols, ch = H / p.rows;
   const cells = [];
   for (let i = 0; i < n; i++) {
-    const rKind = rnd(), rLabel = rnd(), rJit = rnd();
+    const rKind = rnd(), rLabel = rnd(), rJit = rnd(), rL2 = rnd(), rL3 = rnd();
     cells.push({
       kind: allKinds[Math.floor(rKind * allKinds.length)],
       label: labels[Math.floor(rLabel * labels.length)],
+      labels: [rLabel, rL2, rL3].map(r => labels[Math.floor(r * labels.length)]),
       size: 1 - rJit * p.jitter / 100 * 0.6,
-      cx: (i % p.cols + 0.5) * cw, cy: (Math.floor(i / p.cols) + 0.5) * ch,
       st: p.st[i] ?? 0,
     });
   }
+  // grid slot → widget: rearranged by drag and drop, persisted in p.order
+  const order = p.order.length === n ? p.order : cells.map((_, i) => i);
+  order.forEach((i, slot) => { cells[i].cx = (slot % p.cols + 0.5) * cw; cells[i].cy = (Math.floor(slot / p.cols) + 0.5) * ch; });
   // links: own stream, so link count never reshuffles the widgets
   const rl = mulberry32(p.seed ^ 0x9e37);
   const links = [], seen = new Set();
@@ -326,20 +331,35 @@ function makeSVG(time = null) {
   }
 
   // ---- widget renderers: local coords, origin at the widget centre ----
+  const measure = (str, size) => { measureCtx.font = `700 ${f(size)}px ${fam}`; return measureCtx.measureText(str).width; };
   const rect = (x, y, w, h, fill, rx = p.radius) =>
     `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="${f(rx)}" fill="${fill}"/>`;
-  const box = (w, h, fill, rx = p.radius) => rect(-w / 2 + dx, -h / 2 + dy, w, h, p.ink, rx) + rect(-w / 2, -h / 2, w, h, fill, rx);
+  const srect = (x, y, w, h, fill, rx = p.radius) => rect(x + dx, y + dy, w, h, p.ink, rx) + rect(x, y, w, h, fill, rx);
+  const box = (w, h, fill, rx = p.radius) => srect(-w / 2, -h / 2, w, h, fill, rx);
   const circ = (cx, cy, r, fill) => `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${fill}"/>`;
   const disc = (r, fill) => circ(dx, dy, r, p.ink) + circ(0, 0, r, fill);
+  const line = (x1, y1, x2, y2, w = sw) => `<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke-width="${f(w)}"/>`;
   const text = (x, y, s, size, fill, anchor = "middle") =>
     `<text x="${f(x)}" y="${f(y)}" font-family="${fam}" font-weight="700" font-size="${f(size)}" fill="${fill}" `
     + `stroke="none" text-anchor="${anchor}" dominant-baseline="central">${esc(s)}</text>`;
+  // text widgets: the label sets the width — measured advance plus padding, capped at the
+  // cell (type shrinks to fit when the label is too long); height caps so they stay wide
+  const tbox = (bw, bh, label, extra = 0, frac = 0.42) => {
+    const h = Math.min(bh, bw * 0.6 / (0.7 + extra)), pad = h * (0.7 + extra);   // padding never eats the whole cell
+    let size = h * frac, m = measure(label, size);
+    if (m + pad > bw) { size = Math.max(h * 0.18, size * (bw - pad) / m); m = measure(label, size); }
+    return {w: Math.max(m + pad, h), h, size};              // may exceed the cell: box grows, text never spills
+  };
+  const chevron = (cx, cy, ch, up) =>
+    `<polyline points="${f(cx - ch)},${f(up ? cy + ch / 2 : cy - ch / 2)} ${f(cx)},${f(up ? cy - ch / 2 : cy + ch / 2)} ${f(cx + ch)},${f(up ? cy + ch / 2 : cy - ch / 2)}" fill="none" stroke-width="${f(sw * 1.4)}"/>`;
+  const nn = st => String(Math.round(st * 99)).padStart(2, "0");
+  const idx3 = st => Math.min(2, Math.floor(st * 3));         // quarter steps → 3 positions
   const draw = {
     button(bw, bh, c, fill) {
-      const [w, h] = fit(bw, bh, 2.2), on = c.st > 0.5;
+      const {w, h, size} = tbox(bw, bh, c.label), on = c.st > 0.5;
       // pressed = sunk into its own shadow
       return (on ? `<g transform="translate(${f(dx)} ${f(dy)})">${rect(-w / 2, -h / 2, w, h, fill)}</g>` : box(w, h, fill))
-        + text(on ? dx : 0, on ? dy : 0, c.label, h * 0.42, p.ink);
+        + text(on ? dx : 0, on ? dy : 0, c.label, size, p.ink);
     },
     toggle(bw, bh, c, fill) {
       const [w, h] = fit(bw, bh, 2), on = c.st > 0.5, r = h / 2;
@@ -350,15 +370,56 @@ function makeSVG(time = null) {
       return box(w, h, fill) + (c.st > 0.5
         ? `<polyline points="${f(-w * 0.3)},${f(0)} ${f(-w * 0.08)},${f(h * 0.25)} ${f(w * 0.32)},${f(-h * 0.28)}" fill="none" stroke-width="${f(sw * 1.8)}"/>` : "");
     },
+    radio(bw, bh, c, fill) {
+      const d = Math.min(bh * 0.7, bw / 3.6), sel = idx3(c.st);
+      let s = "";
+      for (let j = 0; j < 3; j++) {
+        const x = (j - 1) * d * 1.2;
+        s += circ(x + dx, dy, d / 2, p.ink) + circ(x, 0, d / 2, j === sel ? p.on : fill) + (j === sel ? circ(x, 0, d / 5, p.ink) : "");
+      }
+      return s;
+    },
+    segmented(bw, bh, c, fill) {
+      const h = Math.min(bh, bw * 0.5), sel = idx3(c.st);
+      let size = h * 0.36, ws = c.labels.map(l => measure(l, size) + h * 0.5);
+      let w = ws.reduce((a, b) => a + b, 0);
+      if (w > bw) { const k = bw / w; size *= k; ws = ws.map(x => x * k); w = bw; }
+      let s = box(w, h, fill), x = -w / 2;
+      ws.forEach((sw2, j) => {
+        if (j === sel) s += rect(x, -h / 2, sw2, h, p.on, j === 0 || j === 2 ? p.radius : 0);
+        if (j) s += line(x, -h / 2, x, h / 2);
+        s += text(x + sw2 / 2, 0, c.labels[j], size, p.ink);
+        x += sw2;
+      });
+      return s;
+    },
+    stepper(bw, bh, c, fill) {
+      const {h, size} = tbox(bw, bh, "00"), w = Math.min(bw, h * 3.4), t = w / 3.4;
+      return box(w, h, fill) + line(-w / 2 + t, -h / 2, -w / 2 + t, h / 2) + line(w / 2 - t, -h / 2, w / 2 - t, h / 2)
+        + text(-w / 2 + t / 2, 0, "−", size, p.ink) + text(0, 0, nn(c.st), size, p.ink) + text(w / 2 - t / 2, 0, "+", size, p.ink);
+    },
     slider(bw, bh, c, fill) {
       const [w, h] = fit(bw, bh, 4), th = h * 0.36, x = -w / 2 + h / 2 + c.st * (w - h);
       return rect(-w / 2, -th / 2, w, th, fill, th / 2) + (c.st ? rect(-w / 2, -th / 2, x + w / 2, th, p.on, th / 2) : "") + box(h * 0.6, h, p.paper);
     },
+    range(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 4), th = h * 0.36, span = 0.35;
+      const lo = -w / 2 + h / 2 + c.st * (1 - span) * (w - h), hi = lo + span * (w - h);
+      return rect(-w / 2, -th / 2, w, th, fill, th / 2) + rect(lo, -th / 2, hi - lo, th, p.on, th / 2)
+        + srect(lo - h * 0.3, -h / 2, h * 0.6, h, p.paper) + srect(hi - h * 0.3, -h / 2, h * 0.6, h, p.paper);
+    },
     knob(bw, bh, c, fill) {
       const r = Math.min(bw, bh) / 2, a = (-225 + 270 * c.st) * Math.PI / 180;
-      return disc(r, fill)
-        + `<line x1="0" y1="0" x2="${f(Math.cos(a) * r * 0.8)}" y2="${f(Math.sin(a) * r * 0.8)}" stroke-width="${f(sw * 1.6)}"/>`
+      return disc(r, fill) + line(0, 0, Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8, sw * 1.6)
         + circ(Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8, sw * 1.2, c.st > 0 ? p.on : p.ink);
+    },
+    gauge(bw, bh, c, fill) {
+      const r = Math.min(bw / 2, bh / 1.4), cy = r / 2.5, a = Math.PI * (1 + c.st);   // half dial, needle sweeps left → right
+      const arc = (r, to, stroke, width) => `<path d="M${f(-r)} ${f(cy)}A${f(r)} ${f(r)} 0 0 1 ${f(Math.cos(to) * r)} ${f(cy + Math.sin(to) * r)}" fill="none" stroke="${stroke}" stroke-width="${f(width)}"/>`;
+      return `<path d="M${f(-r + dx)} ${f(cy + dy)}A${f(r)} ${f(r)} 0 0 1 ${f(r + dx)} ${f(cy + dy)}Z" fill="${p.ink}"/>`
+        + `<path d="M${f(-r)} ${f(cy)}A${f(r)} ${f(r)} 0 0 1 ${f(r)} ${f(cy)}Z" fill="${fill}"/>`
+        + (c.st ? arc(r - sw * 2, a, p.on, sw * 2) : "")
+        + line(0, cy, Math.cos(a) * r * 0.75, cy + Math.sin(a) * r * 0.75, sw * 1.6) + circ(0, cy, sw * 1.5, p.ink);
     },
     led(bw, bh, c, fill) {
       return disc(Math.min(bw, bh) * 0.35, c.st > 0.5 ? p.on : fill);
@@ -370,24 +431,40 @@ function makeSVG(time = null) {
         s += rect(-w / 2 + pad + j * bw2 + pad * 0.25, -h / 2 + pad, bw2 - pad * 0.5, bh2, (j + 0.5) / k <= c.st ? p.on : p.paper, 0);
       return s;
     },
+    vu(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 1.3), k = 5, bw2 = w / k;
+      let s = "";
+      for (let j = 0; j < k; j++) {
+        const hj = h * (0.3 + 0.7 * j / (k - 1));
+        s += srect(-w / 2 + j * bw2 + bw2 * 0.1, h / 2 - hj, bw2 * 0.8, hj, (j + 0.5) / k <= c.st ? p.on : fill, 0);
+      }
+      return s;
+    },
     counter(bw, bh, c, fill) {
-      const [w, h] = fit(bw, bh, 1.8);
-      return box(w, h, fill) + text(0, 0, String(Math.round(c.st * 99)).padStart(2, "0"), h * 0.6, p.ink);
+      const {w, h, size} = tbox(bw, bh, "00", 0, 0.6);
+      return box(w, h, fill) + text(0, 0, nn(c.st), size, p.ink);
+    },
+    progress(bw, bh, c, fill) {
+      const h = Math.min(bh, bw * 0.3), w = bw, size = h * 0.5;
+      return box(w, h, fill) + (c.st ? rect(-w / 2, -h / 2, w * c.st, h, p.on) : "") + text(0, 0, nn(c.st) + "%", size, p.ink);
     },
     chip(bw, bh, c, fill) {
-      const [w, h] = fit(bw, bh, 2.6);
-      return box(w, h, fill, h / 2) + text(0, 0, c.label, h * 0.4, p.ink);
+      const {w, h, size} = tbox(bw, bh, c.label);
+      return box(w, h, fill, h / 2) + text(0, 0, c.label, size, p.ink);
+    },
+    badge(bw, bh, c, fill) {
+      const {w, h, size} = tbox(bw, bh, c.label, 0.9), r = h * 0.32;
+      return box(w, h, fill, h / 2) + text(-w / 2 + h * 0.35, 0, c.label, size, p.ink, "start")
+        + circ(w / 2 - h * 0.45 + dx * 0.5, dy * 0.5, r, p.ink) + circ(w / 2 - h * 0.45, 0, r, p.on) + text(w / 2 - h * 0.45, 0, String(Math.round(c.st * 9)), r * 1.2, p.ink);
     },
     field(bw, bh, c, fill) {
-      const [w, h] = fit(bw, bh, 3), on = c.st > 0.5, pad = h * 0.3, size = h * 0.4;
-      const tw = c.label.length * size * 0.62;          // rough advance for the caret
+      const {w, h, size} = tbox(bw, bh, c.label, 0.5), on = c.st > 0.5, pad = h * 0.3;
       return box(w, h, fill) + text(-w / 2 + pad, 0, c.label, size, p.ink, "start")
-        + (on ? rect(-w / 2 + pad + tw + sw, -h * 0.3, sw * 1.2, h * 0.6, p.accent, 0) : "");
+        + (on ? rect(-w / 2 + pad + measure(c.label, size) + sw, -h * 0.3, sw * 1.2, h * 0.6, p.accent, 0) : "");
     },
     dropdown(bw, bh, c, fill) {
-      const [w, h] = fit(bw, bh, 3), on = c.st > 0.5, pad = h * 0.3, ch = h * 0.18, cx = w / 2 - pad;
-      return box(w, h, fill) + text(-w / 2 + pad, 0, c.label, h * 0.4, p.ink, "start")
-        + `<polyline points="${f(cx - ch)},${f(on ? ch / 2 : -ch / 2)} ${f(cx)},${f(on ? -ch / 2 : ch / 2)} ${f(cx + ch)},${f(on ? ch / 2 : -ch / 2)}" fill="none" stroke-width="${f(sw * 1.4)}"/>`;
+      const {w, h, size} = tbox(bw, bh, c.label, 0.9), on = c.st > 0.5, pad = h * 0.3;
+      return box(w, h, fill) + text(-w / 2 + pad, 0, c.label, size, p.ink, "start") + chevron(w / 2 - pad, 0, h * 0.18, on);
     },
   };
 
@@ -418,18 +495,55 @@ const view = createZoom({
   onChange: z => { p.zoom = z; localStorage.setItem("switchboard", JSON.stringify(p)); },
 });
 function render() {
-  p.st = Array.from({length: p.cols * p.rows}, (_, i) => p.st[i] ?? 0);
+  const n = p.cols * p.rows;
+  p.st = Array.from({length: n}, (_, i) => p.st[i] ?? 0);
+  p.order = p.order.filter(i => i < n);
+  for (let i = 0; i < n; i++) if (!p.order.includes(i)) p.order.push(i);
   localStorage.setItem("switchboard", JSON.stringify(p));
   art = makeSVG();
   stage.innerHTML = art.svg;
-  for (const g of stage.querySelectorAll("g[data-i]")) g.style.cursor = "pointer";
+  for (const g of stage.querySelectorAll("g[data-i]")) g.style.cursor = "grab";
   view.apply();
 }
+
+// drag a widget onto another cell to swap the two; a press without movement is a click
+let drag = null, dragged = false;
+const toArt = e => {
+  const r = stage.querySelector("svg").getBoundingClientRect();
+  return {x: (e.clientX - r.left) / r.width * art.w, y: (e.clientY - r.top) / r.height * art.h};
+};
+stage.addEventListener("pointerdown", e => {
+  const g = e.target.closest("g[data-i]");
+  if (!g || view.panning || e.button !== 0) return;
+  const at = toArt(e);
+  drag = {g, i: +g.dataset.i, x0: at.x, y0: at.y, base: g.getAttribute("transform")};
+  dragged = false;
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener("pointermove", e => {
+  if (!drag) return;
+  const at = toArt(e), mx = at.x - drag.x0, my = at.y - drag.y0;
+  if (!dragged && Math.hypot(mx, my) < art.w * 0.005) return;   // dead zone: still a click
+  if (!dragged) { dragged = true; drag.g.parentNode.append(drag.g); }  // raise above siblings
+  drag.g.setAttribute("transform", `translate(${mx.toFixed(1)} ${my.toFixed(1)}) ${drag.base}`);
+});
+stage.addEventListener("pointerup", e => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (!dragged) return;                              // the click handler takes it from here
+  const at = toArt(e);
+  const col = Math.max(0, Math.min(p.cols - 1, Math.floor(at.x / (art.w / p.cols))));
+  const row = Math.max(0, Math.min(p.rows - 1, Math.floor(at.y / (art.h / p.rows))));
+  const to = row * p.cols + col, from = p.order.indexOf(d.i);
+  [p.order[to], p.order[from]] = [p.order[from], p.order[to]];   // snap: swap slots
+  render();
+});
+stage.addEventListener("pointercancel", () => { drag = null; dragged = false; });
 
 // click a widget: flip / step its state, then push it along outgoing wires
 stage.addEventListener("click", e => {
   const g = e.target.closest("g[data-i]");
-  if (!g || view.panning) return;
+  if (!g || view.panning || dragged) return;
   const i = +g.dataset.i;
   p.st[i] = BINARY.has(art.kinds[i]) ? (p.st[i] > 0.5 ? 0 : 1) : (p.st[i] + 0.25) % 1.25;
   if (p.propagate !== "none") {
