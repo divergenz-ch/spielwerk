@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Switchboard — interconnected UI elements</title>
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  body { font: 13px/1.4 system-ui, sans-serif; margin: 0; display: flex; background: #e9e7e2; }
+  #panel { width: 264px; margin: 16px; padding: 14px 18px; background: #fff; border-radius: 8px;
+           box-shadow: 0 2px 12px rgba(0,0,0,.15); box-sizing: border-box; flex-shrink: 0;
+           align-self: flex-start; max-height: calc(100vh - 32px); overflow-y: auto; }
+  #panel label { display: grid; grid-template-columns: 90px 1fr 38px; align-items: center; margin: 10px 0; gap: 6px; }
+  #panel label span:first-child { color: #444; }
+  #panel input[type=range] { width: 100%; min-width: 0; margin: 0; }
+  #panel input[type=color], #panel select, #panel input[type=checkbox] { justify-self: end; grid-column: 2 / 4; }
+  #panel input[type=text] { grid-column: 2 / 4; min-width: 0; box-sizing: border-box; font: inherit; }
+  #panel output { text-align: right; font-variant-numeric: tabular-nums; }
+  #stage { flex: 1; display: flex; overflow: auto; padding: 32px; }
+  #stage svg { display: block; margin: auto; flex-shrink: 0; box-shadow: 0 4px 24px rgba(0,0,0,.18); }
+  #panel input[type=number] { width: 58px; box-sizing: border-box; font: inherit; }
+  #viewbox { position: fixed; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px;
+             background: #fff; border-radius: 8px; padding: 8px 12px; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
+  #viewbox span { color: #444; }
+  #viewbox select { font: inherit; padding: 3px 6px; }
+  .btns { display: flex; gap: 8px; margin-top: 16px; }
+  .btns a { flex: 1; text-align: center; padding: 7px 0; border-radius: 8px; background: #3b82f6; color: #fff; text-decoration: none; cursor: pointer; }
+  .btns select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
+  h1 { font-size: 14px; margin: 0 0 6px; }
+  #panel details { border-top: 1px solid #eee; }
+  #panel details > label:last-child { margin-bottom: 12px; }
+  #panel summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+                   padding: 7px 0; color: #888; font: 600 11px/1 system-ui; letter-spacing: .07em; text-transform: uppercase; }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary::after { content: "+"; font-size: 13px; }
+  #panel details[open] summary::after { content: "\2212"; }
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="mobile.css">
+<body>
+<div id="panel">
+  <h1>Switchboard</h1>
+  <div id="controls"></div>
+  <div class="btns">
+    <select id="fmt" title="file type"></select>
+    <a id="dl">⬇ export</a>
+    <a id="dldir" title="choose export folder">📁 …</a>
+  </div>
+</div>
+<div id="stage"></div>
+<div id="viewbox">
+  <span>view</span>
+  <select id="zoom">
+    <option value="fit">scale to fit</option>
+    <option>10%</option><option>25%</option><option>50%</option><option>75%</option>
+    <option>100%</option><option>150%</option><option>200%</option>
+  </select>
+</div>
+<script src="export.js"></script>
+<script src="zoom.js"></script>
+<script src="mobile.js"></script>
+<script src="sliders.js"></script>
+<script src="fontpick.js"></script>
+<script>
+// ---------- parameters ----------
+// A ["", "group", …] row opens a new collapsible section; rows after it land in it.
+const DEFS = [
+  ["", "group", {label: "grid"}],
+  ["seed",    "range", {min: 1, max: 9999, step: 1, value: 42}],
+  ["cols",    "range", {min: 2, max: 12, step: 1, value: 5, label: "columns"}],
+  ["rows",    "range", {min: 2, max: 16, step: 1, value: 7, label: "rows"}],
+  ["gap",     "range", {min: 0, max: 60, step: 2, value: 24, label: "gap %"}],
+  ["jitter",  "range", {min: 0, max: 100, step: 5, value: 0, label: "size jitter %"}],
+  ["buttons", "checkbox", {value: true, label: "buttons"}],
+  ["dials",   "checkbox", {value: true, label: "sliders + knobs"}],
+  ["lights",  "checkbox", {value: true, label: "lights + meters"}],
+  ["form",    "checkbox", {value: true, label: "form widgets"}],
+  ["labels",  "text",  {value: "ON,OFF,SEND,OK,RUN,A,B,MUTE,ARM,SYNC", label: "labels"}],
+  ["", "group", {label: "look"}],
+  ["stroke",  "range", {min: 1, max: 24, step: 1, value: 6, label: "stroke px"}],
+  ["radius",  "range", {min: 0, max: 60, step: 2, value: 8, label: "corner px"}],
+  ["shadow",  "range", {min: 0, max: 40, step: 1, value: 10, label: "shadow px"}],
+  ["paper",   "color", {value: "#f4f1ea", label: "paper"}],
+  ["ink",     "color", {value: "#111111", label: "ink"}],
+  ["on",      "color", {value: "#ffd400", label: "on"}],
+  ["accent",  "color", {value: "#ff4d2e", label: "link tint"}],
+  ["", "group", {label: "links"}],
+  ["links",   "range", {min: 0, max: 60, step: 1, value: 12, label: "links"}],
+  ["effect",  "select", {options: ["colour", "size", "colour + size"], value: "colour + size", label: "link effect"}],
+  ["strength","range", {min: 0, max: 100, step: 5, value: 70, label: "strength %"}],
+  ["propagate","select", {options: ["none", "copy", "invert"], value: "copy", label: "propagate state"}],
+  ["wires",   "checkbox", {value: true, label: "draw wires"}],
+  ["wire",    "select", {options: ["straight", "elbow", "curve"], value: "curve", label: "wire style"}],
+  ["wirepx",  "range", {min: 1, max: 20, step: 1, value: 4, label: "wire px"}],
+  ["", "group", {label: "motion"}],
+  ["motion",  "select", {options: ["none", "flow"], value: "flow"}],
+  ["secs",    "range", {min: 1, max: 20, step: 1, value: 4, label: "cycle secs"}],
+  ["", "group", {label: "export"}],
+  ["fps",     "range", {min: 5, max: 30, step: 1, value: 20, label: "gif fps"}],
+  ["gifpx",   "range", {min: 200, max: 1000, step: 50, value: 600, label: "gif px"}]
+];
+const p = {};
+const saved = JSON.parse(localStorage.getItem("switchboard") || "{}");
+const controls = document.getElementById("controls");
+
+// ---------- collapsible groups ----------
+// Native <details>: no toggle state machine, and open/closed rides along in the
+// same saved blob as every other parameter.
+p.open = saved.open || {};
+let cur = controls;
+const groups = {};
+const group = name => cur = groups[name] ??= (() => {
+  const d = document.createElement("details");
+  d.open = p.open[name] ?? name === "grid";
+  d.innerHTML = `<summary>${name}</summary>`;
+  d.addEventListener("toggle", () => {
+    p.open[name] = d.open;
+    localStorage.setItem("switchboard", JSON.stringify(p));
+  });
+  controls.append(d);
+  return d;
+})();
+
+// ---------- artboard size (exact pixels) ----------
+p.wpx = +saved.wpx || 1500;
+p.hpx = +saved.hpx || 2000;
+{
+  const wIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.wpx});
+  const hIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.hpx});
+  const preset = document.createElement("select");
+  for (const o of ["custom", "2:3", "3:4", "4:5", "1:1", "9:16"]) preset.append(new Option(o, o));
+  const swap = Object.assign(document.createElement("button"), {textContent: "⇄", title: "swap width/height"});
+  swap.style.cssText = "font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer";
+  p.lock = saved.lock ?? false;
+  const lock = Object.assign(document.createElement("button"), {title: "lock aspect ratio"});
+  lock.style.cssText = "font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer";
+  const drawLock = () => { lock.textContent = p.lock ? "🔒" : "🔓"; lock.style.background = p.lock ? "#eef" : "#fff"; };
+  drawLock();
+  lock.addEventListener("click", () => { p.lock = !p.lock; drawLock(); localStorage.setItem("switchboard", JSON.stringify(p)); });
+
+  const sizeRow = document.createElement("label");
+  sizeRow.style.cssText = "display:flex;justify-content:space-between;align-items:center";
+  sizeRow.innerHTML = "<span>artboard px</span>";
+  const sizeBox = document.createElement("span");
+  sizeBox.style.cssText = "display:flex;align-items:center;gap:4px";
+  sizeBox.append(wIn, "×", hIn, lock);
+  sizeRow.append(sizeBox);
+
+  const presetRow = document.createElement("label");
+  presetRow.innerHTML = "<span>aspect</span>";
+  const presetBox = document.createElement("span");
+  presetBox.style.cssText = "display:flex;align-items:center;gap:6px;grid-column:2/4;justify-self:end";
+  presetBox.append(preset, swap);
+  presetRow.append(presetBox);
+
+  let ratio = p.hpx / p.wpx;                     // locked aspect, frozen at lock time
+  lock.addEventListener("click", () => { if (p.lock) ratio = p.hpx / p.wpx; });
+  const apply = soft => {
+    p.wpx = Math.max(100, Math.min(8000, +wIn.value || p.wpx));
+    p.hpx = Math.max(100, Math.min(8000, +hIn.value || p.hpx));
+    if (!soft) { wIn.value = p.wpx; hIn.value = p.hpx; ratio = p.hpx / p.wpx; }
+    render();                                    // render() persists — saves on every keystroke
+  };
+  const onEdit = (src, other, factor) => soft => {
+    if (p.lock) other.value = Math.round((+src.value || 100) * factor());
+    else preset.value = "custom";
+    apply(soft);
+  };
+  const wEdit = onEdit(wIn, hIn, () => ratio), hEdit = onEdit(hIn, wIn, () => 1 / ratio);
+  wIn.addEventListener("input", () => wEdit(true));    // live: saves while typing, no clamp-fight
+  wIn.addEventListener("change", () => wEdit(false));  // commit: normalize the field
+  hIn.addEventListener("input", () => hEdit(true));
+  hIn.addEventListener("change", () => hEdit(false));
+  preset.addEventListener("input", () => {
+    if (preset.value === "custom") return;
+    const [a, b] = preset.value.split(":").map(Number);
+    hIn.value = Math.round(p.wpx * b / a);   // width is the anchor
+    apply();
+  });
+  swap.addEventListener("click", () => {
+    [wIn.value, hIn.value] = [hIn.value, wIn.value];
+    preset.value = "custom";
+    apply();
+  });
+  group("artboard").append(sizeRow, presetRow);
+}
+
+for (const [key, type, opt] of DEFS) {
+  if (type === "group") { group(opt.label); continue; }
+  p[key] = key in saved ? saved[key] : opt.value;
+  const label = document.createElement("label");
+  const name = document.createElement("span");
+  name.textContent = opt.label || key;
+  label.append(name);
+  let input;
+  if (type === "select") {
+    input = document.createElement("select");
+    for (const o of opt.options) input.append(new Option(o, o, o === p[key], o === p[key]));
+  } else {
+    input = document.createElement("input");
+    input.type = type;
+    if (type === "range") { Object.assign(input, {min: opt.min, max: opt.max, step: opt.step}); input.dataset.def = opt.value; }
+    if (type === "checkbox") input.checked = p[key]; else input.value = p[key];
+  }
+  label.append(input);
+  let out;
+  if (type === "range") { out = document.createElement("output"); out.value = p[key]; label.append(out); }
+  input.addEventListener("input", () => {
+    p[key] = type === "range" ? +input.value : type === "checkbox" ? input.checked : input.value;
+    if (out) out.value = input.value;
+    render();
+  });
+  cur.append(label);
+}
+
+
+// custom typeface for widget labels — FontFace renders it live, and the data:
+// URL is embedded as an @font-face in the SVG so exports keep the face
+const userFont = fontPicker({onChange: () => render()});
+group("grid").append(userFont.row);
+
+// per-widget state 0..1, persisted in the same blob; resized to the grid on every render
+p.st = Array.isArray(saved.st) ? saved.st : [];
+{
+  const row = document.createElement("label");
+  row.style.cssText = "display:flex;gap:6px";
+  const btn = (text, fn) => {
+    const b = Object.assign(document.createElement("button"), {textContent: text});
+    b.style.cssText = "flex:1;font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer;padding:4px";
+    b.addEventListener("click", fn);
+    return b;
+  };
+  row.append(
+    btn("randomise states", () => { const r = mulberry32(p.seed * 7 + 1); p.st = p.st.map(() => Math.round(r() * 4) / 4); render(); }),
+    btn("all off", () => { p.st = p.st.map(() => 0); render(); }));
+  group("links").append(row);
+}
+
+// ---------- generator ----------
+function mulberry32(s) {
+  return () => {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const FAMILY = {
+  buttons: ["button", "toggle", "checkbox"],
+  dials:   ["slider", "knob"],
+  lights:  ["led", "meter", "counter"],
+  form:    ["chip", "field", "dropdown"],
+};
+// binary kinds flip on click; the rest step through 0 … 1 in quarters
+const BINARY = new Set(["button", "toggle", "checkbox", "led", "chip", "field", "dropdown"]);
+
+const f = n => +n.toFixed(2);
+const esc = s => s.replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+const mix = (a, b, t) => "#" + hex(a).map((v, i) => Math.round(v + (hex(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
+// largest w×h of aspect a that fits the box
+const fit = (bw, bh, a) => { let w = bw, h = w / a; if (h > bh) { h = bh; w = h * a; } return [w, h]; };
+
+// time === null → live SMIL animation. A number bakes that instant statically
+// (GIF frames), so both paths share one generator.
+function makeSVG(time = null) {
+  const W = p.wpx, H = p.hpx, n = p.cols * p.rows;
+  const rnd = mulberry32(p.seed);
+  const sw = p.stroke, dx = p.shadow, dy = p.shadow;
+  const strength = p.strength / 100;
+  const tint = p.effect !== "size", grow = p.effect !== "colour";
+  const kinds = Object.keys(FAMILY).filter(k => p[k]).flatMap(k => FAMILY[k]);
+  const allKinds = kinds.length ? kinds : Object.values(FAMILY).flat();
+  const labels = p.labels.split(",").map(s => s.trim()).filter(Boolean);
+  if (!labels.length) labels.push("ON");
+  const fam = userFont.font.family
+    ? `${userFont.font.family}, Helvetica, sans-serif`
+    : "Helvetica Neue, Helvetica, Arial, sans-serif";
+  const fontDefs = userFont.font.dataURL
+    ? `<defs><style>@font-face{font-family:"${userFont.font.family}";src:url(${userFont.font.dataURL});}</style></defs>`
+    : "";
+
+  // cells: fixed random draws per widget so the stream stays aligned whatever options are set
+  const cw = W / p.cols, ch = H / p.rows;
+  const cells = [];
+  for (let i = 0; i < n; i++) {
+    const rKind = rnd(), rLabel = rnd(), rJit = rnd();
+    cells.push({
+      kind: allKinds[Math.floor(rKind * allKinds.length)],
+      label: labels[Math.floor(rLabel * labels.length)],
+      size: 1 - rJit * p.jitter / 100 * 0.6,
+      cx: (i % p.cols + 0.5) * cw, cy: (Math.floor(i / p.cols) + 0.5) * ch,
+      st: p.st[i] ?? 0,
+    });
+  }
+  // links: own stream, so link count never reshuffles the widgets
+  const rl = mulberry32(p.seed ^ 0x9e37);
+  const links = [], seen = new Set();
+  for (let k = 0; k < p.links; k++) {
+    const a = Math.floor(rl() * n), b = Math.floor(rl() * n);
+    if (a === b || seen.has(a * n + b)) continue;
+    seen.add(a * n + b); links.push([a, b]);
+  }
+  // incoming influence per widget = mean state of its sources
+  const mod = cells.map(() => ({sum: 0, k: 0}));
+  for (const [a, b] of links) { mod[b].sum += cells[a].st; mod[b].k++; }
+  cells.forEach((c, i) => c.mod = mod[i].k ? mod[i].sum / mod[i].k * strength : 0);
+
+  // ---- wires (under the widgets) ----
+  const wires = [];
+  if (p.wires) {
+    const dash = p.wirepx * 3, period = dash * 2, loops = 4;
+    const offset = time === null ? 0 : -(time / p.secs) * period * loops;
+    const anim = p.motion === "flow" && time === null
+      ? `<animate attributeName="stroke-dashoffset" from="0" to="${f(-period * loops)}" dur="${p.secs}s" repeatCount="indefinite"/>` : "";
+    for (const [a, b] of links) {
+      const A = cells[a], B = cells[b], on = A.st > 0.5;
+      let d;
+      if (p.wire === "straight") d = `M${f(A.cx)} ${f(A.cy)}L${f(B.cx)} ${f(B.cy)}`;
+      else if (p.wire === "elbow") d = `M${f(A.cx)} ${f(A.cy)}H${f(B.cx)}V${f(B.cy)}`;
+      else {
+        const mx = (A.cx + B.cx) / 2, my = (A.cy + B.cy) / 2, vx = B.cx - A.cx, vy = B.cy - A.cy;
+        d = `M${f(A.cx)} ${f(A.cy)}Q${f(mx - vy * 0.3)} ${f(my + vx * 0.3)} ${f(B.cx)} ${f(B.cy)}`;
+      }
+      wires.push(`<path d="${d}" fill="none" stroke="${on ? p.on : p.ink}" stroke-width="${p.wirepx}" stroke-linecap="round"`
+        + (on ? ` stroke-dasharray="${f(dash)} ${f(dash)}" stroke-dashoffset="${f(offset)}">${anim}</path>` : "/>"));
+    }
+  }
+
+  // ---- widget renderers: local coords, origin at the widget centre ----
+  const rect = (x, y, w, h, fill, rx = p.radius) =>
+    `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" rx="${f(rx)}" fill="${fill}"/>`;
+  const box = (w, h, fill, rx = p.radius) => rect(-w / 2 + dx, -h / 2 + dy, w, h, p.ink, rx) + rect(-w / 2, -h / 2, w, h, fill, rx);
+  const circ = (cx, cy, r, fill) => `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="${fill}"/>`;
+  const disc = (r, fill) => circ(dx, dy, r, p.ink) + circ(0, 0, r, fill);
+  const text = (x, y, s, size, fill, anchor = "middle") =>
+    `<text x="${f(x)}" y="${f(y)}" font-family="${fam}" font-weight="700" font-size="${f(size)}" fill="${fill}" `
+    + `stroke="none" text-anchor="${anchor}" dominant-baseline="central">${esc(s)}</text>`;
+  const draw = {
+    button(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 2.2), on = c.st > 0.5;
+      // pressed = sunk into its own shadow
+      return (on ? `<g transform="translate(${f(dx)} ${f(dy)})">${rect(-w / 2, -h / 2, w, h, fill)}</g>` : box(w, h, fill))
+        + text(on ? dx : 0, on ? dy : 0, c.label, h * 0.42, p.ink);
+    },
+    toggle(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 2), on = c.st > 0.5, r = h / 2;
+      return box(w, h, fill, r) + circ(on ? w / 2 - r : r - w / 2, 0, r - sw, on ? p.ink : p.paper);
+    },
+    checkbox(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 1);
+      return box(w, h, fill) + (c.st > 0.5
+        ? `<polyline points="${f(-w * 0.3)},${f(0)} ${f(-w * 0.08)},${f(h * 0.25)} ${f(w * 0.32)},${f(-h * 0.28)}" fill="none" stroke-width="${f(sw * 1.8)}"/>` : "");
+    },
+    slider(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 4), th = h * 0.36, x = -w / 2 + h / 2 + c.st * (w - h);
+      return rect(-w / 2, -th / 2, w, th, fill, th / 2) + (c.st ? rect(-w / 2, -th / 2, x + w / 2, th, p.on, th / 2) : "") + box(h * 0.6, h, p.paper);
+    },
+    knob(bw, bh, c, fill) {
+      const r = Math.min(bw, bh) / 2, a = (-225 + 270 * c.st) * Math.PI / 180;
+      return disc(r, fill)
+        + `<line x1="0" y1="0" x2="${f(Math.cos(a) * r * 0.8)}" y2="${f(Math.sin(a) * r * 0.8)}" stroke-width="${f(sw * 1.6)}"/>`
+        + circ(Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8, sw * 1.2, c.st > 0 ? p.on : p.ink);
+    },
+    led(bw, bh, c, fill) {
+      return disc(Math.min(bw, bh) * 0.35, c.st > 0.5 ? p.on : fill);
+    },
+    meter(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 1.6), k = 6, pad = h * 0.12, bh2 = (h - pad * 2), bw2 = (w - pad * 2) / k;
+      let s = box(w, h, fill);
+      for (let j = 0; j < k; j++)
+        s += rect(-w / 2 + pad + j * bw2 + pad * 0.25, -h / 2 + pad, bw2 - pad * 0.5, bh2, (j + 0.5) / k <= c.st ? p.on : p.paper, 0);
+      return s;
+    },
+    counter(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 1.8);
+      return box(w, h, fill) + text(0, 0, String(Math.round(c.st * 99)).padStart(2, "0"), h * 0.6, p.ink);
+    },
+    chip(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 2.6);
+      return box(w, h, fill, h / 2) + text(0, 0, c.label, h * 0.4, p.ink);
+    },
+    field(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 3), on = c.st > 0.5, pad = h * 0.3, size = h * 0.4;
+      const tw = c.label.length * size * 0.62;          // rough advance for the caret
+      return box(w, h, fill) + text(-w / 2 + pad, 0, c.label, size, p.ink, "start")
+        + (on ? rect(-w / 2 + pad + tw + sw, -h * 0.3, sw * 1.2, h * 0.6, p.accent, 0) : "");
+    },
+    dropdown(bw, bh, c, fill) {
+      const [w, h] = fit(bw, bh, 3), on = c.st > 0.5, pad = h * 0.3, ch = h * 0.18, cx = w / 2 - pad;
+      return box(w, h, fill) + text(-w / 2 + pad, 0, c.label, h * 0.4, p.ink, "start")
+        + `<polyline points="${f(cx - ch)},${f(on ? ch / 2 : -ch / 2)} ${f(cx)},${f(on ? -ch / 2 : ch / 2)} ${f(cx + ch)},${f(on ? ch / 2 : -ch / 2)}" fill="none" stroke-width="${f(sw * 1.4)}"/>`;
+    },
+  };
+
+  const widgets = cells.map((c, i) => {
+    const bw = cw * (1 - p.gap / 100) * c.size, bh = ch * (1 - p.gap / 100) * c.size;
+    const base = BINARY.has(c.kind) && c.st > 0.5 ? p.on : p.paper;
+    const fill = tint ? mix(base, p.accent, c.mod) : base;
+    const s = grow ? 1 + 0.4 * c.mod : 1;
+    return `<g data-i="${i}" transform="translate(${f(c.cx)} ${f(c.cy)}) scale(${f(s)})">${draw[c.kind](bw, bh, c, fill)}</g>`;
+  });
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
+    + fontDefs + `<rect width="${W}" height="${H}" fill="${p.paper}"/>`
+    + wires.join("")
+    + `<g stroke="${p.ink}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round">${widgets.join("")}</g>`
+    + `</svg>`;
+  return {w: W, h: H, svg, kinds: cells.map(c => c.kind), links};
+}
+
+// ---------- render + export ----------
+const stage = document.getElementById("stage");
+const zoomEl = document.getElementById("zoom");
+p.zoom = saved.zoom === "fit" || typeof saved.zoom === "number" ? saved.zoom : "fit";
+let art;
+const view = createZoom({
+  stage, select: zoomEl, zoom: p.zoom,
+  size: () => ({w: art.w, h: art.h}),
+  onChange: z => { p.zoom = z; localStorage.setItem("switchboard", JSON.stringify(p)); },
+});
+function render() {
+  p.st = Array.from({length: p.cols * p.rows}, (_, i) => p.st[i] ?? 0);
+  localStorage.setItem("switchboard", JSON.stringify(p));
+  art = makeSVG();
+  stage.innerHTML = art.svg;
+  for (const g of stage.querySelectorAll("g[data-i]")) g.style.cursor = "pointer";
+  view.apply();
+}
+
+// click a widget: flip / step its state, then push it along outgoing wires
+stage.addEventListener("click", e => {
+  const g = e.target.closest("g[data-i]");
+  if (!g || view.panning) return;
+  const i = +g.dataset.i;
+  p.st[i] = BINARY.has(art.kinds[i]) ? (p.st[i] > 0.5 ? 0 : 1) : (p.st[i] + 0.25) % 1.25;
+  if (p.propagate !== "none") {
+    const seen = new Set([i]);                     // visited set: cycles terminate
+    const walk = a => {
+      for (const [s, d] of art.links) if (s === a && !seen.has(d)) {
+        seen.add(d);
+        p.st[d] = p.propagate === "copy" ? p.st[a] : 1 - p.st[a];
+        walk(d);
+      }
+    };
+    walk(i);
+  }
+  render();
+});
+
+async function exportGIF(setLabel) {
+  const scale = Math.min(1, p.gifpx / Math.max(art.w, art.h));
+  const w = Math.round(art.w * scale), h = Math.round(art.h * scale);
+  // one full loop of the wire flow; static art is a single frame
+  const n = p.motion === "none" ? 1 : Math.max(1, Math.round(p.secs * p.fps));
+  const frames = [];
+  try {
+    for (let i = 0; i < n; i++) {
+      setLabel(`… ${i + 1}/${n}`);
+      await new Promise(r => setTimeout(r));           // let the label repaint
+      frames.push(await rasterise(makeSVG(i / n * p.secs).svg, w, h));
+    }
+    setLabel("… encoding");
+    await new Promise(r => setTimeout(r));
+    const blob = encodeGIF(frames, {width: w, height: h, delay: Math.max(2, Math.round(100 / p.fps))});
+    await saveAs(`switchboard-${p.seed}.gif`, blob);
+  } finally {
+    render();                                          // restore the live SVG
+  }
+}
+
+wireExport({
+  SVG: () => saveAs(`switchboard-${p.seed}.svg`, svgBlob(art.svg)),
+  PNG: async () => saveAs(`switchboard-${p.seed}.png`, await svgToPNG(art.svg, art.w, art.h)),
+  GIF: exportGIF,
+});
+
+render();
+
+// self-check: deterministic output for fixed params
+console.assert(makeSVG().svg === makeSVG().svg, "generator must be deterministic");
+</script>
+</body>
+</html>
