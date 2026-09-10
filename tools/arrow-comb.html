@@ -233,11 +233,6 @@ function makeSVG(time = null) {
   const loop = p.motion === "draw loop";
   const m = Math.max(0.05, 1 - p.hold / 100);    // reveal ends at m of the cycle
   const F = {"ease out": x => 1 - (1 - x) ** 3, "linear": x => x, "snap": x => x >= 1 ? 1 : 0};
-  const CURVE = {
-    "ease out": ` calcMode="spline" keySplines=".16 1 .3 1;0 0 1 1"`,
-    "linear":   ` calcMode="linear"`,
-    "snap":     ` calcMode="discrete"`
-  };
   const progress = (ph, t) => {
     let c = t / p.speed + (loop ? ph : -ph);
     c = loop ? c - Math.floor(c) : clamp(c, 0, 1);
@@ -315,31 +310,67 @@ function makeSVG(time = null) {
         L2.push([pts[k][0] + ty / tl * wh, pts[k][1] - tx / tl * wh]);
       }
       const shaft = "M" + P(L1.concat(L2.reverse())) + "Z";
-      const head = "M" + P([[u0, 0], [u0 - headW / 2, headL], [u0 + headW / 2, headL]]) + "Z";
+      // the head rides the centerline tail → tip: a local triangle pointing +x,
+      // carried by animateMotion (live) or a baked transform, while a synced
+      // dash wipe on the same path reveals the shaft behind it — declarative,
+      // so exports stay animated
+      const rp = [...pts].reverse().map(pt => map(pt));      // tail → head base, poster coords
+      const dPath = "M" + rp.map(([x, y]) => f(x) + " " + f(y)).join("L");
+      const cum = [0];
+      for (let k = 1; k < rp.length; k++)
+        cum.push(cum[k - 1] + Math.hypot(rp[k][0] - rp[k - 1][0], rp[k][1] - rp[k - 1][1]));
+      const Lh = f(cum[cum.length - 1]);
+      const pose = r => {                                    // position + tangent at fraction r
+        const s = clamp(r, 0, 1) * Lh;
+        let i = 1;
+        while (i < cum.length - 1 && cum[i] < s) i++;
+        const [ax, ay] = rp[i - 1], [bx, by] = rp[i];
+        const t = (s - cum[i - 1]) / (cum[i] - cum[i - 1] || 1);
+        return `translate(${f(ax + (bx - ax) * t)} ${f(ay + (by - ay) * t)})`
+          + ` rotate(${f(Math.atan2(by - ay, bx - ax) * 180 / Math.PI)})`;
+      };
+      const hd = `M${f(-0.2 * headL)} ${f(-headW / 2)}L${f(0.8 * headL)} 0L${f(-0.2 * headL)} ${f(headW / 2)}Z`;
 
-      // motion: the arrow is revealed tail → tip by a dash wipe on a masked
-      // stroke along its own centerline — declarative, so exports stay animated
-      let pre = "", attr = "";
-      if (p.motion !== "none") {
+      let pre = "", attr = "", headEl;
+      if (p.motion === "none") {
+        headEl = `<path d="${hd}" transform="${pose(1)}"/>`;
+      } else {
         const ph = (p.stagger / 100) * ((bi + q) / nb);
-        const cl = [...pts].reverse().concat([[u0, -0.2 * headL]]);   // tail → past the tip
-        let L = 0;
-        for (let k = 1; k < cl.length; k++) L += Math.hypot(cl[k][0] - cl[k - 1][0], cl[k][1] - cl[k - 1][1]);
-        L = f(L);
-        const mw = f(Math.max(thick, headW) * 1.3);
-        let anim = "", off = L;
-        if (time === null) {
-          anim = `<animate attributeName="stroke-dashoffset" values="${L};0;0" keyTimes="0;${f(m)};1"`
-            + ` dur="${f(p.speed)}s" begin="${f((loop ? -1 : 1) * ph * p.speed)}s"`
-            + (loop ? ` repeatCount="indefinite"` : ` fill="freeze"`) + CURVE[p.timing] + `/>`;
-        } else off = f(L * (1 - progress(ph, time)));
+        const mw = f(thick * 1.5);
         const id = "ac" + mid++;
-        pre = `<mask id="${id}"><path d="M${P(cl)}" fill="none" stroke="#fff" stroke-width="${mw}"`
-          + ` stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${L}"`
-          + ` stroke-dashoffset="${off}">${anim}</path></mask>`;
         attr = ` mask="url(#${id})"`;
+        let off = Lh;
+        if (time === null) {
+          // one shared timing for the dash wipe and the travelling head; draw-in
+          // folds its stagger into the keyTimes so the head waits at the tail
+          const T = loop ? p.speed : p.speed * (1 + p.stagger / 100);
+          const kt = loop ? [0, m, 1]
+            : [0, ph * p.speed / T, Math.min(1, (ph + m) * p.speed / T), 1];
+          const seg = loop ? [1, 0] : [0, 1, 0];             // which segment is the reveal
+          const SPL = {"ease out": ".16 1 .3 1", "linear": "0 0 1 1"};
+          const calc = p.timing === "snap" ? ` calcMode="discrete"`
+            : ` calcMode="spline" keySplines="${seg.map(s2 => s2 ? SPL[p.timing] : "0 0 1 1").join(";")}"`;
+          const tm = ` keyTimes="${kt.map(k => +k.toFixed(4)).join(";")}" dur="${f(T)}s"`
+            + ` begin="${loop ? f(-ph * p.speed) : 0}s"`
+            + (loop ? ` repeatCount="indefinite"` : ` fill="freeze"`) + calc;
+          pre = `<mask id="${id}"><path d="${dPath}" fill="none" stroke="#fff" stroke-width="${mw}"`
+            + ` stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${Lh}"`
+            + ` stroke-dashoffset="${Lh}"><animate attributeName="stroke-dashoffset"`
+            + ` values="${loop ? `${Lh};0;0` : `${Lh};${Lh};0;0`}"${tm}/></path></mask>`;
+          headEl = `<path d="${hd}"><animateMotion path="${dPath}" rotate="auto"`
+            + ` keyPoints="${loop ? "0;1;1" : "0;0;1;1"}"${tm}/></path>`;
+        } else {
+          const r = progress(ph, time);
+          off = f(Lh * (1 - r));
+          pre = `<mask id="${id}"><path d="${dPath}" fill="none" stroke="#fff" stroke-width="${mw}"`
+            + ` stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${Lh}"`
+            + ` stroke-dashoffset="${off}"/></mask>`;
+          headEl = `<path d="${hd}" transform="${pose(r)}"/>`;
+        }
       }
-      parts.push(pre + `<g fill="${p.ink}"${attr}><path d="${shaft}"/><path d="${head}"/></g>`);
+      parts.push(pre + `<g fill="${p.ink}">`
+        + (attr ? `<g${attr}><path d="${shaft}"/></g>` : `<path d="${shaft}"/>`)
+        + headEl + `</g>`);
     }
   }
 
