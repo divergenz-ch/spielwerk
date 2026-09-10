@@ -31,6 +31,13 @@
   .btns a { flex: 1; text-align: center; padding: 7px 0; border-radius: 8px; background: #3b82f6; color: #fff; text-decoration: none; cursor: pointer; }
   .btns select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
   h1 { font-size: 14px; margin: 0 0 6px; }
+  #panel details { border-top: 1px solid #eee; }
+  #panel details > label:last-child { margin-bottom: 12px; }
+  #panel summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+                   padding: 7px 0; color: #888; font: 600 11px/1 system-ui; letter-spacing: .07em; text-transform: uppercase; }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary::after { content: "+"; font-size: 13px; }
+  #panel details[open] summary::after { content: "\2212"; }
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="mobile.css">
@@ -61,7 +68,9 @@
 <script>
 // ---------- parameters ----------
 // 4th element ties a control to one filter; untagged controls are always visible.
+// A ["", "group", …] row opens a new collapsible section; rows after it land in it.
 const DEFS = [
+  ["", "group", {label: "type"}],
   ["text",     "textarea", {value: "Cinetype", label: "string"}],
   ["size",     "range",  {min: 2, max: 4000, step: 1, value: 300, label: "font size px"}],
   ["lineh",    "range",  {min: 20, max: 400, step: 1, value: 100, label: "line height %"}],
@@ -71,6 +80,7 @@ const DEFS = [
   ["gapx",     "range",  {min: 0, max: 300, step: 5, value: 0, label: "word gap %"}],
   ["basex",    "range",  {min: -100, max: 100, step: 1, value: 0, label: "baseline x %"}],
   ["basey",    "range",  {min: -100, max: 100, step: 1, value: 0, label: "baseline y %"}],
+  ["", "group", {label: "filter"}],
   ["filter",   "select", {options: ["simplify", "centerline"], value: "simplify", label: "filter"}],
   ["simplify", "range",  {min: 0, max: 100, step: 1, value: 30, label: "simplify"}, "simplify"],
   ["spacing",  "range",  {min: 4, max: 80, step: 1, value: 14, label: "spacing px"}, "centerline"],
@@ -80,12 +90,32 @@ const DEFS = [
   ["stampY",   "range",  {min: -60, max: 60, step: 1, value: 0, label: "stamp y px"}, "centerline"],
   ["orient",   "select", {options: ["along path", "upright"], value: "along path", label: "stamps"}, "centerline"],
   ["ghost",    "select", {options: ["hidden", "outline"], value: "outline", label: "original"}],
+  ["", "group", {label: "colour"}],
   ["ink",      "color",  {value: "#111111", label: "ink"}],
   ["paper",    "color",  {value: "#f4f2ee", label: "paper"}]
 ];
 const p = {};
 const saved = JSON.parse(localStorage.getItem("font-remixer") || "{}");
 const controls = document.getElementById("controls");
+
+// ---------- collapsible groups ----------
+// Native <details>: no toggle state machine, and open/closed rides along in the
+// same saved blob as every other parameter. Memoized: calling group("type")
+// again re-enters the existing section instead of creating a duplicate.
+p.open = saved.open || {};
+let cur = controls;
+const groups = {};
+const group = name => cur = groups[name] ??= (() => {
+  const d = document.createElement("details");
+  d.open = p.open[name] ?? name === "type";
+  d.innerHTML = `<summary>${name}</summary>`;
+  d.addEventListener("toggle", () => {
+    p.open[name] = d.open;
+    localStorage.setItem("font-remixer", JSON.stringify(p));
+  });
+  controls.append(d);
+  return d;
+})();
 
 // font file input + name readout (font itself is not persisted — too big for localStorage)
 {
@@ -98,7 +128,7 @@ const controls = document.getElementById("controls");
     try { setFont(opentype.parse(await inp.files[0].arrayBuffer())); }
     catch (e) { name.textContent = "could not parse: " + e.message; }
   });
-  controls.append(row);
+  group("type").append(row);
 }
 
 // ---------- artboard size (exact pixels) ----------
@@ -162,12 +192,13 @@ p.hpx = +saved.hpx || 1000;
     preset.value = "custom";
     apply();
   });
-  controls.append(sizeRow, presetRow);
+  group("artboard").append(sizeRow, presetRow);
 }
 
 let filterRow;                                    // the stamp picker slots in after this
 let textField;                                    // panel twin of the artboard text
 for (const [key, type, opt, flt] of DEFS) {
+  if (type === "group") { group(opt.label); continue; }
   p[key] = key in saved ? saved[key] : opt.value;
   if (type === "select" && !opt.options.includes(p[key])) p[key] = opt.value;
   const label = document.createElement("label");
@@ -198,7 +229,7 @@ for (const [key, type, opt, flt] of DEFS) {
     if (key === "filter") syncVis();
     render();
   });
-  controls.append(label);
+  cur.append(label);
   if (key === "filter") filterRow = label;
   if (key === "text") textField = input;
 }

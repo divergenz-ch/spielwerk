@@ -25,6 +25,13 @@
   .btns a { flex: 1; text-align: center; padding: 7px 0; border-radius: 8px; background: #3b82f6; color: #fff; text-decoration: none; cursor: pointer; }
   .btns select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
   h1 { font-size: 14px; margin: 0 0 6px; }
+  #panel details { border-top: 1px solid #eee; }
+  #panel details > label:last-child { margin-bottom: 12px; }
+  #panel summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+                   padding: 7px 0; color: #888; font: 600 11px/1 system-ui; letter-spacing: .07em; text-transform: uppercase; }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary::after { content: "+"; font-size: 13px; }
+  #panel details[open] summary::after { content: "\2212"; }
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="mobile.css">
@@ -51,12 +58,17 @@
 <script src="zoom.js"></script>
 <script src="mobile.js"></script>
 <script src="sliders.js"></script>
+<script src="fontpick.js"></script>
 <script>
 // ---------- parameters ----------
+// A ["", "group", …] row opens a new collapsible section; rows after it land in it.
 const DEFS = [
+  ["", "group", {label: "bands"}],
   ["seed",    "range", {min: 1, max: 9999, step: 1, value: 42}],
   ["bands",   "range", {min: 1, max: 8, step: 1, value: 4}],
   ["count",   "range", {min: 4, max: 60, step: 1, value: 22, label: "arrows across"}],
+  ["profile", "select", {options: ["mixed", "fan", "wave"], value: "mixed", label: "comb profile"}],
+  ["", "group", {label: "arrows"}],
   ["swing",   "range", {min: 0, max: 170, step: 5, value: 100, label: "tail swing °"}],
   ["curve",   "range", {min: 0.5, max: 4, step: 0.1, value: 1.8, label: "bend ease"}],
   ["len",     "range", {min: 20, max: 160, step: 5, value: 85, label: "length %"}],
@@ -65,24 +77,45 @@ const DEFS = [
   ["headL",   "range", {min: 20, max: 200, step: 5, value: 85, label: "head length %"}],
   ["headW",   "range", {min: 30, max: 200, step: 5, value: 95, label: "head width %"}],
   ["variety", "range", {min: 0, max: 100, step: 5, value: 35, label: "variety %"}],
-  ["profile", "select", {options: ["mixed", "fan", "wave"], value: "mixed", label: "comb profile"}],
+  ["", "group", {label: "text"}],
   ["textTop", "text", {value: "29.11.25|09–17h", label: "top row"}],
   ["textMid", "text", {value: "Arrow|Comb|2026", label: "middle row"}],
   ["textBot", "text", {value: "", label: "bottom row"}],
   ["textpx",  "range", {min: 20, max: 240, step: 2, value: 72, label: "text px"}],
+  ["", "group", {label: "colour"}],
   ["ink",     "color", {value: "#111111", label: "ink"}],
   ["paper",   "color", {value: "#ffffff", label: "paper"}],
+  ["", "group", {label: "motion"}],
   ["motion",  "select", {options: ["none", "draw in", "draw loop"], value: "draw loop"}],
   ["speed",   "range", {min: 0.5, max: 20, step: 0.5, value: 3, label: "cycle sec"}],
   ["hold",    "range", {min: 0, max: 90, step: 5, value: 35, label: "hold %"}],
   ["stagger", "range", {min: 0, max: 100, step: 5, value: 50, label: "stagger %"}],
   ["timing",  "select", {options: ["ease out", "linear", "snap"], value: "ease out"}],
+  ["", "group", {label: "export"}],
   ["fps",     "range", {min: 5, max: 30, step: 1, value: 20, label: "gif fps"}],
   ["gifpx",   "range", {min: 200, max: 1000, step: 50, value: 600, label: "gif px"}]
 ];
 const p = {};
 const saved = JSON.parse(localStorage.getItem("arrow-comb") || "{}");
 const controls = document.getElementById("controls");
+
+// ---------- collapsible groups ----------
+// Native <details>: no toggle state machine, and open/closed rides along in the
+// same saved blob as every other parameter.
+p.open = saved.open || {};
+let cur = controls;
+const groups = {};
+const group = name => cur = groups[name] ??= (() => {
+  const d = document.createElement("details");
+  d.open = p.open[name] ?? name === "bands";
+  d.innerHTML = `<summary>${name}</summary>`;
+  d.addEventListener("toggle", () => {
+    p.open[name] = d.open;
+    localStorage.setItem("arrow-comb", JSON.stringify(p));
+  });
+  controls.append(d);
+  return d;
+})();
 
 // ---------- artboard size (exact pixels) ----------
 p.wpx = +saved.wpx || 1500;
@@ -145,10 +178,11 @@ p.hpx = +saved.hpx || 2000;
     preset.value = "custom";
     apply();
   });
-  controls.append(sizeRow, presetRow);
+  group("artboard").append(sizeRow, presetRow);
 }
 
 for (const [key, type, opt] of DEFS) {
+  if (type === "group") { group(opt.label); continue; }
   p[key] = key in saved ? saved[key] : opt.value;
   const label = document.createElement("label");
   const name = document.createElement("span");
@@ -173,7 +207,7 @@ for (const [key, type, opt] of DEFS) {
     if (out) out.value = input.value;
     render();
   });
-  controls.append(label);
+  cur.append(label);
 }
 
 // direction mix checkboxes — which edges bands may point at
@@ -196,8 +230,13 @@ p.dirs = saved.dirs ?? ["up", "down"];
     box.append(l);
   }
   row.append(box);
-  controls.append(row);
+  group("bands").append(row);
 }
+
+// custom typeface for the text rows — FontFace renders it live, and the data:
+// URL is embedded as an @font-face in the SVG so exports keep the face
+const userFont = fontPicker({onChange: () => render()});
+group("text").append(userFont.row);
 
 // ---------- generator ----------
 // time === null → live SMIL animation. A number bakes that instant statically
@@ -252,7 +291,13 @@ function makeSVG(time = null) {
   const avail = Math.max(50, H - nText * textH);
   const sumW = bandsSpec.reduce((a, b) => a + b.w, 0);
 
-  const parts = [`<rect width="${W}" height="${H}" fill="${p.paper}"/>`];
+  const fam = userFont.font.family
+    ? `${userFont.font.family}, Helvetica, sans-serif`
+    : "Helvetica Neue, Helvetica, Arial, sans-serif";
+  const fontDefs = userFont.font.dataURL
+    ? `<defs><style>@font-face{font-family:"${userFont.font.family}";src:url(${userFont.font.dataURL});}</style></defs>`
+    : "";
+  const parts = [fontDefs + `<rect width="${W}" height="${H}" fill="${p.paper}"/>`];
   const textParts = [];                          // text draws on top of spilled tails
   let mid = 0;                                   // mask id counter
 
@@ -263,7 +308,7 @@ function makeSVG(time = null) {
       let x = mg, anchor = "start";
       if (segs.length > 1 && i === segs.length - 1) { x = W - mg; anchor = "end"; }
       else if (i > 0) { x = mg + (W - 2 * mg) * i / (segs.length - 1); anchor = "middle"; }
-      textParts.push(`<text x="${f(x)}" y="${cy}" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"`
+      textParts.push(`<text x="${f(x)}" y="${cy}" font-family="${fam}"`
         + ` font-size="${p.textpx}" font-weight="700" fill="${p.ink}" text-anchor="${anchor}"`
         + ` dominant-baseline="central">${esc(t)}</text>`);
     });

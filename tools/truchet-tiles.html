@@ -24,6 +24,13 @@
   .btns a { flex: 1; text-align: center; padding: 7px 0; border-radius: 8px; background: #3b82f6; color: #fff; text-decoration: none; cursor: pointer; }
   .btns select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
   h1 { font-size: 14px; margin: 0 0 6px; }
+  #panel details { border-top: 1px solid #eee; }
+  #panel details > label:last-child { margin-bottom: 12px; }
+  #panel summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+                   padding: 7px 0; color: #888; font: 600 11px/1 system-ui; letter-spacing: .07em; text-transform: uppercase; }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary::after { content: "+"; font-size: 13px; }
+  #panel details[open] summary::after { content: "\2212"; }
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="mobile.css">
@@ -52,13 +59,16 @@
 <script src="sliders.js"></script>
 <script>
 // ---------- parameters ----------
+// A ["", "group", …] row opens a new collapsible section; rows after it land in it.
 const DEFS = [
+  ["", "group", {label: "tiles"}],
   ["seed",   "range", {min: 1, max: 9999, step: 1, value: 42}],
   ["cols",   "range", {min: 2, max: 40, step: 1, value: 8, label: "tiles across"}],
   ["style",  "select", {options: ["arcs", "triangles", "10 PRINT", "mix"], value: "arcs"}],
   ["lines",  "range", {min: 1, max: 5, step: 1, value: 1, label: "arcs / corner"}],
   ["stroke", "range", {min: 5, max: 95, step: 1, value: 40, label: "stroke %"}],
   ["bias",   "range", {min: 0, max: 100, step: 5, value: 50, label: "turn bias %"}],
+  ["", "group", {label: "colour"}],
   ["ink",    "color", {value: "#1c1c1c", label: "ink"}],
   ["ink2",   "color", {value: "#e84f5e", label: "second ink"}],
   ["duo",    "range", {min: 0, max: 100, step: 5, value: 0, label: "second ink %"}],
@@ -67,6 +77,24 @@ const DEFS = [
 const p = {};
 const saved = JSON.parse(localStorage.getItem("truchet-tiles") || "{}");
 const controls = document.getElementById("controls");
+
+// ---------- collapsible groups ----------
+// Native <details>: no toggle state machine, and open/closed rides along in the
+// same saved blob as every other parameter.
+p.open = saved.open || {};
+let cur = controls;
+const groups = {};
+const group = name => cur = groups[name] ??= (() => {
+  const d = document.createElement("details");
+  d.open = p.open[name] ?? name === "tiles";
+  d.innerHTML = `<summary>${name}</summary>`;
+  d.addEventListener("toggle", () => {
+    p.open[name] = d.open;
+    localStorage.setItem("truchet-tiles", JSON.stringify(p));
+  });
+  controls.append(d);
+  return d;
+})();
 
 // ---------- artboard size (exact pixels) ----------
 p.wpx = +saved.wpx || 1500;
@@ -129,10 +157,11 @@ p.hpx = +saved.hpx || 2000;
     preset.value = "custom";
     apply();
   });
-  controls.append(sizeRow, presetRow);
+  group("artboard").append(sizeRow, presetRow);
 }
 
 for (const [key, type, opt] of DEFS) {
+  if (type === "group") { group(opt.label); continue; }
   p[key] = key in saved ? saved[key] : opt.value;
   const label = document.createElement("label");
   const name = document.createElement("span");
@@ -156,7 +185,7 @@ for (const [key, type, opt] of DEFS) {
     if (out) out.value = input.value;
     render();
   });
-  controls.append(label);
+  cur.append(label);
 }
 
 // ---------- generator ----------

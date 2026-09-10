@@ -24,6 +24,13 @@
   .btns a { flex: 1; text-align: center; padding: 7px 0; border-radius: 8px; background: #3b82f6; color: #fff; text-decoration: none; cursor: pointer; }
   .btns select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
   h1 { font-size: 14px; margin: 0 0 6px; }
+  #panel details { border-top: 1px solid #eee; }
+  #panel details > label:last-child { margin-bottom: 12px; }
+  #panel summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+                   padding: 7px 0; color: #888; font: 600 11px/1 system-ui; letter-spacing: .07em; text-transform: uppercase; }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary::after { content: "+"; font-size: 13px; }
+  #panel details[open] summary::after { content: "\2212"; }
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="mobile.css">
@@ -52,7 +59,9 @@
 <script src="sliders.js"></script>
 <script>
 // ---------- parameters ----------
+// A ["", "group", …] row opens a new collapsible section; rows after it land in it.
 const DEFS = [
+  ["", "group", {label: "rays"}],
   ["seed",    "range", {min: 1, max: 9999, step: 1, value: 42}],
   ["rays",    "range", {min: 3, max: 40, step: 1, value: 14}],
   ["length",  "range", {min: 20, max: 100, step: 1, value: 78, label: "reach %"}],
@@ -60,10 +69,12 @@ const DEFS = [
   ["scatter", "range", {min: 0, max: 100, step: 5, value: 60, label: "scatter %"}],
   ["pairs",   "range", {min: 0, max: 100, step: 5, value: 45, label: "pairs %"}],
   ["stroke",  "range", {min: 0.5, max: 12, step: 0.5, value: 3, label: "stroke px"}],
+  ["", "group", {label: "relief"}],
   ["relief",  "select", {options: ["raised", "pressed"], value: "raised"}],
   ["depth",   "range", {min: 0, max: 8, step: 0.5, value: 2, label: "depth px"}],
   ["soften",  "range", {min: 0, max: 6, step: 0.25, value: 1, label: "soften px"}],
   ["light",   "range", {min: 0, max: 360, step: 5, value: 225, label: "light angle"}],
+  ["", "group", {label: "colour"}],
   ["shadow",  "color", {value: "#000000", label: "shadow"}],
   ["shadowO", "range", {min: 0, max: 100, step: 5, value: 20, label: "shadow %"}],
   ["glow",    "color", {value: "#ffffff", label: "highlight"}],
@@ -71,6 +82,7 @@ const DEFS = [
   ["halo",    "range", {min: 0, max: 100, step: 5, value: 35, label: "halo %"}],
   ["paper",   "color", {value: "#e9e7e3", label: "paper"}],
   ["line",    "color", {value: "#f1efeb", label: "line"}],
+  ["", "group", {label: "motion"}],
   ["motion",  "select", {options: ["none", "drift", "grow in", "grow loop"], value: "drift"}],
   ["drift",   "range", {min: 0, max: 100, step: 5, value: 40, label: "drift %"}],
   ["speed",   "range", {min: 0.5, max: 20, step: 0.5, value: 6, label: "cycle sec"}],
@@ -79,6 +91,24 @@ const DEFS = [
 const p = {};
 const saved = JSON.parse(localStorage.getItem("imprint") || "{}");
 const controls = document.getElementById("controls");
+
+// ---------- collapsible groups ----------
+// Native <details>: no toggle state machine, and open/closed rides along in the
+// same saved blob as every other parameter.
+p.open = saved.open || {};
+let cur = controls;
+const groups = {};
+const group = name => cur = groups[name] ??= (() => {
+  const d = document.createElement("details");
+  d.open = p.open[name] ?? name === "rays";
+  d.innerHTML = `<summary>${name}</summary>`;
+  d.addEventListener("toggle", () => {
+    p.open[name] = d.open;
+    localStorage.setItem("imprint", JSON.stringify(p));
+  });
+  controls.append(d);
+  return d;
+})();
 
 // ---------- artboard size (exact pixels) ----------
 p.wpx = +saved.wpx || 1500;
@@ -141,10 +171,11 @@ p.hpx = +saved.hpx || 1500;
     preset.value = "custom";
     apply();
   });
-  controls.append(sizeRow, presetRow);
+  group("artboard").append(sizeRow, presetRow);
 }
 
 for (const [key, type, opt] of DEFS) {
+  if (type === "group") { group(opt.label); continue; }
   p[key] = key in saved ? saved[key] : opt.value;
   if (type === "select" && !opt.options.includes(p[key])) p[key] = opt.value;  // stale saved value
   const label = document.createElement("label");
@@ -169,7 +200,7 @@ for (const [key, type, opt] of DEFS) {
     if (out) out.value = input.value;
     render();
   });
-  controls.append(label);
+  cur.append(label);
 }
 
 // ---------- generator ----------

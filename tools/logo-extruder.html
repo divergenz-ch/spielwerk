@@ -38,6 +38,13 @@
             color: #fff; text-decoration: none; cursor: pointer; }
   .btns select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
   h1 { font-size: 14px; margin: 0 0 6px; }
+  #panel details { border-top: 1px solid #eee; }
+  #panel details > label:last-child { margin-bottom: 12px; }
+  #panel summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+                   padding: 7px 0; color: #888; font: 600 11px/1 system-ui; letter-spacing: .07em; text-transform: uppercase; }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary::after { content: "+"; font-size: 13px; }
+  #panel details[open] summary::after { content: "\2212"; }
 </style>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="stylesheet" href="mobile.css">
@@ -71,12 +78,15 @@ import * as THREE from "https://esm.sh/three@0.160.0";
 import { SVGLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/SVGLoader.js";
 
 // ---------- parameters ----------
+// A ["", "group", …] row opens a new collapsible section; rows after it land in it.
 const DEFS = [
+  ["", "group", {label: "shape"}],
   ["depth",    "range",  {min: 0, max: 60, step: 1, value: 12, label: "depth %"}],
   ["bevel",    "range",  {min: 0, max: 10, step: 0.5, value: 1, label: "bevel %"}],
   ["holes",    "select", {options: ["auto", "evenodd", "nonzero"], value: "auto", label: "counters"}],
   ["slices",   "range",  {min: 8, max: 160, step: 4, value: 64, label: "img slices"}],
   ["keyWhite", "range",  {min: 0, max: 100, step: 5, value: 0, label: "key white %"}],
+  ["", "group", {label: "material"}],
   ["color",    "color",  {value: "#c9a227", label: "logo"}],
   ["metal",    "range",  {min: 0, max: 100, step: 5, value: 80, label: "metal %"}],
   ["rough",    "range",  {min: 0, max: 100, step: 5, value: 25, label: "rough %"}],
@@ -84,6 +94,7 @@ const DEFS = [
   ["bg",       "color",  {value: "#1c1c1c", label: "backdrop"}],
   ["light",    "range",  {min: 0, max: 360, step: 5, value: 40, label: "light angle"}],
   ["power",    "range",  {min: 0, max: 300, step: 10, value: 160, label: "light %"}],
+  ["", "group", {label: "motion"}],
   ["motion",   "select", {options: ["spin", "rock", "orbit"], value: "spin"}],
   ["spinX",    "range",  {min: -180, max: 180, step: 5, value: 0, label: "x °/s"}],
   ["spinY",    "range",  {min: -180, max: 180, step: 5, value: 45, label: "y °/s"}],
@@ -91,11 +102,27 @@ const DEFS = [
   ["bob",      "range",  {min: 0, max: 60, step: 5, value: 0, label: "bob %"}],
   ["persp",    "range",  {min: 10, max: 70, step: 1, value: 35, label: "lens °"}],
   ["cycle",    "range",  {min: 1, max: 20, step: 0.5, value: 8, label: "cycle sec"}],
+  ["", "group", {label: "export"}],
   ["fps",      "range",  {min: 5, max: 30, step: 5, value: 20, label: "gif fps"}]
 ];
 const p = {};
 const saved = JSON.parse(localStorage.getItem("logo-extruder") || "{}");
 const controls = document.getElementById("controls");
+
+// ---------- collapsible groups ----------
+// Native <details>: no toggle state machine, and open/closed rides along in the
+// same saved blob as every other parameter.
+p.open = saved.open || {};
+let cur = controls;
+const groups = {};
+const group = name => cur = groups[name] ??= (() => {
+  const d = document.createElement("details");
+  d.open = p.open[name] ?? name === "shape";
+  d.innerHTML = `<summary>${name}</summary>`;
+  d.addEventListener("toggle", () => { p.open[name] = d.open; save(); });
+  controls.append(d);
+  return d;
+})();
 
 // ---------- canvas size ----------
 p.wpx = +saved.wpx || 1200;
@@ -117,10 +144,11 @@ p.hpx = +saved.hpx || 1200;
   };
   wIn.addEventListener("input", apply);
   hIn.addEventListener("input", apply);
-  controls.append(row);
+  group("canvas").append(row);
 }
 
 for (const [key, type, opt] of DEFS) {
+  if (type === "group") { group(opt.label); continue; }
   p[key] = key in saved ? saved[key] : opt.value;
   if (type === "select" && !opt.options.includes(p[key])) p[key] = opt.value;
   const label = document.createElement("label");
@@ -165,7 +193,7 @@ for (const [key, type, opt] of DEFS) {
     hit.title = `reset to ${opt.value}`;
     hit.addEventListener("click", reset);
   }
-  controls.append(label);
+  cur.append(label);
 }
 const save = () => localStorage.setItem("logo-extruder", JSON.stringify(p));
 

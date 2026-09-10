@@ -8,8 +8,9 @@ convention below. Shortest diff against the house pattern wins.
 ## Page skeleton
 
 - Single HTML file: inline `<style>`, `#panel` (left, sliders) + `#stage`
-  (right, live SVG) + `#viewbox` zoom select, then the four shared scripts —
-  `export.js`, `zoom.js`, `mobile.js`, `sliders.js` — and `mobile.css`.
+  (right, live SVG) + `#viewbox` zoom select, then the shared scripts —
+  `export.js`, `zoom.js`, `mobile.js`, `sliders.js`, and `fontpick.js` when
+  the tool renders text — and `mobile.css`.
   Never duplicate what those helpers already do.
 - Register the tool in the `tools` manifest array in `index.html`
   (file, name, one-paragraph desc).
@@ -31,6 +32,14 @@ convention below. Shortest diff against the house pattern wins.
 - Include the artboard-size block (width × height inputs, aspect presets,
   swap, ratio lock) copied from any existing tool — it belongs in an
   "artboard" group.
+- **REQUIRED: any tool that renders text lets the user upload their own
+  typeface.** Use the shared `fontpick.js` (`fontPicker({onChange})`) — it
+  loads .ttf/.otf/.woff(2) via FontFace for live canvas/SVG rendering and
+  hands back a data: URL. If text survives into the exported SVG (as `<text>`),
+  embed that data: URL as an `@font-face` in a `<style>` inside the SVG so the
+  export keeps the face (see arrow-comb); canvas-baked type (stripe-marquee)
+  needs no embedding. The binary is never persisted — localStorage quota is
+  origin-wide and shared by every tool.
 
 ## Generator
 

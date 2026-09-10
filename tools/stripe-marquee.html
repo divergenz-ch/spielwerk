@@ -63,6 +63,7 @@
 <script src="zoom.js"></script>
 <script src="mobile.js"></script>
 <script src="sliders.js"></script>
+<script src="fontpick.js"></script>
 <script>
 // ---------- parameters ----------
 // A ["", "group", …] row opens a new collapsible section; rows after it land in it.
@@ -117,10 +118,12 @@ const controls = document.getElementById("controls");
 
 // ---------- collapsible groups ----------
 // Native <details>: no toggle state machine, and open/closed rides along in the
-// same saved blob as every other parameter.
+// same saved blob as every other parameter. Memoized: calling group("type")
+// again re-enters the existing section instead of creating a duplicate.
 p.open = saved.open || {};
 let cur = controls;
-const group = name => {
+const groups = {};
+const group = name => cur = groups[name] ??= (() => {
   const d = document.createElement("details");
   d.open = p.open[name] ?? name === "type";
   d.innerHTML = `<summary>${name}</summary>`;
@@ -129,8 +132,8 @@ const group = name => {
     localStorage.setItem("stripe-marquee", JSON.stringify(p));
   });
   controls.append(d);
-  return cur = d;
-};
+  return d;
+})();
 
 // ---------- artboard size (exact pixels) ----------
 p.wpx = +saved.wpx || 1500;
@@ -225,6 +228,11 @@ for (const [key, type, opt] of DEFS) {
   cur.append(label);
 }
 
+// custom typeface — the mask draws on canvas, which renders any FontFace-loaded
+// font directly; the export carries geometry only, so nothing needs embedding
+const userFont = fontPicker({onChange: () => { maskKey = ""; render(); }});
+group("type").append(userFont.row);
+
 // ---------- type mask ----------
 // The tile is one REPEAT of the line (adv × LH), not the artboard. Type is drawn at
 // its own size and tiles across the page, so glyphs keep their proportions — the old
@@ -232,11 +240,13 @@ for (const [key, type, opt] of DEFS) {
 // Scrolling only moves the sample point, so one raster still serves every frame, and
 // the exported SVG carries no <text> at all: nothing to embed, nothing to substitute.
 const MW = 512;                                  // mask columns across one tile
-const FAM = `"Helvetica Neue", Helvetica, Arial, sans-serif`;
+const FAM = () => userFont.font.family
+  ? `"${userFont.font.family}", "Helvetica Neue", sans-serif`
+  : `"Helvetica Neue", Helvetica, Arial, sans-serif`;
 let maskKey = "", maskData = null;
 function typeMask() {
   const key = [p.text, p.fontsize, p.fit, p.lineh, p.xscale, p.yscale, p.weight,
-               p.basex, p.basey, p.track, p.gapx, p.wpx, p.hpx].join("|");
+               p.basex, p.basey, p.track, p.gapx, p.wpx, p.hpx, userFont.font.family].join("|");
   if (key === maskKey) return maskData;
   const sx = Math.max(1, p.xscale) / 100, sy = Math.max(1, p.yscale) / 100;
   const line = p.text || " ";
@@ -244,7 +254,7 @@ function typeMask() {
   // Measure once at 100px: width scales linearly with size because tracking is a
   // percentage of it, so "fit width" is one division instead of a search.
   const meas = document.createElement("canvas").getContext("2d");
-  meas.font = `${p.weight} 100px ${FAM}`;
+  meas.font = `${p.weight} 100px ${FAM()}`;
   meas.letterSpacing = `${p.track}px`;
   const w100 = Math.max(1, meas.measureText(line).width);
   const fs = p.fit === "fit width"
@@ -262,7 +272,7 @@ function typeMask() {
   g.fillStyle = "#fff";
   const k = sx / sy;      // y-scale rides the font size; x-scale is the leftover stretch
   g.transform(k, 0, 0, 1, 0, 0);
-  g.font = `${p.weight} ${fs * sy}px ${FAM}`;
+  g.font = `${p.weight} ${fs * sy}px ${FAM()}`;
   g.letterSpacing = `${p.track / 100 * fs * sy}px`;
   // Baseline from real font metrics, not a 0.78 guess — the tile top is the
   // ascent line, so glyphs sit in the tile the way the typeface intends.
