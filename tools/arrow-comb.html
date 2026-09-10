@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Arrow Comb — parametric generator</title>
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  body { font: 13px/1.4 system-ui, sans-serif; margin: 0; display: flex; background: #e9e7e2; }
+  #panel { width: 264px; margin: 16px; padding: 14px 18px; background: #fff; border-radius: 8px;
+           box-shadow: 0 2px 12px rgba(0,0,0,.15); box-sizing: border-box; flex-shrink: 0;
+           align-self: flex-start; max-height: calc(100vh - 32px); overflow-y: auto; }
+  #panel label { display: grid; grid-template-columns: 90px 1fr 38px; align-items: center; margin: 10px 0; gap: 6px; }
+  #panel label span:first-child { color: #444; }
+  #panel input[type=range] { width: 100%; min-width: 0; margin: 0; }
+  #panel input[type=color], #panel select, #panel input[type=checkbox] { justify-self: end; grid-column: 2 / 4; }
+  #panel input[type=text] { grid-column: 2 / 4; width: 100%; box-sizing: border-box; font: inherit; }
+  #panel output { text-align: right; font-variant-numeric: tabular-nums; }
+  #stage { flex: 1; display: flex; overflow: auto; padding: 32px; }
+  #stage svg { display: block; margin: auto; flex-shrink: 0; box-shadow: 0 4px 24px rgba(0,0,0,.18); }
+  #panel input[type=number] { width: 58px; box-sizing: border-box; font: inherit; }
+  #viewbox { position: fixed; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px;
+             background: #fff; border-radius: 8px; padding: 8px 12px; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
+  #viewbox span { color: #444; }
+  #viewbox select { font: inherit; padding: 3px 6px; }
+  .btns { display: flex; gap: 8px; margin-top: 16px; }
+  .btns a { flex: 1; text-align: center; padding: 7px 0; border-radius: 8px; background: #3b82f6; color: #fff; text-decoration: none; cursor: pointer; }
+  .btns select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
+  h1 { font-size: 14px; margin: 0 0 6px; }
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="mobile.css">
+<body>
+<div id="panel">
+  <h1>Arrow Comb</h1>
+  <div id="controls"></div>
+  <div class="btns">
+    <select id="fmt" title="file type"></select>
+    <a id="dl">⬇ export</a>
+    <a id="dldir" title="choose export folder">📁 …</a>
+  </div>
+</div>
+<div id="stage"></div>
+<div id="viewbox">
+  <span>view</span>
+  <select id="zoom">
+    <option value="fit">scale to fit</option>
+    <option>10%</option><option>25%</option><option>50%</option><option>75%</option>
+    <option>100%</option><option>150%</option><option>200%</option>
+  </select>
+</div>
+<script src="export.js"></script>
+<script src="zoom.js"></script>
+<script src="mobile.js"></script>
+<script src="sliders.js"></script>
+<script>
+// ---------- parameters ----------
+const DEFS = [
+  ["seed",    "range", {min: 1, max: 9999, step: 1, value: 42}],
+  ["bands",   "range", {min: 1, max: 8, step: 1, value: 4}],
+  ["count",   "range", {min: 4, max: 60, step: 1, value: 22, label: "arrows across"}],
+  ["swing",   "range", {min: 0, max: 170, step: 5, value: 100, label: "tail swing °"}],
+  ["curve",   "range", {min: 0.5, max: 4, step: 0.1, value: 1.8, label: "bend ease"}],
+  ["len",     "range", {min: 20, max: 160, step: 5, value: 85, label: "length %"}],
+  ["thick",   "range", {min: 5, max: 100, step: 1, value: 40, label: "thickness %"}],
+  ["taper",   "range", {min: 0.3, max: 3, step: 0.1, value: 1, label: "taper"}],
+  ["headL",   "range", {min: 20, max: 200, step: 5, value: 85, label: "head length %"}],
+  ["headW",   "range", {min: 30, max: 200, step: 5, value: 95, label: "head width %"}],
+  ["variety", "range", {min: 0, max: 100, step: 5, value: 35, label: "variety %"}],
+  ["profile", "select", {options: ["mixed", "fan", "wave"], value: "mixed", label: "comb profile"}],
+  ["textTop", "text", {value: "29.11.25|09–17h", label: "top row"}],
+  ["textMid", "text", {value: "Arrow|Comb|2026", label: "middle row"}],
+  ["textBot", "text", {value: "", label: "bottom row"}],
+  ["textpx",  "range", {min: 20, max: 240, step: 2, value: 72, label: "text px"}],
+  ["ink",     "color", {value: "#111111", label: "ink"}],
+  ["paper",   "color", {value: "#ffffff", label: "paper"}],
+  ["motion",  "select", {options: ["none", "draw in", "draw loop"], value: "draw loop"}],
+  ["speed",   "range", {min: 0.5, max: 20, step: 0.5, value: 3, label: "cycle sec"}],
+  ["hold",    "range", {min: 0, max: 90, step: 5, value: 35, label: "hold %"}],
+  ["stagger", "range", {min: 0, max: 100, step: 5, value: 50, label: "stagger %"}],
+  ["timing",  "select", {options: ["ease out", "linear", "snap"], value: "ease out"}],
+  ["fps",     "range", {min: 5, max: 30, step: 1, value: 20, label: "gif fps"}],
+  ["gifpx",   "range", {min: 200, max: 1000, step: 50, value: 600, label: "gif px"}]
+];
+const p = {};
+const saved = JSON.parse(localStorage.getItem("arrow-comb") || "{}");
+const controls = document.getElementById("controls");
+
+// ---------- artboard size (exact pixels) ----------
+p.wpx = +saved.wpx || 1500;
+p.hpx = +saved.hpx || 2000;
+{
+  const wIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.wpx});
+  const hIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.hpx});
+  const preset = document.createElement("select");
+  for (const o of ["custom", "2:3", "3:4", "4:5", "1:1", "9:16"]) preset.append(new Option(o, o));
+  const swap = Object.assign(document.createElement("button"), {textContent: "⇄", title: "swap width/height"});
+  swap.style.cssText = "font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer";
+  p.lock = saved.lock ?? false;
+  const lock = Object.assign(document.createElement("button"), {title: "lock aspect ratio"});
+  lock.style.cssText = "font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer";
+  const drawLock = () => { lock.textContent = p.lock ? "🔒" : "🔓"; lock.style.background = p.lock ? "#eef" : "#fff"; };
+  drawLock();
+  lock.addEventListener("click", () => { p.lock = !p.lock; drawLock(); localStorage.setItem("arrow-comb", JSON.stringify(p)); });
+
+  const sizeRow = document.createElement("label");
+  sizeRow.style.cssText = "display:flex;justify-content:space-between;align-items:center";
+  sizeRow.innerHTML = "<span>artboard px</span>";
+  const sizeBox = document.createElement("span");
+  sizeBox.style.cssText = "display:flex;align-items:center;gap:4px";
+  sizeBox.append(wIn, "×", hIn, lock);
+  sizeRow.append(sizeBox);
+
+  const presetRow = document.createElement("label");
+  presetRow.innerHTML = "<span>aspect</span>";
+  const presetBox = document.createElement("span");
+  presetBox.style.cssText = "display:flex;align-items:center;gap:6px;grid-column:2/4;justify-self:end";
+  presetBox.append(preset, swap);
+  presetRow.append(presetBox);
+
+  let ratio = p.hpx / p.wpx;                     // locked aspect, frozen at lock time
+  lock.addEventListener("click", () => { if (p.lock) ratio = p.hpx / p.wpx; });
+  const apply = soft => {
+    p.wpx = Math.max(100, Math.min(8000, +wIn.value || p.wpx));
+    p.hpx = Math.max(100, Math.min(8000, +hIn.value || p.hpx));
+    if (!soft) { wIn.value = p.wpx; hIn.value = p.hpx; ratio = p.hpx / p.wpx; }
+    render();                                    // render() persists — saves on every keystroke
+  };
+  const onEdit = (src, other, factor) => soft => {
+    if (p.lock) other.value = Math.round((+src.value || 100) * factor());
+    else preset.value = "custom";
+    apply(soft);
+  };
+  const wEdit = onEdit(wIn, hIn, () => ratio), hEdit = onEdit(hIn, wIn, () => 1 / ratio);
+  wIn.addEventListener("input", () => wEdit(true));    // live: saves while typing, no clamp-fight
+  wIn.addEventListener("change", () => wEdit(false));  // commit: normalize the field
+  hIn.addEventListener("input", () => hEdit(true));
+  hIn.addEventListener("change", () => hEdit(false));
+  preset.addEventListener("input", () => {
+    if (preset.value === "custom") return;
+    const [a, b] = preset.value.split(":").map(Number);
+    hIn.value = Math.round(p.wpx * b / a);   // width is the anchor
+    apply();
+  });
+  swap.addEventListener("click", () => {
+    [wIn.value, hIn.value] = [hIn.value, wIn.value];
+    preset.value = "custom";
+    apply();
+  });
+  controls.append(sizeRow, presetRow);
+}
+
+for (const [key, type, opt] of DEFS) {
+  p[key] = key in saved ? saved[key] : opt.value;
+  const label = document.createElement("label");
+  const name = document.createElement("span");
+  name.textContent = opt.label || key;
+  label.append(name);
+  let input;
+  if (type === "select") {
+    input = document.createElement("select");
+    for (const o of opt.options) input.append(new Option(o, o, o === p[key], o === p[key]));
+  } else {
+    input = document.createElement("input");
+    input.type = type;
+    if (type === "range") { Object.assign(input, {min: opt.min, max: opt.max, step: opt.step}); input.dataset.def = opt.value; }
+    if (type === "text") input.title = "segments split on | spread across the width";
+    input.value = p[key];
+  }
+  label.append(input);
+  let out;
+  if (type === "range") { out = document.createElement("output"); out.value = p[key]; label.append(out); }
+  input.addEventListener("input", () => {
+    p[key] = type === "range" ? +input.value : input.value;
+    if (out) out.value = input.value;
+    render();
+  });
+  controls.append(label);
+}
+
+// direction mix checkboxes — which edges bands may point at
+const DIR_ALL = ["up", "down", "left", "right"];
+p.dirs = saved.dirs ?? ["up", "down"];
+{
+  const row = document.createElement("label");
+  row.innerHTML = "<span>directions</span>";
+  const box = document.createElement("span");
+  box.style.cssText = "display:flex;flex-wrap:wrap;gap:4px 8px;flex:1";
+  for (const k of DIR_ALL) {
+    const l = document.createElement("label");
+    l.style.cssText = "display:inline-flex;gap:3px;margin:0";
+    const cb = Object.assign(document.createElement("input"), {type: "checkbox", checked: p.dirs.includes(k)});
+    cb.addEventListener("input", () => {
+      p.dirs = DIR_ALL.filter((_, i) => box.querySelectorAll("input")[i].checked);
+      render();
+    });
+    l.append(cb, k);
+    box.append(l);
+  }
+  row.append(box);
+  controls.append(row);
+}
+
+// ---------- generator ----------
+// time === null → live SMIL animation. A number bakes that instant statically
+// (GIF frames), so both paths share one generator.
+function makeSVG(time = null) {
+  const W = p.wpx, H = p.hpx;
+  const mulberry = s => () => {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const rnd = mulberry(p.seed), rnd2 = mulberry(p.seed * 31 + 7);
+  const f = n => +n.toFixed(2);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const esc = s => s.replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+  const v = p.variety / 100;
+  const dirs = p.dirs.length ? p.dirs : DIR_ALL;
+  const nb = p.bands;
+
+  // per-band structure — fixed draws per band so the stream stays aligned
+  const bandsSpec = Array.from({length: nb}, () => ({
+    w: 0.6 + rnd() * 0.9,                        // height weight
+    dir: dirs[(rnd() * dirs.length) | 0],
+    kindPick: rnd(),
+    phase: rnd(),
+    freq: [0.5, 1, 1.5][(rnd() * 3) | 0],
+    sign: rnd() < 0.5 ? -1 : 1,
+    cJit: rnd(), lJit: rnd(), sJit: rnd()
+  }));
+
+  // motion timing, shared by SMIL and baked frames
+  const loop = p.motion === "draw loop";
+  const m = Math.max(0.05, 1 - p.hold / 100);    // reveal ends at m of the cycle
+  const F = {"ease out": x => 1 - (1 - x) ** 3, "linear": x => x, "snap": x => x >= 1 ? 1 : 0};
+  const CURVE = {
+    "ease out": ` calcMode="spline" keySplines=".16 1 .3 1;0 0 1 1"`,
+    "linear":   ` calcMode="linear"`,
+    "snap":     ` calcMode="discrete"`
+  };
+  const progress = (ph, t) => {
+    let c = t / p.speed + (loop ? ph : -ph);
+    c = loop ? c - Math.floor(c) : clamp(c, 0, 1);
+    return F[p.timing](Math.min(1, c / m));
+  };
+
+  // layout: text rows interleaved with arrow bands
+  const textH = p.textpx * 1.4;
+  const items = [];
+  if (p.textTop.trim()) items.push({text: p.textTop});
+  bandsSpec.forEach((b, i) => {
+    items.push({b, bi: i});
+    if (i === Math.ceil(nb / 2) - 1 && p.textMid.trim()) items.push({text: p.textMid});
+  });
+  if (p.textBot.trim()) items.push({text: p.textBot});
+  const nText = items.filter(i => i.text).length;
+  const avail = Math.max(50, H - nText * textH);
+  const sumW = bandsSpec.reduce((a, b) => a + b.w, 0);
+
+  const parts = [`<rect width="${W}" height="${H}" fill="${p.paper}"/>`];
+  const textParts = [];                          // text draws on top of spilled tails
+  let mid = 0;                                   // mask id counter
+
+  function textBand(str, y0) {
+    const segs = str.split("|").map(s => s.trim()).filter(Boolean);
+    const mg = W * 0.03, cy = f(y0 + textH / 2);
+    segs.forEach((t, i) => {
+      let x = mg, anchor = "start";
+      if (segs.length > 1 && i === segs.length - 1) { x = W - mg; anchor = "end"; }
+      else if (i > 0) { x = mg + (W - 2 * mg) * i / (segs.length - 1); anchor = "middle"; }
+      textParts.push(`<text x="${f(x)}" y="${cy}" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"`
+        + ` font-size="${p.textpx}" font-weight="700" fill="${p.ink}" text-anchor="${anchor}"`
+        + ` dominant-baseline="central">${esc(t)}</text>`);
+    });
+  }
+
+  function arrowBand(b, bi, y0, bh) {
+    const horiz = b.dir === "left" || b.dir === "right";
+    const across = horiz ? bh : W, depth = horiz ? W : bh;
+    // canonical frame: u across the anchor edge, d = depth into the band from the tip
+    const map = b.dir === "up"   ? ([u, d]) => [u, y0 + d]
+              : b.dir === "down" ? ([u, d]) => [u, y0 + bh - d]
+              : b.dir === "left" ? ([u, d]) => [d, y0 + u]
+              :                    ([u, d]) => [W - d, y0 + u];
+    const P = pts => pts.map(pt => { const [x, y] = map(pt); return f(x) + " " + f(y); }).join("L");
+    const s = W / p.count;                       // spacing sets all arrow proportions
+    const n = Math.max(1, Math.round(across / s * (1 + (b.cJit * 2 - 1) * v * 0.4)));
+    const su = across / n;
+    const headL = s * p.headL / 100, headW = s * p.headW / 100, thick = s * p.thick / 100;
+    const swingB = p.swing * b.sign * (1 + (b.sJit * 2 - 1) * v * 0.5);
+    const lenB = depth * p.len / 100 * (1 + (b.lJit * 2 - 1) * v * 0.4);
+    const kind = p.profile === "mixed" ? (b.kindPick < 0.5 ? "fan" : "wave") : p.profile;
+
+    for (let i = 0; i < n; i++) {
+      const q = (i + 0.5) / n, u0 = q * across;
+      const prof = kind === "fan" ? 2 * q - 1 : Math.sin(2 * Math.PI * (b.freq * q + b.phase));
+      const len = Math.max(headL, lenB * (1 + 0.8 * Math.abs(prof)) * (1 + (rnd2() * 2 - 1) * v * 0.3));
+      // centerline, head base → tail: angle eases from straight to the full swing
+      const NS = 22, step = len / NS, sw = swingB * prof * Math.PI / 180;
+      const pts = [[u0, headL * 0.8]];
+      let u = u0, d = headL * 0.8;
+      for (let k = 1; k <= NS; k++) {
+        const a = sw * (((k - 0.5) / NS) ** p.curve);
+        u += Math.sin(a) * step; d += Math.cos(a) * step;
+        if (k > 2 && d > depth) break;           // stay inside the band
+        pts.push([u, d]);
+      }
+      // tapered polygon: offset ± normal, width thick at the head → 0 at the tail
+      const L1 = [], L2 = [];
+      for (let k = 0; k < pts.length; k++) {
+        const a = pts[Math.max(0, k - 1)], c = pts[Math.min(pts.length - 1, k + 1)];
+        const tx = c[0] - a[0], ty = c[1] - a[1], tl = Math.hypot(tx, ty) || 1;
+        const wh = thick / 2 * ((1 - k / (pts.length - 1)) ** p.taper);
+        L1.push([pts[k][0] - ty / tl * wh, pts[k][1] + tx / tl * wh]);
+        L2.push([pts[k][0] + ty / tl * wh, pts[k][1] - tx / tl * wh]);
+      }
+      const shaft = "M" + P(L1.concat(L2.reverse())) + "Z";
+      const head = "M" + P([[u0, 0], [u0 - headW / 2, headL], [u0 + headW / 2, headL]]) + "Z";
+
+      // motion: the arrow is revealed tail → tip by a dash wipe on a masked
+      // stroke along its own centerline — declarative, so exports stay animated
+      let pre = "", attr = "";
+      if (p.motion !== "none") {
+        const ph = (p.stagger / 100) * ((bi + q) / nb);
+        const cl = [...pts].reverse().concat([[u0, -0.2 * headL]]);   // tail → past the tip
+        let L = 0;
+        for (let k = 1; k < cl.length; k++) L += Math.hypot(cl[k][0] - cl[k - 1][0], cl[k][1] - cl[k - 1][1]);
+        L = f(L);
+        const mw = f(Math.max(thick, headW) * 1.3);
+        let anim = "", off = L;
+        if (time === null) {
+          anim = `<animate attributeName="stroke-dashoffset" values="${L};0;0" keyTimes="0;${f(m)};1"`
+            + ` dur="${f(p.speed)}s" begin="${f((loop ? -1 : 1) * ph * p.speed)}s"`
+            + (loop ? ` repeatCount="indefinite"` : ` fill="freeze"`) + CURVE[p.timing] + `/>`;
+        } else off = f(L * (1 - progress(ph, time)));
+        const id = "ac" + mid++;
+        pre = `<mask id="${id}"><path d="M${P(cl)}" fill="none" stroke="#fff" stroke-width="${mw}"`
+          + ` stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${L}"`
+          + ` stroke-dashoffset="${off}">${anim}</path></mask>`;
+        attr = ` mask="url(#${id})"`;
+      }
+      parts.push(pre + `<g fill="${p.ink}"${attr}><path d="${shaft}"/><path d="${head}"/></g>`);
+    }
+  }
+
+  let y = 0;
+  for (const it of items) {
+    if (it.text) { textBand(it.text, y); y += textH; }
+    else { const bh = avail * it.b.w / sumW; arrowBand(it.b, it.bi, y, bh); y += bh; }
+  }
+  parts.push(...textParts);
+  return {w: W, h: H, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join("")}</svg>`};
+}
+
+// ---------- render + export ----------
+const stage = document.getElementById("stage");
+const zoomEl = document.getElementById("zoom");
+p.zoom = saved.zoom === "fit" || typeof saved.zoom === "number" ? saved.zoom : "fit";
+let art;
+const view = createZoom({
+  stage, select: zoomEl, zoom: p.zoom,
+  size: () => ({w: art.w, h: art.h}),
+  onChange: z => { p.zoom = z; localStorage.setItem("arrow-comb", JSON.stringify(p)); },
+});
+function render() {
+  localStorage.setItem("arrow-comb", JSON.stringify(p));
+  art = makeSVG();
+  stage.innerHTML = art.svg;
+  view.apply();
+}
+
+async function exportGIF(setLabel) {
+  const scale = Math.min(1, p.gifpx / Math.max(art.w, art.h));
+  const w = Math.round(art.w * scale), h = Math.round(art.h * scale);
+  // one full cycle; draw-in also covers the stagger tail. static art = one frame
+  const dur = p.motion === "none" ? 0 : p.speed * (p.motion === "draw loop" ? 1 : 1 + p.stagger / 100);
+  const n = dur ? Math.max(1, Math.round(dur * p.fps)) : 1;
+  const frames = [];
+  try {
+    for (let i = 0; i < n; i++) {
+      setLabel(`… ${i + 1}/${n}`);
+      await new Promise(r => setTimeout(r));           // let the label repaint
+      frames.push(await rasterise(makeSVG(i / n * dur).svg, w, h));
+    }
+    setLabel("… encoding");
+    await new Promise(r => setTimeout(r));
+    const blob = encodeGIF(frames, {width: w, height: h, delay: Math.max(2, Math.round(100 / p.fps))});
+    await saveAs(`arrow-comb-${p.seed}.gif`, blob);
+  } finally {
+    render();                                          // restore the live SVG
+  }
+}
+
+wireExport({
+  SVG: () => saveAs(`arrow-comb-${p.seed}.svg`, svgBlob(art.svg)),
+  PNG: async () => saveAs(`arrow-comb-${p.seed}.png`, await svgToPNG(art.svg, art.w, art.h)),
+  GIF: exportGIF,
+});
+
+render();
+
+// self-check: deterministic output for fixed params
+console.assert(makeSVG().svg === makeSVG().svg, "generator must be deterministic");
+</script>
+</body>
+</html>
