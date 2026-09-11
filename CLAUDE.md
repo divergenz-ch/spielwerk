@@ -9,8 +9,8 @@ convention below. Shortest diff against the house pattern wins.
 
 - Single HTML file: inline `<style>`, `#panel` (left, sliders) + `#stage`
   (right, live SVG) + `#viewbox` zoom select, then the shared scripts —
-  `export.js`, `zoom.js`, `mobile.js`, `sliders.js`, and `fontpick.js` when
-  the tool renders text — and `mobile.css`.
+  `export.js`, `zoom.js`, `mobile.js`, `sliders.js`, `snapshots.js`, and
+  `fontpick.js` (after snapshots.js) when the tool renders text — and `mobile.css`.
   Never duplicate what those helpers already do.
 - Register the tool in the `tools` manifest array in `index.html`
   (file, name, one-paragraph desc).
@@ -32,6 +32,10 @@ convention below. Shortest diff against the house pattern wins.
 - Include the artboard-size block (width × height inputs, aspect presets,
   swap, ratio lock) copied from any existing tool — it belongs in an
   "artboard" group.
+- Snapshots: after the DEFS loop, `group("snapshots").append(snapshotPanel());`
+  (shared `snapshots.js`). A snapshot is the tool's localStorage blob plus the
+  uploaded typeface, stored in IndexedDB; loading writes both back and reloads,
+  so anything a tool keeps outside `p` (uploaded images, stamps) is not carried.
 - **REQUIRED: any tool that renders text lets the user upload their own
   typeface.** Use the shared `fontpick.js` (`fontPicker({onChange})`) — it
   loads .ttf/.otf/.woff(2) via FontFace for live canvas/SVG rendering and

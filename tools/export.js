@@ -74,6 +74,7 @@
   function wireExport(handlers) {
     const sel = document.getElementById("fmt"), btn = document.getElementById("dl");
     const dirBtn = document.getElementById("dldir");
+    if (dirBtn && !can) dirBtn.remove();              // Safari/Firefox: no folder picker, downloads go to the browser's folder
     if (sel && btn) {
       sel.innerHTML = Object.keys(handlers).map(k => `<option>${k}</option>`).join("");
       const label = btn.textContent;

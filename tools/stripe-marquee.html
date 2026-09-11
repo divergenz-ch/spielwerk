@@ -63,6 +63,7 @@
 <script src="zoom.js"></script>
 <script src="mobile.js"></script>
 <script src="sliders.js"></script>
+<script src="snapshots.js"></script>
 <script src="fontpick.js"></script>
 <script>
 // ---------- parameters ----------
@@ -227,6 +228,7 @@ for (const [key, type, opt] of DEFS) {
   });
   cur.append(label);
 }
+group("snapshots").append(snapshotPanel());
 
 // custom typeface — the mask draws on canvas, which renders any FontFace-loaded
 // font directly; the export carries geometry only, so nothing needs embedding

@@ -73,6 +73,7 @@
 <script src="zoom.js"></script>
 <script src="mobile.js"></script>
 <script src="sliders.js"></script>
+<script src="snapshots.js"></script>
 <script type="module">
 import * as THREE from "https://esm.sh/three@0.160.0";
 import { SVGLoader } from "https://esm.sh/three@0.160.0/examples/jsm/loaders/SVGLoader.js";
@@ -195,6 +196,7 @@ for (const [key, type, opt] of DEFS) {
   }
   cur.append(label);
 }
+group("snapshots").append(snapshotPanel());
 const save = () => localStorage.setItem("logo-extruder", JSON.stringify(p));
 
 // ---------- scene ----------

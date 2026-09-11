@@ -1,44 +1,52 @@
 // Shared typeface picker for Spielwerk tools. Classic script → window.fontPicker.
+// Needs snapshots.js first (SLUG, kv, fileURL).
 // Loads a local .ttf/.otf/.woff(2) via FontFace so canvas and inline SVG render it
 // immediately, and keeps a data: URL so SVG exports can embed the face and keep
-// rendering elsewhere. The font itself is NOT persisted — the binary is too big
-// for the origin-wide localStorage quota all tools share (font-remixer precedent).
+// rendering elsewhere. The face lives in IndexedDB under "font:<slug>" — never in
+// localStorage, whose origin-wide quota every tool shares — so it survives reloads
+// and rides along in snapshots (snapshots.js reads the same key).
 //
 //   const userFont = fontPicker({onChange: () => render()});
 //   somegroup.append(userFont.row);
 //   userFont.font  // {family, dataURL} — both null until a file is picked
 function fontPicker({label = "typeface", onChange}) {
+  const KEY = "font:" + SLUG;
   const row = document.createElement("label");
   const name = document.createElement("span");
   name.textContent = label;
   const inp = Object.assign(document.createElement("input"),
     {type: "file", accept: ".ttf,.otf,.woff,.woff2"});
-  inp.style.cssText = "grid-column: 2 / 4; min-width: 0; font: inherit; font-size: 11px;";
+  inp.style.cssText = "grid-column: 2 / 3; min-width: 0; font: inherit; font-size: 11px;";
+  const clear = Object.assign(document.createElement("button"), {type: "button", textContent: "✕", title: "back to the system font"});
+  clear.style.cssText = "font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer;justify-self:end";
   const info = document.createElement("span");
   info.style.cssText = "grid-column: 1 / 4; color: #888; font-size: 11px;";
-  info.textContent = "system default — uploads last until reload";
+  info.textContent = "system default";
   const font = {family: null, dataURL: null};
+  const apply = async ({family, file, dataURL}) => {
+    const face = new FontFace(family, `url(${dataURL})`);
+    await face.load();
+    document.fonts.add(face);
+    Object.assign(font, {family, dataURL});
+    info.textContent = file;
+    onChange(font);
+  };
   inp.addEventListener("input", async () => {
     const file = inp.files[0];
     if (!file) return;
-    try {
-      const buf = await file.arrayBuffer();
-      const fam = "user-" + file.name.replace(/\.[^.]+$/, "").replace(/[^\w-]/g, "");
-      const face = new FontFace(fam, buf);
-      await face.load();
-      document.fonts.add(face);
-      font.family = fam;
-      font.dataURL = await new Promise(r => {
-        const fr = new FileReader();
-        fr.onload = () => r(fr.result);
-        fr.readAsDataURL(new Blob([buf], {type: "font/ttf"}));
-      });
-      info.textContent = file.name;
-      onChange(font);
-    } catch (e) {
-      info.textContent = "could not load: " + e.message;
-    }
+    const f = {family: "user-" + file.name.replace(/\.[^.]+$/, "").replace(/[^\w-]/g, ""),
+               file: file.name, dataURL: await fileURL(file)};
+    try { await apply(f); kv.set(KEY, f); }
+    catch (e) { info.textContent = "could not load: " + e.message; }
   });
-  row.append(name, inp, info);
+  clear.addEventListener("click", () => {
+    Object.assign(font, {family: null, dataURL: null});
+    info.textContent = "system default";
+    inp.value = "";
+    kv.set(KEY, null);
+    onChange(font);
+  });
+  kv.get(KEY).then(f => f && apply(f)).catch(() => {});   // restore last upload / snapshot font
+  row.append(name, inp, clear, info);
   return {row, font};
 }

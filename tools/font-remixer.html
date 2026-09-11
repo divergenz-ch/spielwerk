@@ -65,6 +65,7 @@
 <script src="zoom.js"></script>
 <script src="mobile.js"></script>
 <script src="sliders.js"></script>
+<script src="snapshots.js"></script>
 <script>
 // ---------- parameters ----------
 // 4th element ties a control to one filter; untagged controls are always visible.
@@ -117,17 +118,32 @@ const group = name => cur = groups[name] ??= (() => {
   return d;
 })();
 
-// font file input + name readout (font itself is not persisted — too big for localStorage)
+// font file input + name readout. The face is kept in IndexedDB under "font:<slug>"
+// (never localStorage — too big for the shared quota), so it survives reloads and
+// rides along in snapshots.
 {
+  const KEY = "font:" + SLUG;
+  const DEFAULT = "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/spacemono/SpaceMono-Regular.ttf";
   const row = document.createElement("label");
   const inp = Object.assign(document.createElement("input"), {type: "file", accept: ".ttf,.otf,.woff"});
+  inp.style.gridColumn = "1 / 3";
+  const clear = Object.assign(document.createElement("button"), {type: "button", textContent: "✕", title: "back to the default font"});
+  clear.style.cssText = "font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer;justify-self:end";
   const name = Object.assign(document.createElement("span"), {id: "fontname", textContent: "loading default font…"});
-  row.append(inp, name);
+  row.append(inp, clear, name);
+  const loadURL = url => fetch(url).then(r => r.arrayBuffer()).then(b => setFont(opentype.parse(b)))
+    .catch(() => name.textContent = "load a font file ↑");
   inp.addEventListener("input", async () => {
-    if (!inp.files[0]) return;
-    try { setFont(opentype.parse(await inp.files[0].arrayBuffer())); }
-    catch (e) { name.textContent = "could not parse: " + e.message; }
+    const file = inp.files[0];
+    if (!file) return;
+    try {
+      setFont(opentype.parse(await file.arrayBuffer()));
+      kv.set(KEY, {file: file.name, dataURL: await fileURL(file)});
+    } catch (e) { name.textContent = "could not parse: " + e.message; }
   });
+  clear.addEventListener("click", () => { inp.value = ""; kv.set(KEY, null); loadURL(DEFAULT); });
+  // last upload / snapshot font, else the default (needs network once)
+  kv.get(KEY).catch(() => null).then(f => { if (!font) loadURL(f ? f.dataURL : DEFAULT); });
   group("type").append(row);
 }
 
@@ -233,6 +249,7 @@ for (const [key, type, opt, flt] of DEFS) {
   if (key === "filter") filterRow = label;
   if (key === "text") textField = input;
 }
+group("snapshots").append(snapshotPanel());
 
 // stamp picker (centerline only): any SVG becomes the item placed along the path.
 // Sits right below the filter dropdown, with a live preview of the current stamp.
@@ -731,11 +748,6 @@ wireExport({
     await saveAs("README-VF.txt", new Blob([VF_README], {type: "text/plain"}));
   },
 });
-
-// default font so the tool works before anything is loaded (needs network once)
-fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/spacemono/SpaceMono-Regular.ttf")
-  .then(r => r.arrayBuffer()).then(b => { if (!font) setFont(opentype.parse(b)); })
-  .catch(() => document.getElementById("fontname").textContent = "load a font file ↑");
 </script>
 </body>
 </html>
