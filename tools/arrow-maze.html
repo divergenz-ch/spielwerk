@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Arrow Maze — parametric generator</title>
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  body { font: 13px/1.4 system-ui, sans-serif; margin: 0; display: flex; background: #e9e7e2; }
+  #panel { width: 264px; margin: 16px; padding: 14px 18px; background: #fff; border-radius: 8px;
+           box-shadow: 0 2px 12px rgba(0,0,0,.15); box-sizing: border-box; flex-shrink: 0;
+           align-self: flex-start; max-height: calc(100vh - 32px); overflow-y: auto; }
+  #panel label { display: grid; grid-template-columns: 90px 1fr 38px; align-items: center; margin: 10px 0; gap: 6px; }
+  #panel label span:first-child { color: #444; }
+  #panel input[type=range] { width: 100%; min-width: 0; margin: 0; }
+  #panel input[type=color], #panel select, #panel input[type=checkbox] { justify-self: end; grid-column: 2 / 4; }
+  #panel output { text-align: right; font-variant-numeric: tabular-nums; }
+  #stage { flex: 1; display: flex; overflow: auto; padding: 32px; }
+  #stage svg { display: block; margin: auto; flex-shrink: 0; box-shadow: 0 4px 24px rgba(0,0,0,.18); }
+  #panel input[type=number] { width: 58px; box-sizing: border-box; font: inherit; }
+  #viewbox { position: fixed; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 8px;
+             background: #fff; border-radius: 8px; padding: 8px 12px; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
+  #viewbox span { color: #444; }
+  #viewbox select { font: inherit; padding: 3px 6px; }
+  .btns { display: flex; gap: 8px; margin-top: 16px; }
+  .btns a { flex: 1; text-align: center; padding: 7px 0; border-radius: 8px; background: #3b82f6; color: #fff; text-decoration: none; cursor: pointer; }
+  .btns select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
+  h1 { font-size: 14px; margin: 0 0 6px; }
+  #panel details { border-top: 1px solid #eee; }
+  #panel details > label:last-child { margin-bottom: 12px; }
+  #panel summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between;
+                   padding: 7px 0; color: #888; font: 600 11px/1 system-ui; letter-spacing: .07em; text-transform: uppercase; }
+  #panel summary::-webkit-details-marker { display: none; }
+  #panel summary::after { content: "+"; font-size: 13px; }
+  #panel details[open] summary::after { content: "\2212"; }
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="mobile.css">
+<body>
+<div id="panel">
+  <h1>Arrow Maze</h1>
+  <div id="controls"></div>
+  <div class="btns">
+    <select id="fmt" title="file type"></select>
+    <a id="dl">⬇ export</a>
+    <a id="dldir" title="choose export folder">📁 …</a>
+  </div>
+</div>
+<div id="stage"></div>
+<div id="viewbox">
+  <span>view</span>
+  <select id="zoom">
+    <option value="fit">scale to fit</option>
+    <option>10%</option><option>25%</option><option>50%</option><option>75%</option>
+    <option>100%</option><option>150%</option><option>200%</option>
+  </select>
+</div>
+<script src="export.js"></script>
+<script src="zoom.js"></script>
+<script src="mobile.js"></script>
+<script src="sliders.js"></script>
+<script>
+// ---------- parameters ----------
+// A ["", "group", …] row opens a new collapsible section; rows after it land in it.
+const DEFS = [
+  ["", "group", {label: "arrows"}],
+  ["seed",   "range", {min: 1, max: 9999, step: 1, value: 42}],
+  ["count",  "range", {min: 1, max: 60, step: 1, value: 30, label: "arrows"}],
+  ["cols",   "range", {min: 6, max: 40, step: 1, value: 12, label: "grid cols"}],
+  ["length", "range", {min: 3, max: 40, step: 1, value: 14, label: "max steps"}],
+  ["turn",   "range", {min: 0, max: 100, step: 5, value: 30, label: "turn %"}],
+  ["dirs",   "select", {options: ["mixed", "orthogonal", "diagonal"], value: "mixed", label: "turns"}],
+  ["dots",   "range", {min: 0, max: 12, step: 1, value: 1, label: "dots"}],
+  ["", "group", {label: "geometry"}],
+  ["gap",    "range", {min: 5, max: 100, step: 5, value: 30, label: "spacing % shaft"}],
+  ["headW",  "range", {min: 100, max: 300, step: 5, value: 200, label: "head width % shaft"}],
+  ["headL",  "range", {min: 50, max: 250, step: 5, value: 130, label: "head length % shaft"}],
+  ["radius", "range", {min: 10, max: 100, step: 5, value: 100, label: "corner radius %"}],
+  ["round",  "range", {min: 0, max: 100, step: 5, value: 50, label: "round corners %"}],
+  ["mix",    "select", {options: ["per arrow", "per bend"], value: "per arrow", label: "round/square"}],
+  ["arcs",   "range", {min: 0, max: 100, step: 5, value: 40, label: "sweeping arcs %"}],
+  ["arcR",   "range", {min: 1, max: 4, step: 1, value: 3, label: "arc radius cells"}],
+  ["vary",   "range", {min: 0, max: 80, step: 5, value: 30, label: "shaft taper %"}],
+  ["", "group", {label: "panels"}],
+  ["panels", "range", {min: 1, max: 8, step: 1, value: 4, label: "panels"}],
+  ["invert", "range", {min: 0, max: 100, step: 5, value: 40, label: "inverted %"}],
+  ["line",   "range", {min: 0, max: 12, step: 0.5, value: 3, label: "line px"}],
+  ["", "group", {label: "colour"}],
+  ["ink",    "color", {value: "#111111", label: "ink"}],
+  ["paper",  "color", {value: "#f4f1ea", label: "paper"}],
+  ["", "group", {label: "motion"}],
+  ["motion", "select", {options: ["none", "draw in", "draw loop"], value: "none", label: "motion"}],
+  ["speed",  "range", {min: 0.5, max: 20, step: 0.5, value: 3, label: "cycle sec"}],
+  ["hold",   "range", {min: 0, max: 90, step: 5, value: 35, label: "hold %"}],
+  ["stagger","range", {min: 0, max: 100, step: 5, value: 50, label: "stagger %"}],
+  ["timing", "select", {options: ["ease out", "linear", "snap"], value: "ease out", label: "timing"}],
+  ["", "group", {label: "export"}],
+  ["fps",    "range", {min: 5, max: 30, step: 1, value: 20, label: "gif fps"}],
+  ["gifpx",  "range", {min: 200, max: 1000, step: 50, value: 600, label: "gif px"}]
+];
+const p = {};
+const saved = JSON.parse(localStorage.getItem("arrow-maze") || "{}");
+const controls = document.getElementById("controls");
+
+// ---------- collapsible groups ----------
+// Native <details>: no toggle state machine, and open/closed rides along in the
+// same saved blob as every other parameter.
+p.open = saved.open || {};
+let cur = controls;
+const groups = {};
+const group = name => cur = groups[name] ??= (() => {
+  const d = document.createElement("details");
+  d.open = p.open[name] ?? name === "arrows";
+  d.innerHTML = `<summary>${name}</summary>`;
+  d.addEventListener("toggle", () => {
+    p.open[name] = d.open;
+    localStorage.setItem("arrow-maze", JSON.stringify(p));
+  });
+  controls.append(d);
+  return d;
+})();
+
+// ---------- artboard size (exact pixels) ----------
+p.wpx = +saved.wpx || 1500;
+p.hpx = +saved.hpx || 2000;
+p.margin = +saved.margin || 0;
+{
+  const wIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.wpx});
+  const hIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.hpx});
+  const preset = document.createElement("select");
+  for (const o of ["custom", "2:3", "3:4", "4:5", "1:1", "9:16"]) preset.append(new Option(o, o));
+  const swap = Object.assign(document.createElement("button"), {textContent: "⇄", title: "swap width/height"});
+  swap.style.cssText = "font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer";
+  p.lock = saved.lock ?? false;
+  const lock = Object.assign(document.createElement("button"), {title: "lock aspect ratio"});
+  lock.style.cssText = "font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer";
+  const drawLock = () => { lock.textContent = p.lock ? "🔒" : "🔓"; lock.style.background = p.lock ? "#eef" : "#fff"; };
+  drawLock();
+  lock.addEventListener("click", () => { p.lock = !p.lock; drawLock(); localStorage.setItem("arrow-maze", JSON.stringify(p)); });
+
+  const sizeRow = document.createElement("label");
+  sizeRow.style.cssText = "display:flex;justify-content:space-between;align-items:center";
+  sizeRow.innerHTML = "<span>artboard px</span>";
+  const sizeBox = document.createElement("span");
+  sizeBox.style.cssText = "display:flex;align-items:center;gap:4px";
+  sizeBox.append(wIn, "×", hIn, lock);
+  sizeRow.append(sizeBox);
+
+  const presetRow = document.createElement("label");
+  presetRow.innerHTML = "<span>aspect</span>";
+  const presetBox = document.createElement("span");
+  presetBox.style.cssText = "display:flex;align-items:center;gap:6px;grid-column:2/4;justify-self:end";
+  presetBox.append(preset, swap);
+  presetRow.append(presetBox);
+
+  let ratio = p.hpx / p.wpx;                     // locked aspect, frozen at lock time
+  lock.addEventListener("click", () => { if (p.lock) ratio = p.hpx / p.wpx; });
+  const apply = soft => {
+    p.wpx = Math.max(100, Math.min(8000, +wIn.value || p.wpx));
+    p.hpx = Math.max(100, Math.min(8000, +hIn.value || p.hpx));
+    if (!soft) { wIn.value = p.wpx; hIn.value = p.hpx; ratio = p.hpx / p.wpx; }
+    render();                                    // render() persists — saves on every keystroke
+  };
+  const onEdit = (src, other, factor) => soft => {
+    if (p.lock) other.value = Math.round((+src.value || 100) * factor());
+    else preset.value = "custom";
+    apply(soft);
+  };
+  const wEdit = onEdit(wIn, hIn, () => ratio), hEdit = onEdit(hIn, wIn, () => 1 / ratio);
+  wIn.addEventListener("input", () => wEdit(true));    // live: saves while typing, no clamp-fight
+  wIn.addEventListener("change", () => wEdit(false));  // commit: normalize the field
+  hIn.addEventListener("input", () => hEdit(true));
+  hIn.addEventListener("change", () => hEdit(false));
+  preset.addEventListener("input", () => {
+    if (preset.value === "custom") return;
+    const [a, b] = preset.value.split(":").map(Number);
+    hIn.value = Math.round(p.wpx * b / a);   // width is the anchor
+    apply();
+  });
+  swap.addEventListener("click", () => {
+    [wIn.value, hIn.value] = [hIn.value, wIn.value];
+    preset.value = "custom";
+    apply();
+  });
+  const mIn = Object.assign(document.createElement("input"), {type: "number", min: 0, max: 4000, value: p.margin});
+  const marginRow = document.createElement("label");
+  marginRow.innerHTML = "<span>margin px</span>";
+  marginRow.append(mIn);
+  mIn.addEventListener("input", () => { p.margin = Math.max(0, +mIn.value || 0); render(); });
+  group("artboard").append(sizeRow, presetRow, marginRow);
+}
+
+for (const [key, type, opt] of DEFS) {
+  if (type === "group") { group(opt.label); continue; }
+  p[key] = key in saved ? saved[key] : opt.value;
+  const label = document.createElement("label");
+  const name = document.createElement("span");
+  name.textContent = opt.label || key;
+  label.append(name);
+  let input;
+  if (type === "select") {
+    input = document.createElement("select");
+    for (const o of opt.options) input.append(new Option(o, o, o === p[key], o === p[key]));
+  } else {
+    input = document.createElement("input");
+    input.type = type;
+    if (type === "range") { Object.assign(input, {min: opt.min, max: opt.max, step: opt.step}); input.dataset.def = opt.value; }
+    if (type === "checkbox") input.checked = p[key]; else input.value = p[key];
+  }
+  label.append(input);
+  let out;
+  if (type === "range") { out = document.createElement("output"); out.value = p[key]; label.append(out); }
+  input.addEventListener("input", () => {
+    p[key] = type === "checkbox" ? input.checked : type === "range" ? +input.value : input.value;
+    if (out) out.value = input.value;
+    render();
+  });
+  cur.append(label);
+}
+
+// ---------- generator ----------
+// Arrows are self-avoiding walks on a cell grid; occupancy lives on a finer
+// subcell grid where each shaft lane, head triangle and arc claims what it
+// covers plus half a gap, so nothing can ever overlap or touch. Panels are a
+// guillotine split of the grid; a walk never leaves its panel.
+// time === null → live SMIL animation. A number bakes that instant statically
+// (GIF frames), so both paths share one generator.
+function makeSVG(time = null) {
+  const W = p.wpx, H = p.hpx;
+  const mulberry = s => () => {
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const rnd = mulberry(p.seed), rnd3 = mulberry(p.seed * 97 + 13), rnd4 = mulberry(p.seed * 131 + 19);
+  const f = n => +n.toFixed(2), f3 = n => +n.toFixed(3);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // motion timing, shared by SMIL and baked frames (same math as arrow-poster)
+  const moving = p.motion !== "none", loop = p.motion === "draw loop";
+  const m = Math.max(0.05, 1 - p.hold / 100);    // reveal ends at m of the cycle
+  const F = {"ease out": x => 1 - (1 - x) ** 3, "linear": x => x, "snap": x => x >= 1 ? 1 : 0};
+  const progress = (ph, t) => {
+    let c = t / p.speed + (loop ? ph : -ph);
+    c = loop ? c - Math.floor(c) : clamp(c, 0, 1);
+    return F[p.timing](Math.min(1, c / m));
+  };
+  // one shared timing for the dash wipe and the travelling head; draw-in folds
+  // its stagger into the keyTimes so the head waits at the tail
+  const T = loop ? p.speed : p.speed * (1 + p.stagger / 100);
+  const SPL = {"ease out": ".16 1 .3 1", "linear": "0 0 1 1"};
+  const smil = ph => {
+    const kt = loop ? [0, m, 1] : [0, ph * p.speed / T, Math.min(1, (ph + m) * p.speed / T), 1];
+    const seg = loop ? [1, 0] : [0, 1, 0];               // which segment is the reveal
+    const calc = p.timing === "snap" ? ` calcMode="discrete"`
+      : ` calcMode="spline" keySplines="${seg.map(s => s ? SPL[p.timing] : "0 0 1 1").join(";")}"`;
+    return ` keyTimes="${kt.map(k => +k.toFixed(4)).join(";")}" dur="${f(T)}s"`
+      + ` begin="${loop ? f(-ph * p.speed) : 0}s"`
+      + (loop ? ` repeatCount="indefinite"` : ` fill="freeze"`) + calc;
+  };
+
+  // ---- grid + panels
+  const M = Math.min(p.margin, Math.min(W, H) / 2 - 50), gw = W - 2 * M, gh = H - 2 * M;   // margin stays paper
+  const cols = p.cols, cell = gw / cols, rows = Math.max(3, Math.floor(gh / cell));
+  const ox = M, oy = M + (gh - rows * cell) / 2;       // grid is centred vertically, panels stretch to the margin
+  const panels = [{x0: 0, y0: 0, x1: cols, y1: rows}];
+  for (let k = 1; k < p.panels; k++) {                 // guillotine: cut the largest panel across its long side
+    const q = panels.reduce((a, b) => (b.x1 - b.x0) * (b.y1 - b.y0) > (a.x1 - a.x0) * (a.y1 - a.y0) ? b : a);
+    const w = q.x1 - q.x0, h = q.y1 - q.y0;
+    if (Math.max(w, h) < 6) break;
+    const vert = w === h ? rnd() < 0.5 : w > h;
+    const cut = Math.round((vert ? w : h) * (0.3 + rnd() * 0.4));
+    const r = {...q};
+    if (vert) { q.x1 = q.x0 + cut; r.x0 = q.x1; } else { q.y1 = q.y0 + cut; r.y0 = q.y1; }
+    panels.push(r);
+  }
+  for (const q of panels) q.inv = rnd() < p.invert / 100;
+  const N = cols * rows;
+  const pid = new Int8Array(N);                        // panel per cell
+  panels.forEach((q, i) => { for (let y = q.y0; y < q.y1; y++) for (let x = q.x0; x < q.x1; x++) pid[y * cols + x] = i; });
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const starts = shuffle(Array.from({length: N}, (_, i) => i));
+
+  // ---- fine occupancy: SUB×SUB subcells per cell, in cell units (cell centres on the
+  // integers). Every shape claims what it covers plus half the lane gap, so any
+  // two shapes end up a full gap apart: a shaft lane is exactly one cell wide,
+  // heads and arcs take just the subcells they need. Sampling on centres can
+  // miss a sliver thinner than a subcell, so the head claims one subcell more
+  // than the gap: its distance to anything is then never under the lane gap.
+  const SUB = 8, fw = cols * SUB, fh = rows * SUB;
+  const fid = new Int16Array(fw * fh).fill(-1), fst = new Uint8Array(fw * fh);   // owner arrow, its step
+  // a lane is one cell = shaft + spacing; everything else scales off the shaft
+  const sc = 0.5 / (1 + p.gap / 100), hg = 0.5 - sc, hm = hg + 1 / SUB;   // shaft half-width, half gap, head margin
+  const hw = p.headW / 100 * sc, hl = p.headL / 50 * sc, r0c = p.radius / 100;
+  const subs = (x0, y0, x1, y1, test) => {              // subcells in a bbox whose centre passes test
+    const out = [];
+    const i0 = Math.max(0, Math.floor((x0 + 0.5) * SUB)), i1 = Math.min(fw - 1, Math.ceil((x1 + 0.5) * SUB));
+    const j0 = Math.max(0, Math.floor((y0 + 0.5) * SUB)), j1 = Math.min(fh - 1, Math.ceil((y1 + 0.5) * SUB));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++)
+      if (test((i + 0.5) / SUB - 0.5, (j + 0.5) / SUB - 0.5)) out.push(j * fw + i);
+    return out;
+  };
+  const panelOf = k => pid[((k / fw | 0) / SUB | 0) * cols + ((k % fw) / SUB | 0)];
+  const clear = (list, qi, ok) => list.every(k => panelOf(k) === qi && (fid[k] === -1 || ok(k)));
+  const unit0 = ([x, y]) => { const l = Math.hypot(x, y); return [x / l, y / l]; };
+  const dSeg = (x, y, ax, ay, bx, by) => {
+    const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(x - ax - t * dx, y - ay - t * dy);
+  };
+  const rect = (a, b, ca, cb) => {                      // a lane a→b, one cell wide, caps ca behind / cb ahead
+    const [ux, uy] = unit0([b[0] - a[0], b[1] - a[1]]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = 0.5 + Math.max(ca, cb);
+    return subs(Math.min(a[0], b[0]) - m, Math.min(a[1], b[1]) - m, Math.max(a[0], b[0]) + m, Math.max(a[1], b[1]) + m, (x, y) => {
+      const px = x - a[0], py = y - a[1], al = px * ux + py * uy;
+      return al >= -ca && al <= L + cb && Math.abs(py * ux - px * uy) <= 0.5;
+    });
+  };
+  const tri = (P, m) => {                               // triangle P grown by m
+    const inside = (x, y) => { let sgn = 0; for (let i = 0; i < 3; i++) { const [ax, ay] = P[i], [bx, by] = P[(i + 1) % 3]; sgn |= (bx - ax) * (y - ay) - (by - ay) * (x - ax) > 0 ? 1 : 2; } return sgn !== 3; };
+    const xs = P.map(v => v[0]), ys = P.map(v => v[1]);
+    return subs(Math.min(...xs) - m, Math.min(...ys) - m, Math.max(...xs) + m, Math.max(...ys) + m, (x, y) =>
+      inside(x, y) || P.some((a, i) => dSeg(x, y, a[0], a[1], P[(i + 1) % 3][0], P[(i + 1) % 3][1]) <= m));
+  };
+  const disc = ([cx, cy], R) => subs(cx - R, cy - R, cx + R, cy + R, (x, y) => Math.hypot(x - cx, y - cy) <= R);
+  const annulus = (V, u1, u2, r, th) => {               // a round bend's arc band: its inner edge can leave the lanes
+    const sg = Math.sign(u1[0] * u2[1] - u1[1] * u2[0]), t = r * Math.tan(th / 2);
+    const cx = V[0] - u1[0] * t - u1[1] * sg * r, cy = V[1] - u1[1] * t + u1[0] * sg * r;
+    const mx = V[0] - cx, my = V[1] - cy, ml = Math.hypot(mx, my), cs = Math.cos(th / 2);
+    return subs(cx - r - 0.5, cy - r - 0.5, cx + r + 0.5, cy + r + 0.5, (x, y) => {
+      const dx = x - cx, dy = y - cy, dd = Math.hypot(dx, dy);
+      return Math.abs(dd - r) <= 0.5 && dx * mx + dy * my >= cs * dd * ml;
+    });
+  };
+
+  // ---- self-avoiding walks
+  // ponytail: greedy first-fit from shuffled starts, no backtracking beyond the head — fine up to ~40×60 cells
+  const D = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+  const turns = p.dirs === "orthogonal" ? [2, -2] : p.dirs === "diagonal" ? [1, -1] : [1, -1, 2, -2];
+  const arrows = [];
+  const walk = (s, d, id, q) => {                       // one attempt from cell s heading d; claims subcells on success
+    const qi = panels.indexOf(q);
+    const cells = [[s % cols, s / cols | 0]], bends = [], arcs = [], dirs = [d], claimed = [];   // arcs[k]: radius of step k if it sweeps
+    const want = 3 + Math.floor(rnd() * (p.length - 2));
+    const arrowRound = rnd3() < p.round / 100;           // this arrow's corners, when mixing per arrow
+    const dip = p.vary / 100 * (0.5 + 0.5 * rnd3());    // how far the shaft thins mid-way: thick tail, thin middle, thick at the head
+    let run = 0, lastV = 0;                              // cells since the last bend; index of the last bend
+    const claim = (list, k) => {                        // remember what was free vs shared with our own earlier step
+      const fresh = [], shared = [];
+      for (const j of list) { (fid[j] === -1 ? fresh : shared).push(j); fid[j] = id; fst[j] = k; }
+      claimed.push({fresh, shared, k});
+    };
+    const release = () => { const {fresh, shared, k} = claimed.pop(); for (const j of fresh) fid[j] = -1; for (const j of shared) fst[j] = k - 1; };
+    const inPanel = (x, y) => x >= q.x0 && x < q.x1 && y >= q.y0 && y < q.y1;
+    const step = t => {                                 // try a step turning by t (45° units)
+      const [x, y] = cells[cells.length - 1], nd = (d + t + 8) % 8, [dx, dy] = D[nd], nx = x + dx, ny = y + dy;
+      const k = cells.length;
+      // a 90° turn may sweep: a quarter circle of n cells radius, vertex n cells
+      // ahead, landing n cells along the new heading — on the grid for axis and
+      // diagonal headings alike (radius n√2 for the latter)
+      if (Math.abs(t) === 2 && rnd() < p.arcs / 100) {
+        const n = 1 + Math.floor(rnd() * p.arcR), [ax, ay] = D[d], vx = x + ax * n, vy = y + ay * n, bx = vx + dx * n, by = vy + dy * n;
+        const R = n * Math.hypot(ax, ay);
+        if (inPanel(bx, by) && inPanel(vx, vy)) {
+          const list = annulus([vx, vy], unit0(D[d]), unit0(D[nd]), R, Math.PI / 2);
+          if (clear(list, qi, j => fid[j] === id && fst[j] >= k - 2)) {
+            claim(list, k); cells.push([bx, by]); dirs.push(nd); arcs[k] = R; bends[k - 1] = false;
+            lastV = k; run = 2; d = nd;
+            return true;
+          }
+        }
+      }
+      if (!inPanel(nx, ny)) return false;
+      const bendRound = rnd3() < p.round / 100;         // one draw per bend, mixing or not
+      const round = t !== 0 && (p.mix === "per arrow" ? arrowRound : bendRound);
+      let list = rect([x, y], [nx, ny], k === 1 ? hg : 0.5, 0.5);
+      if (round && r0c > 0) {                            // biggest radius this bend can get; render may shrink it
+        const th = Math.abs(t) * Math.PI / 4, prev = Math.hypot(x - cells[lastV][0], y - cells[lastV][1]);
+        list = list.concat(annulus([x, y], unit0(D[d]), unit0(D[nd]), Math.min(r0c, prev / 2 / Math.tan(th / 2)), th));
+      }
+      // our own last two steps may share the corner region, nothing else
+      if (!clear(list, qi, j => fid[j] === id && fst[j] >= k - 2)) return false;
+      claim(list, k); cells.push([nx, ny]); dirs.push(nd); bends[k - 1] = round;
+      if (t) lastV = k - 1;
+      run = t ? 1 : run + 1; d = nd;
+      return true;
+    };
+    // head: its triangle plus half a gap, only overlapping our own last step;
+    // the tip must stay on the artboard, the corners may clip at the edge
+    const head = () => {
+      const [bx, by] = cells[cells.length - 1], [ux, uy] = unit0(D[dirs[dirs.length - 1]]);
+      const tx = bx + ux * hl, ty = by + uy * hl;
+      const P = [[bx - uy * hw, by + ux * hw], [tx, ty], [bx + uy * hw, by - ux * hw]];
+      // the tip stays on the grid; with a margin the corners must too (no clipping into it)
+      const out = (x, y, m) => x < -0.5 - m || x > cols - 0.5 + m || y < -0.5 - m || y > rows - 0.5 + m;
+      if (out(tx, ty, 0) || (M > 0 && P.some(([x, y]) => out(x, y, -hm)))) return null;
+      const list = tri(P, hm);
+      return clear(list, qi, j => fid[j] === id && fst[j] === cells.length - 1) ? list : null;
+    };
+    let hd = null;
+    // walk to the wanted length, then on until the head fits
+    while (!(cells.length - 1 >= want && (hd = head())) && cells.length - 1 < want + 6) {
+      const ts = shuffle([...turns]);
+      const order = run >= 2 && rnd() < p.turn / 100 ? [...ts, 0] : [0, ...ts];   // straight runs at least 2 cells
+      if (!order.some(step)) break;
+    }
+    // no room for the head here: back the shaft up one step and try again
+    while (cells.length >= 2) {
+      if (hd ||= head()) { claim(hd, cells.length - 1); arrows.push({cells, bends, arcs, dirs, dip, q}); return true; }
+      release(); cells.pop(); dirs.pop();
+    }
+    while (claimed.length) release();
+    return false;
+  };
+  const d0 = p.dirs === "orthogonal" ? [0, 2, 4, 6] : [0, 1, 2, 3, 4, 5, 6, 7];
+  for (const s of starts) {
+    if (arrows.length >= p.count) break;
+    const x = s % cols, y = s / cols | 0;
+    if (fid[(y * SUB + SUB / 2) * fw + x * SUB + SUB / 2] !== -1) continue;
+    for (const d of shuffle([...d0])) if (walk(s, d, arrows.length, panels[pid[s]])) break;
+  }
+  // dots fill leftover holes
+  const dots = [];
+  for (const s of starts) {
+    if (dots.length >= p.dots) break;
+    const x = s % cols, y = s / cols | 0, list = disc([x, y], 1.25 + hg);
+    if (x < 1.25 || x > cols - 2.25 || y < 1.25 || y > rows - 2.25 || !clear(list, pid[s], () => false)) continue;
+    for (const j of list) fid[j] = 999;
+    dots.push({x, y, q: panels[pid[s]]});
+  }
+
+  // ---- draw
+  const sw = 2 * sc * cell, hwp = hw * cell, hlp = hl * cell, r0 = r0c * cell;
+  const parts = [`<rect width="${W}" height="${H}" fill="${p.paper}"/>`];
+  const lines = [];
+  for (const q of panels) {
+    const x0 = q.x0 ? ox + q.x0 * cell : M, x1 = q.x1 < cols ? ox + q.x1 * cell : W - M;
+    const y0 = q.y0 ? oy + q.y0 * cell : M, y1 = q.y1 < rows ? oy + q.y1 * cell : H - M;
+    parts.push(`<rect x="${f(x0)}" y="${f(y0)}" width="${f(x1 - x0)}" height="${f(y1 - y0)}" fill="${q.inv ? p.ink : p.paper}"/>`);
+    if (q.x1 < cols) lines.push(`M${f(x1)} ${f(y0)}V${f(y1)}`);   // inner edges only, so the artboard rim stays clean
+    if (q.y1 < rows) lines.push(`M${f(x0)} ${f(y1)}H${f(x1)}`);
+  }
+  if (M > 0) lines.push(`M${f(M)} ${f(M)}H${f(W - M)}V${f(H - M)}H${f(M)}Z`);   // inside a margin the panels need their frame
+  if (p.line && lines.length) parts.push(`<path d="${lines.join("")}" fill="none" stroke="${p.ink}" stroke-width="${p.line}"/>`);
+  for (const {x, y, q} of dots)
+    parts.push(`<circle cx="${f(ox + (x + 0.5) * cell)}" cy="${f(oy + (y + 0.5) * cell)}" r="${f(1.25 * cell)}" fill="${q.inv ? p.paper : p.ink}"/>`);
+
+  const unit = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [dx / l, dy / l]; };
+  arrows.forEach((A, i) => {
+    const pts = A.cells.map(([x, y]) => [ox + (x + 0.5) * cell, oy + (y + 0.5) * cell]);
+    // centreline as lines, with each bend either sharp or a true arc (radius
+    // clamped so a cut never eats more than half a segment). The same string is
+    // the shaft, the head's motion path and the dash wipe, so the three can never
+    // drift apart; segs carries the exact geometry for the baked pose.
+    const segs = [];
+    let L = 0, cur = pts[0], d = `M${f(cur[0])} ${f(cur[1])}`;
+    const line = (a, b) => {
+      const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (l < 1e-6) return;
+      segs.push({a, u: unit(a, b), s0: L, len: l}); L += l;
+      d += `L${f(b[0])} ${f(b[1])}`;
+    };
+    const arc = (a, u1, sg, r, th, b) => {              // from a, tangent u1, sweeping sg through th, to b
+      const c = [a[0] - u1[1] * sg * r, a[1] + u1[0] * sg * r];
+      segs.push({c, r, sg, a0: Math.atan2(a[1] - c[1], a[0] - c[0]), s0: L, len: r * th}); L += r * th;
+      d += `A${f(r)} ${f(r)} 0 0 ${sg > 0 ? 1 : 0} ${f(b[0])} ${f(b[1])}`;
+    };
+    // straight runs between bends: a corner's radius may use half of each
+    // neighbouring run, which is exactly what the walk reserved for it
+    const bendAt = k => k > 0 && k < pts.length - 1 && (A.arcs[k] || A.arcs[k + 1] || A.dirs[k] !== A.dirs[k + 1]);
+    const runLen = (k, dir) => { let j = k; do j += dir; while (j > 0 && j < pts.length - 1 && !bendAt(j)); return Math.hypot(pts[j][0] - pts[k][0], pts[j][1] - pts[k][1]); };
+    for (let k = 1; k < pts.length; k++) {
+      const P = pts[k], nx = pts[k + 1];
+      if (A.arcs[k]) {                                   // sweeping step: a quarter circle from cur to P
+        const u1 = unit0(D[A.dirs[k - 1]]), u2 = unit0(D[A.dirs[k]]);
+        arc(cur, u1, Math.sign(u1[0] * u2[1] - u1[1] * u2[0]), A.arcs[k] * cell, Math.PI / 2, P);
+        cur = P;
+        continue;
+      }
+      if (nx && !A.arcs[k + 1]) {
+        const u1 = unit(cur, P), u2 = unit(P, nx);
+        const cross = u1[0] * u2[1] - u1[1] * u2[0];
+        if (Math.abs(cross) > 1e-9 && A.bends[k] && r0 > 0) {
+          const th = Math.atan2(Math.abs(cross), u1[0] * u2[0] + u1[1] * u2[1]), tan = Math.tan(th / 2);
+          const r = Math.min(r0, runLen(k, -1) / 2 / tan, runLen(k, 1) / 2 / tan);
+          const t = r * tan, sg = Math.sign(cross);
+          const a = [P[0] - u1[0] * t, P[1] - u1[1] * t], b = [P[0] + u2[0] * t, P[1] + u2[1] * t];
+          line(cur, a);
+          arc(a, u1, sg, r, th, b);
+          cur = b;
+          continue;
+        }
+      }
+      line(cur, P); cur = P;
+    }
+    const pose = rr => {                                   // position + tangent at fraction rr of the centreline
+      const s = clamp(rr, 0, 1) * L;
+      const g = segs.find(g => s <= g.s0 + g.len) || segs[segs.length - 1], ds = s - g.s0;
+      if (g.u) return `translate(${f(g.a[0] + g.u[0] * ds)} ${f(g.a[1] + g.u[1] * ds)}) rotate(${f(Math.atan2(g.u[1], g.u[0]) * 180 / Math.PI)})`;
+      const ang = g.a0 + g.sg * ds / g.r;
+      return `translate(${f(g.c[0] + g.r * Math.cos(ang))} ${f(g.c[1] + g.r * Math.sin(ang))}) rotate(${f((ang + g.sg * Math.PI / 2) * 180 / Math.PI)})`;
+    };
+
+    // head in the motion frame (base on the origin, tip along +x), with a tab back
+    // into the shaft so the seam never shows
+    // shaft as a filled outline: each straight run has one width, runs alternate
+    // full / thinner starting full, and the width switches only at angled bends,
+    // where the two runs' offset edges cross (a square junction for 90°); arcs
+    // and the runs after them keep the width they came in with
+    let w = sw, k = 0;
+    const same = (g, h) => g.u && h.u && g.u[0] * h.u[0] + g.u[1] * h.u[1] > 1 - 1e-6;
+    const wid = segs.map((g, i) => {
+      const prev = segs[i - 1];
+      if (g.u && prev && prev.u && !same(g, prev)) w = ++k % 2 ? sw * (1 - A.dip * (0.6 + 0.4 * rnd3())) : sw;
+      return w;
+    });
+    const st = [];                                             // stations: x, y, tangent, width
+    segs.forEach((g, i) => {
+      const wv = wid[i];
+      if (g.u) st.push([g.a[0], g.a[1], g.u[0], g.u[1], wv], [g.a[0] + g.u[0] * g.len, g.a[1] + g.u[1] * g.len, g.u[0], g.u[1], wv]);
+      else {
+        const n = Math.ceil(g.len / (0.1 * cell));
+        for (let j = 0; j <= n; j++) {
+          const ds = g.len * j / n, ang = g.a0 + g.sg * ds / g.r;
+          st.push([g.c[0] + g.r * Math.cos(ang), g.c[1] + g.r * Math.sin(ang), -g.sg * Math.sin(ang), g.sg * Math.cos(ang), wv]);
+        }
+      }
+    });
+    const left = [], right = [];
+    for (let i = 0; i < st.length; i++) {
+      const [x, y, tx, ty, w] = st[i];
+      let ox = -ty * w / 2, oy = tx * w / 2;                   // offset to the left edge
+      const nxt = st[i + 1];
+      if (nxt && Math.hypot(nxt[0] - x, nxt[1] - y) < 1e-6) {   // joint: two tangents (and widths) at one point
+        const n1 = [-ty, tx], n2 = [-nxt[3], nxt[2]], c = n1[0] * n2[0] + n1[1] * n2[1], d1 = w / 2, d2 = nxt[4] / 2;
+        if (Math.abs(c) < 0.999) {                             // corner: where the two offset edges cross
+          const q = 1 - c * c;
+          ox = (d1 * (n1[0] - n2[0] * c) + d2 * (n2[0] - n1[0] * c)) / q;
+          oy = (d1 * (n1[1] - n2[1] * c) + d2 * (n2[1] - n1[1] * c)) / q;
+        }
+        i++;
+      }
+      left.push(`${f(x + ox)} ${f(y + oy)}`);
+      right.push(`${f(x - ox)} ${f(y - oy)}`);
+    }
+    const outline = `M${left.join("L")}L${right.reverse().join("L")}Z`;
+
+    const col = A.q.inv ? p.paper : p.ink, tab = f(Math.min(sw / 2, hwp));
+    const headD = `M0 ${f(hwp)} L${f(hlp)} 0 L0 ${f(-hwp)} L-0.5 ${-tab} L-0.5 ${tab} Z`;
+    const beat = Math.round(rnd4() * 8) / 8, ph = (p.stagger / 100) * beat;   // phases land on a 1/8 grid
+    let headAttr = ` transform="${pose(1)}"`, headAnim = "", mask = "", mk = "";
+    if (moving) {
+      // the wipe is a dash on the centreline, stroked wide enough to cover the
+      // outline, used as a mask — same path and timing as the travelling head
+      let wipe = "", off = 1;
+      if (time === null) {
+        const tm = smil(ph);
+        headAnim = `<animateMotion path="${d}" rotate="auto" keyPoints="${loop ? "0;1;1" : "0;0;1;1"}"${tm}/>`;
+        headAttr = "";
+        wipe = `<animate attributeName="stroke-dashoffset" values="${loop ? "1;0;0" : "1;1;0;0"}"${tm}/>`;
+      } else {
+        const r = progress(ph, time);
+        headAttr = ` transform="${pose(r)}"`;
+        off = f3(1 - r);
+      }
+      mk = ` mask="url(#k${i})"`;
+      mask = `<mask id="k${i}" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">`
+        + `<path d="${d}" fill="none" stroke="#fff" stroke-width="${f(sw + 2)}" stroke-linejoin="miter"`
+        + ` pathLength="1" stroke-dasharray="1 1" stroke-dashoffset="${off}">${wipe}</path></mask>`;
+    }
+    parts.push(`<g>${mask}<path d="${outline}" fill="${col}"${mk}/>`
+      + `<g${headAttr}>${headAnim}<path d="${headD}" fill="${col}"/></g></g>`);
+  });
+  return {w: W, h: H, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join("")}</svg>`};
+}
+
+// ---------- render + export ----------
+const stage = document.getElementById("stage");
+const zoomEl = document.getElementById("zoom");
+p.zoom = saved.zoom === "fit" || typeof saved.zoom === "number" ? saved.zoom : "fit";
+let art;
+const view = createZoom({
+  stage, select: zoomEl, zoom: p.zoom,
+  size: () => ({w: art.w, h: art.h}),
+  onChange: z => { p.zoom = z; localStorage.setItem("arrow-maze", JSON.stringify(p)); },
+});
+function render() {
+  localStorage.setItem("arrow-maze", JSON.stringify(p));
+  art = makeSVG();
+  stage.innerHTML = art.svg;
+  view.apply();
+}
+async function exportGIF(setLabel) {
+  const scale = Math.min(1, p.gifpx / Math.max(art.w, art.h));
+  const w = Math.round(art.w * scale), h = Math.round(art.h * scale);
+  // one full cycle; draw-in also covers the stagger tail. static art = one frame
+  const dur = p.motion === "none" ? 0 : p.speed * (p.motion === "draw loop" ? 1 : 1 + p.stagger / 100);
+  const n = dur ? Math.max(1, Math.round(dur * p.fps)) : 1;
+  const frames = [];
+  try {
+    for (let i = 0; i < n; i++) {
+      setLabel(`… ${i + 1}/${n}`);
+      await new Promise(r => setTimeout(r));           // let the label repaint
+      frames.push(await rasterise(makeSVG(i / n * dur).svg, w, h));
+    }
+    setLabel("… encoding");
+    await new Promise(r => setTimeout(r));
+    const blob = encodeGIF(frames, {width: w, height: h, delay: Math.max(2, Math.round(100 / p.fps))});
+    await saveAs(`arrow-maze-${p.seed}.gif`, blob);
+  } finally {
+    render();                                          // restore the live SVG
+  }
+}
+wireExport({
+  SVG: () => saveAs(`arrow-maze-${p.seed}.svg`, svgBlob(art.svg)),
+  PNG: async () => saveAs(`arrow-maze-${p.seed}.png`, await svgToPNG(art.svg, art.w, art.h)),
+  GIF: exportGIF,
+});
+render();
+
+// self-check: deterministic output for fixed params
+console.assert(makeSVG().svg === makeSVG().svg, "generator must be deterministic");
+</script>
+</body>
+</html>
