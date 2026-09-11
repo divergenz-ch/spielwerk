@@ -83,12 +83,14 @@ const DEFS = [
   ["gradB",  "color", {value: "#f5c518", label: "gradient end"}],
   ["steps",  "range", {min: 1, max: 8, step: 1, value: 4, label: "contour colors"}],
   ["", "group", {label: "motion"}],
-  ["motion", "select", {options: ["none", "slide in", "slide loop"], value: "none", label: "motion"}],
-  ["travel", "range", {min: 5, max: 100, step: 5, value: 100, label: "slide in %"}],
+  ["motion", "select", {options: ["none", "draw in", "draw loop"], value: "none", label: "motion"}],
+  ["speed",  "range", {min: 0.5, max: 20, step: 0.5, value: 3, label: "cycle sec"}],
+  ["hold",   "range", {min: 0, max: 90, step: 5, value: 35, label: "hold %"}],
+  ["stagger","range", {min: 0, max: 100, step: 5, value: 50, label: "stagger %"}],
   ["timing", "select", {options: ["ease out", "linear", "snap"], value: "ease out", label: "timing"}],
-  ["hold",   "range", {min: 0, max: 90, step: 5, value: 40, label: "hold %"}],
-  ["speed",  "range", {min: 0.5, max: 20, step: 0.5, value: 2, label: "cycle sec"}],
-  ["stagger","range", {min: 0, max: 100, step: 5, value: 60, label: "stagger %"}]
+  ["", "group", {label: "export"}],
+  ["fps",    "range", {min: 5, max: 30, step: 1, value: 20, label: "gif fps"}],
+  ["gifpx",  "range", {min: 200, max: 1000, step: 50, value: 600, label: "gif px"}]
 ];
 const p = {};
 const saved = JSON.parse(localStorage.getItem("arrow-poster") || "{}");
@@ -260,7 +262,9 @@ const gradient = (a, b) => {
 };
 
 // ---------- generator (same as the pi-ui widget) ----------
-function makeSVG() {
+// time === null → live SMIL animation. A number bakes that instant statically
+// (GIF frames), so both paths share one generator.
+function makeSVG(time = null) {
   const W = p.wpx, H = p.hpx;
   const mulberry = s => () => {
     s |= 0; s = (s + 0x6D2B79F5) | 0;
@@ -274,23 +278,30 @@ function makeSVG() {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const g = gradient(p.gradA, p.gradB);
   const pal = Array.from({length: p.steps}, (_, i) => g(p.steps === 1 ? 0.5 : i / (p.steps - 1)));
-  // parametric arrow geometry — local coords, tip up, ~unit box
-  const GEN = {
-    block: (hl, hw, sw, sl) => {
-      const b = f(-1 + 2 * hl), e = f(b + (1 - b) * sl);
-      return `M0 -1 L${f(hw)} ${b} L${f(sw)} ${b} L${f(sw)} ${e} L${f(-sw)} ${e} L${f(-sw)} ${b} L${f(-hw)} ${b} Z`;
-    },
-    round: (hl, hw, sw, sl) => {
-      const b = f(-1 + 2 * hl), t = f(Math.max(b + 0.05, b + (1 - b) * sl - sw));
-      return `M0 -1 L${f(hw)} ${b} L${f(sw)} ${b} L${f(sw)} ${t} A${f(sw)} ${f(sw)} 0 0 1 ${f(-sw)} ${t} L${f(-sw)} ${b} L${f(-hw)} ${b} Z`;
-    },
-    roof: (hl, hw, sw, sl) => {
-      const b = f(-1 + 2 * hl), t = f(b + 0.4 * sl);
-      return `M0 -1 L${f(hw * 2)} ${b} L${f(-hw * 2)} ${b} Z M${f(-sw)} ${b} L${f(sw)} ${b} L${f(sw)} ${t} L${f(-sw)} ${t} Z`;
-    },
-    tri: (hl, hw, sw, sl) => `M0 -1.1 L${f(hw)} 0.8 L${f(-hw)} 0.8 Z`
-  };
   const kinds = p.kinds.length ? p.kinds : KINDS;
+
+  // motion timing, shared by SMIL and baked frames (same math as arrow-comb)
+  const moving = p.motion !== "none", loop = p.motion === "draw loop";
+  const m = Math.max(0.05, 1 - p.hold / 100);    // reveal ends at m of the cycle
+  const F = {"ease out": x => 1 - (1 - x) ** 3, "linear": x => x, "snap": x => x >= 1 ? 1 : 0};
+  const progress = (ph, t) => {
+    let c = t / p.speed + (loop ? ph : -ph);
+    c = loop ? c - Math.floor(c) : clamp(c, 0, 1);
+    return F[p.timing](Math.min(1, c / m));
+  };
+  // one shared timing for the dash wipe and the travelling head; draw-in folds
+  // its stagger into the keyTimes so the head waits at the tail
+  const T = loop ? p.speed : p.speed * (1 + p.stagger / 100);
+  const SPL = {"ease out": ".16 1 .3 1", "linear": "0 0 1 1"};
+  const smil = ph => {
+    const kt = loop ? [0, m, 1] : [0, ph * p.speed / T, Math.min(1, (ph + m) * p.speed / T), 1];
+    const seg = loop ? [1, 0] : [0, 1, 0];               // which segment is the reveal
+    const calc = p.timing === "snap" ? ` calcMode="discrete"`
+      : ` calcMode="spline" keySplines="${seg.map(s => s ? SPL[p.timing] : "0 0 1 1").join(";")}"`;
+    return ` keyTimes="${kt.map(k => +k.toFixed(4)).join(";")}" dur="${f(T)}s"`
+      + ` begin="${loop ? f(-ph * p.speed) : 0}s"`
+      + (loop ? ` repeatCount="indefinite"` : ` fill="freeze"`) + calc;
+  };
   const pw = W, ph = H;
   const parts = [`<rect width="${W}" height="${H}" fill="${p.paper}"/>`];
   const inner = [];
@@ -325,73 +336,103 @@ function makeSVG() {
     const sw = clamp(p.shaftW / 100 * vr(), 0.08, hw * 0.92);
     const sl = clamp(p.shaftL / 100 * vr(), 0.1, 5);
 
-    // ---- motion: the head slides in along the shaft axis, tail pinned ----
-    // Two SMIL tracks on one clock: the path `d` morphs from a stub shaft to the
-    // full one (same segment structure, so SVG can interpolate it), and the group
-    // translates by exactly the length the shaft gains — so the rearmost shaft
-    // point never moves and the head travels forward into the designed position.
-    // Every slider therefore describes the final, locked frame.
-    // Ships inside the exported SVG; PNG export rasterizes frame 0.
-    const sl0 = Math.max(0.02, sl * (1 - p.travel / 100));   // shaft length at t=0
-    const b0 = -1 + 2 * hl;                                  // head/shaft junction, local y
-    const TAIL = {                                           // rearmost point per kind
-      block: s => b0 + (1 - b0) * s,
-      round: s => b0 + (1 - b0) * s,
-      roof:  s => b0 + 0.4 * s,
-      tri:   () => 0.8,                                      // no shaft: slides its own length
-      hook:  s => Math.max(0.2, 0.95 * s)                    // hook grows along local +x
-    };
-    const grown = TAIL[kind](sl) - TAIL[kind](sl0);
-    const lead = kind === "tri" ? 2 * (p.travel / 100) : grown;
-    const [lx, ly] = kind === "hook" ? [lead, 0] : [0, lead];   // start offset, local space
-    const rad = a * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
-    const off = `${f((lx * cos - ly * sin) * sc)} ${f((lx * sin + ly * cos) * sc)}`;
-    const loop = p.motion === "slide loop";
-    // Timing shape: travel over the first (1 - hold) of the cycle, then sit locked in
-    // the designed position for the rest — the hold is what makes a loop read as
-    // cut-and-hold rather than continuous drift. `snap` = no in-between frames at all.
-    const m = f(1 - p.hold / 100);
-    const CURVE = {
-      "ease out": ` calcMode="spline" keySplines=".16 1 .3 1;0 0 1 1"`,   // fast out, settles
-      "linear":   ` calcMode="linear"`,
-      "snap":     ` calcMode="discrete"`
-    };
-    const beat = Math.round(rnd4() * 8) / 8;                 // phases land on a 1/8 grid
-    const timing = `dur="${f(p.speed)}s"`
-      + ` begin="${f(beat * p.speed * (p.stagger / 100) * (loop ? -1 : 1))}s"`
-      + (loop ? ` repeatCount="indefinite"` : ` fill="freeze"`)
-      + ` keyTimes="0;${m};1"` + CURVE[p.timing];
-    const moving = p.motion !== "none";
-    const anim = moving
-      ? `<animateTransform attributeName="transform" type="translate" additive="sum"`
-        + ` values="${off};0 0;0 0" ${timing}/>`
-      : "";
-    const morph = (from, to) => moving && from !== to
-      ? `<animate attributeName="d" values="${from};${to};${to}" ${timing}/>` : "";
-
+    // ---- motion, arrow-comb style: the arrow is split into a static shaft and
+    // a travelling head. The head lives in a "motion frame" (base centred on the
+    // origin, tip along +x) and rides the shaft's centreline `cl` (tail → head
+    // base, local coords) via animateMotion rotate="auto" live, or a baked
+    // pose(r) transform; a synced dash wipe on the same line masks the shaft
+    // so it is revealed behind the head — declarative, so exports stay animated.
+    const b = -1 + 2 * hl;
     let acc = 0;
     const rings = p.cwidth
       ? pal.map(c => { acc += (p.cwidth / sc) * (0.4 + rnd2() * 1.2); return {c, w: acc}; }).reverse()
       : [];
-    if (kind === "hook") {
-      const hookShaft = s => `M${f(Math.max(0.2, 0.95 * s))} 0.6 L0 0.6 A0.6 0.6 0 0 1 -0.6 0`;
-      const shaft = hookShaft(sl), shaft0 = hookShaft(sl0), sm = morph(shaft0, shaft);
-      const swv = f(1.3 * sw);
-      const head = `M${f(-0.6 - 0.55 * hw)} 0 L${f(-0.6 + 0.55 * hw)} 0 L-0.6 ${f(-0.7 * hw)} Z`;
-      inner.push(`<g data-i="${i}" transform="${pos}">${anim}<g transform="${loc}">`
-        + rings.map(r =>
-            `<path d="${shaft}" fill="none" stroke="${r.c}" stroke-width="${f3(swv + 2 * r.w)}">${sm}</path>`
-          + `<path d="${head}" fill="none" stroke="${r.c}" stroke-width="${f3(2 * r.w)}" stroke-linejoin="round"/>`).join("")
-        + `<path d="${shaft}" fill="none" stroke="${p.color}" stroke-width="${swv}">${sm}</path>`
-        + `<path d="${head}" fill="${p.color}"/></g></g>`);
-    } else {
-      const d = GEN[kind](hl, hw, sw, sl);
-      const dm = morph(GEN[kind](hl, hw, sw, sl0), d);
-      inner.push(`<g data-i="${i}" transform="${pos}">${anim}`
-        + rings.map(r =>
-          `<path d="${d}" fill="none" stroke="${r.c}" stroke-width="${f3(2 * r.w)}" stroke-linejoin="round" transform="${loc}">${dm}</path>`).join("")
-        + `<path d="${d}" fill="${p.color}" transform="${loc}">${dm}</path></g>`);
+    const w1 = rings.length ? rings[0].w : 0;            // widest contour, local units
+    const ext = w1 + 0.05;                               // wipe starts behind the tail: covers the contour's end
+    const swv = f(1.3 * sw);                             // hook shaft stroke
+    let shaft = null, sh = sw, cl, HL = 1 + b, HW = hw;  // shaft path, shaft half-width, centreline, head length/half-width
+    if (kind === "block") {
+      const e = b + (1 - b) * sl;
+      shaft = `M${f(-sw)} ${f(b)} L${f(sw)} ${f(b)} L${f(sw)} ${f(e)} L${f(-sw)} ${f(e)} Z`;
+      cl = [[0, e + ext], [0, b]];
+    } else if (kind === "round") {
+      const t = Math.max(b + 0.05, b + (1 - b) * sl - sw);
+      shaft = `M${f(-sw)} ${f(b)} L${f(sw)} ${f(b)} L${f(sw)} ${f(t)} A${f(sw)} ${f(sw)} 0 0 1 ${f(-sw)} ${f(t)} Z`;
+      cl = [[0, t + sw + ext], [0, b]];
+    } else if (kind === "roof") {
+      const t = b + 0.4 * sl;
+      shaft = `M${f(-sw)} ${f(b)} L${f(sw)} ${f(b)} L${f(sw)} ${f(t)} L${f(-sw)} ${f(t)} Z`;
+      cl = [[0, t + ext], [0, b]];
+      HW = 2 * hw;
+    } else if (kind === "tri") {                         // no shaft: travels its own length
+      cl = [[0, 2.7], [0, 0.8]];
+      HL = 1.9;
+    } else {                                             // hook: stroked shaft, quarter arc into the head
+      const x0 = Math.max(0.2, 0.95 * sl);
+      shaft = `M${f(x0)} 0.6 L0 0.6 A0.6 0.6 0 0 1 -0.6 0`;
+      cl = [[x0 + ext, 0.6], [0, 0.6]];
+      for (let k = 1; k <= 12; k++) {
+        const th = Math.PI / 2 + k * Math.PI / 24;
+        cl.push([0.6 * Math.cos(th), 0.6 * Math.sin(th)]);
+      }
+      sh = 0.65 * sw; HL = 0.7 * hw; HW = 0.55 * hw;
     }
+    cl = cl.map(([x, y]) => [f(x), f(y)]);               // round first: dash length must match the path
+    const dPath = "M" + cl.map(([x, y]) => x + " " + y).join("L");
+    const cum = [0];
+    for (let k = 1; k < cl.length; k++)
+      cum.push(cum[k - 1] + Math.hypot(cl[k][0] - cl[k - 1][0], cl[k][1] - cl[k - 1][1]));
+    const Lh = +cum[cum.length - 1].toFixed(3);
+    const pose = r => {                                  // position + tangent at fraction r
+      const s = clamp(r, 0, 1) * Lh;
+      let k = 1;
+      while (k < cum.length - 1 && cum[k] < s) k++;
+      const [ax, ay] = cl[k - 1], [bx, by] = cl[k];
+      const t = (s - cum[k - 1]) / (cum[k] - cum[k - 1] || 1);
+      return `translate(${f(ax + (bx - ax) * t)} ${f(ay + (by - ay) * t)})`
+        + ` rotate(${f(Math.atan2(by - ay, bx - ax) * 180 / Math.PI)})`;
+    };
+    // head in the motion frame; the fill carries a small tab back into the
+    // shaft so the two never show a seam where the wipe front meets the base
+    const tab = shaft ? Math.min(sh, HW) : 0;
+    const headRing = `M0 ${f(HW)} L${f(HL)} 0 L0 ${f(-HW)} Z`;
+    const headFill = `M0 ${f(HW)} L${f(HL)} 0 L0 ${f(-HW)}` + (tab ? ` L-0.01 ${f(-tab)} L-0.01 ${f(tab)}` : "") + " Z";
+
+    const beat = Math.round(rnd4() * 8) / 8;             // phases land on a 1/8 grid
+    const ph = (p.stagger / 100) * beat;
+    const id = `m${i}`;
+    let mask = "", mk = "", headAnim = "", headAttr = ` transform="${pose(1)}"`;
+    if (moving) {
+      const mw = f(2 * (sh + w1) + 0.1);
+      let wipe = "", off = Lh;
+      if (time === null) {
+        const tm = smil(ph);
+        wipe = `<animate attributeName="stroke-dashoffset" values="${loop ? `${Lh};0;0` : `${Lh};${Lh};0;0`}"${tm}/>`;
+        headAnim = `<animateMotion path="${dPath}" rotate="auto" keyPoints="${loop ? "0;1;1" : "0;0;1;1"}"${tm}/>`;
+        headAttr = "";
+      } else {
+        const r = progress(ph, time);
+        off = f(Lh * (1 - r));
+        headAttr = ` transform="${pose(r)}"`;
+      }
+      if (shaft) {
+        mk = ` mask="url(#${id})"`;
+        mask = `<mask id="${id}" maskUnits="userSpaceOnUse" x="-12" y="-12" width="24" height="24">`
+          + `<path d="${dPath}" fill="none" stroke="#fff" stroke-width="${mw}" stroke-linejoin="round"`
+          + ` stroke-dasharray="${f(Lh + 0.02)}" stroke-dashoffset="${off}">${wipe}</path></mask>`;
+      }
+    }
+    const headG = inner => `<g${headAttr}>${headAnim}${inner}</g>`;
+    const shaftEl = (c, w) => !shaft ? ""
+      : kind === "hook" ? `<path d="${shaft}" fill="none" stroke="${c}" stroke-width="${f3(swv + 2 * w)}"${mk}/>`
+      : w ? `<path d="${shaft}" fill="none" stroke="${c}" stroke-width="${f3(2 * w)}" stroke-linejoin="round"${mk}/>`
+      : `<path d="${shaft}" fill="${c}"${mk}/>`;
+    // contours interleave shaft and head per level so the union reads like one outline
+    inner.push(`<g data-i="${i}" transform="${pos}"><g transform="${loc}">${mask}`
+      + rings.map(r => shaftEl(r.c, r.w)
+        + headG(`<path d="${headRing}" fill="none" stroke="${r.c}" stroke-width="${f3(2 * r.w)}" stroke-linejoin="round"/>`)).join("")
+      + shaftEl(p.color, 0) + headG(`<path d="${headFill}" fill="${p.color}"/>`)
+      + `</g></g>`);
   }
   // z-order: persisted permutation, last = topmost; sanitize against count
   p.zorder = (p.zorder || []).filter(i => i < p.count);
@@ -417,9 +458,31 @@ function render() {
   for (const g of stage.querySelectorAll("g[data-i]")) g.style.cursor = "pointer";
   view.apply();
 }
+async function exportGIF(setLabel) {
+  const scale = Math.min(1, p.gifpx / Math.max(art.w, art.h));
+  const w = Math.round(art.w * scale), h = Math.round(art.h * scale);
+  // one full cycle; draw-in also covers the stagger tail. static art = one frame
+  const dur = p.motion === "none" ? 0 : p.speed * (p.motion === "draw loop" ? 1 : 1 + p.stagger / 100);
+  const n = dur ? Math.max(1, Math.round(dur * p.fps)) : 1;
+  const frames = [];
+  try {
+    for (let i = 0; i < n; i++) {
+      setLabel(`… ${i + 1}/${n}`);
+      await new Promise(r => setTimeout(r));           // let the label repaint
+      frames.push(await rasterise(makeSVG(i / n * dur).svg, w, h));
+    }
+    setLabel("… encoding");
+    await new Promise(r => setTimeout(r));
+    const blob = encodeGIF(frames, {width: w, height: h, delay: Math.max(2, Math.round(100 / p.fps))});
+    await saveAs(`arrows-${p.seed}.gif`, blob);
+  } finally {
+    render();                                          // restore the live SVG
+  }
+}
 wireExport({
   SVG: () => saveAs(`arrows-${p.seed}.svg`, svgBlob(art.svg)),
   PNG: async () => saveAs(`arrows-${p.seed}.png`, await svgToPNG(art.svg, art.w, art.h)),
+  GIF: exportGIF,
 });
 render();
 
