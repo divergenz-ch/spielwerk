@@ -289,7 +289,7 @@ function makeSVG(time = null) {
     c = loop ? c - Math.floor(c) : clamp(c, 0, 1);
     return F[p.timing](Math.min(1, c / m));
   };
-  // one shared timing for the dash wipe and the travelling head; draw-in folds
+  // one shared timing for the travelling head and its mask eraser; draw-in folds
   // its stagger into the keyTimes so the head waits at the tail
   const T = loop ? p.speed : p.speed * (1 + p.stagger / 100);
   const SPL = {"ease out": ".16 1 .3 1", "linear": "0 0 1 1"};
@@ -338,10 +338,10 @@ function makeSVG(time = null) {
 
     // ---- motion, arrow-comb style: the arrow is split into a static shaft and
     // a travelling head. The head lives in a "motion frame" (base centred on the
-    // origin, tip along +x) and rides the shaft's centreline `cl` (tail → head
+    // origin, tip along +x) and rides the shaft's centreline (tail → head
     // base, local coords) via animateMotion rotate="auto" live, or a baked
-    // pose(r) transform; a synced dash wipe on the same line masks the shaft
-    // so it is revealed behind the head — declarative, so exports stay animated.
+    // pose(r) transform; a mask eraser on the same motion hides the shaft ahead
+    // of the head, so it is revealed behind it — declarative, so exports stay animated.
     const b = -1 + 2 * hl;
     let acc = 0;
     const rings = p.cwidth
@@ -350,50 +350,46 @@ function makeSVG(time = null) {
     const w1 = rings.length ? rings[0].w : 0;            // widest contour, local units
     const ext = w1 + 0.05;                               // wipe starts behind the tail: covers the contour's end
     const swv = f(1.3 * sw);                             // hook shaft stroke
-    let shaft = null, sh = sw, cl, HL = 1 + b, HW = hw;  // shaft path, shaft half-width, centreline, head length/half-width
+    let shaft = null, sh = sw, HL = 1 + b, HW = hw;      // shaft path, shaft half-width, head length/half-width
+    let dPath, pose;                                     // centreline tail → head base, and the pose at fraction r
+    const straight = y0 => {                             // vertical centreline from y0 (behind the tail) up to b
+      y0 = f(y0); const Lh = y0 - f(b);
+      dPath = `M0 ${y0}L0 ${f(b)}`;
+      pose = r => `translate(0 ${f(y0 - clamp(r, 0, 1) * Lh)}) rotate(-90)`;
+    };
     if (kind === "block") {
       const e = b + (1 - b) * sl;
       shaft = `M${f(-sw)} ${f(b)} L${f(sw)} ${f(b)} L${f(sw)} ${f(e)} L${f(-sw)} ${f(e)} Z`;
-      cl = [[0, e + ext], [0, b]];
+      straight(e + ext);
     } else if (kind === "round") {
       const t = Math.max(b + 0.05, b + (1 - b) * sl - sw);
       shaft = `M${f(-sw)} ${f(b)} L${f(sw)} ${f(b)} L${f(sw)} ${f(t)} A${f(sw)} ${f(sw)} 0 0 1 ${f(-sw)} ${f(t)} Z`;
-      cl = [[0, t + sw + ext], [0, b]];
+      straight(t + sw + ext);
     } else if (kind === "roof") {
       const t = b + 0.4 * sl;
       shaft = `M${f(-sw)} ${f(b)} L${f(sw)} ${f(b)} L${f(sw)} ${f(t)} L${f(-sw)} ${f(t)} Z`;
-      cl = [[0, t + ext], [0, b]];
       HW = 2 * hw;
+      straight(t + ext);
     } else if (kind === "tri") {                         // no shaft: travels its own length
-      cl = [[0, 2.7], [0, 0.8]];
       HL = 1.9;
+      dPath = "M0 2.7L0 0.8";
+      pose = r => `translate(0 ${f(2.7 - clamp(r, 0, 1) * 1.9)}) rotate(-90)`;
     } else {                                             // hook: stroked shaft, quarter arc into the head
-      const x0 = Math.max(0.2, 0.95 * sl);
+      // the exact arc is the motion path — a polyline stand-in makes rotate="auto"
+      // snap at every vertex — and the baked pose walks the same line analytically
+      const x0 = Math.max(0.2, 0.95 * sl), L0 = f(x0 + ext), La = 0.3 * Math.PI;
       shaft = `M${f(x0)} 0.6 L0 0.6 A0.6 0.6 0 0 1 -0.6 0`;
-      cl = [[x0 + ext, 0.6], [0, 0.6]];
-      for (let k = 1; k <= 12; k++) {
-        const th = Math.PI / 2 + k * Math.PI / 24;
-        cl.push([0.6 * Math.cos(th), 0.6 * Math.sin(th)]);
-      }
+      dPath = `M${L0} 0.6L0 0.6A0.6 0.6 0 0 1 -0.6 0`;
+      pose = r => {
+        const s = clamp(r, 0, 1) * (L0 + La);
+        if (s <= L0) return `translate(${f(L0 - s)} 0.6) rotate(180)`;
+        const th = Math.PI / 2 + (s - L0) / 0.6;         // clockwise from south to west
+        return `translate(${f(0.6 * Math.cos(th))} ${f(0.6 * Math.sin(th))}) rotate(${f(th * 180 / Math.PI + 90)})`;
+      };
       sh = 0.65 * sw; HL = 0.7 * hw; HW = 0.55 * hw;
     }
-    cl = cl.map(([x, y]) => [f(x), f(y)]);               // round first: dash length must match the path
-    const dPath = "M" + cl.map(([x, y]) => x + " " + y).join("L");
-    const cum = [0];
-    for (let k = 1; k < cl.length; k++)
-      cum.push(cum[k - 1] + Math.hypot(cl[k][0] - cl[k - 1][0], cl[k][1] - cl[k - 1][1]));
-    const Lh = +cum[cum.length - 1].toFixed(3);
-    const pose = r => {                                  // position + tangent at fraction r
-      const s = clamp(r, 0, 1) * Lh;
-      let k = 1;
-      while (k < cum.length - 1 && cum[k] < s) k++;
-      const [ax, ay] = cl[k - 1], [bx, by] = cl[k];
-      const t = (s - cum[k - 1]) / (cum[k] - cum[k - 1] || 1);
-      return `translate(${f(ax + (bx - ax) * t)} ${f(ay + (by - ay) * t)})`
-        + ` rotate(${f(Math.atan2(by - ay, bx - ax) * 180 / Math.PI)})`;
-    };
     // head in the motion frame; the fill carries a small tab back into the
-    // shaft so the two never show a seam where the wipe front meets the base
+    // shaft so the two never show a seam where the reveal front meets the base
     const tab = shaft ? Math.min(sh, HW) : 0;
     const headRing = `M0 ${f(HW)} L${f(HL)} 0 L0 ${f(-HW)} Z`;
     const headFill = `M0 ${f(HW)} L${f(HL)} 0 L0 ${f(-HW)}` + (tab ? ` L-0.01 ${f(-tab)} L-0.01 ${f(tab)}` : "") + " Z";
@@ -403,23 +399,19 @@ function makeSVG(time = null) {
     const id = `m${i}`;
     let mask = "", mk = "", headAnim = "", headAttr = ` transform="${pose(1)}"`;
     if (moving) {
-      const mw = f(2 * (sh + w1) + 0.1);
-      let wipe = "", off = Lh;
       if (time === null) {
-        const tm = smil(ph);
-        wipe = `<animate attributeName="stroke-dashoffset" values="${loop ? `${Lh};0;0` : `${Lh};${Lh};0;0`}"${tm}/>`;
-        headAnim = `<animateMotion path="${dPath}" rotate="auto" keyPoints="${loop ? "0;1;1" : "0;0;1;1"}"${tm}/>`;
+        headAnim = `<animateMotion path="${dPath}" rotate="auto" keyPoints="${loop ? "0;1;1" : "0;0;1;1"}"${smil(ph)}/>`;
         headAttr = "";
-      } else {
-        const r = progress(ph, time);
-        off = f(Lh * (1 - r));
-        headAttr = ` transform="${pose(r)}"`;
-      }
+      } else headAttr = ` transform="${pose(progress(ph, time))}"`;
       if (shaft) {
+        // mask: the whole shaft in white, then an eraser riding on the very same
+        // motion as the head blacks out everything ahead of its base — the reveal
+        // front can't drift from the head, whatever the browser's path parametrisation
+        const mw = f(2 * (sh + w1) + 0.1);
         mk = ` mask="url(#${id})"`;
         mask = `<mask id="${id}" maskUnits="userSpaceOnUse" x="-12" y="-12" width="24" height="24">`
-          + `<path d="${dPath}" fill="none" stroke="#fff" stroke-width="${mw}" stroke-linejoin="round"`
-          + ` stroke-dasharray="${f(Lh + 0.02)}" stroke-dashoffset="${off}">${wipe}</path></mask>`;
+          + `<path d="${dPath}" fill="none" stroke="#fff" stroke-width="${mw}" stroke-linejoin="round"/>`
+          + `<g${headAttr}>${headAnim}<rect y="-12" width="24" height="24"/></g></mask>`;
       }
     }
     const headG = inner => `<g${headAttr}>${headAnim}${inner}</g>`;
