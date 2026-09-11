@@ -515,6 +515,7 @@ const toArt = e => {
 stage.addEventListener("pointerdown", e => {
   const g = e.target.closest("g[data-i]");
   if (!g || view.panning || e.button !== 0) return;
+  e.preventDefault();                                // claim the finger: zoom.js won't pan
   const at = toArt(e);
   drag = {g, i: +g.dataset.i, x0: at.x, y0: at.y, base: g.getAttribute("transform")};
   dragged = false;

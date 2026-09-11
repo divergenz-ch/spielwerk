@@ -333,7 +333,8 @@ function render() {
   stage.innerHTML = art.svg;
   view.apply();
 }
-// pointer over the artboard → artboard coordinates
+// pointer over the artboard → artboard coordinates; a finger steers too (claimed, so zoom.js won't pan)
+stage.addEventListener("pointerdown", e => { if (e.pointerType === "touch") e.preventDefault(); });
 stage.addEventListener("pointermove", e => {
   const svg = stage.querySelector("svg");
   if (!svg || view.panning) return;             // space-drag = panning, not steering

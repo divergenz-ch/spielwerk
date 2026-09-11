@@ -1,6 +1,9 @@
 // Shared artboard viewport for Spielwerk tools. Classic script → window.createZoom.
 // Scales whatever element sits in the stage (an <svg> or a <canvas>), and adds
 // Adobe-style navigation: fit/percent zoom, ⌘±, ⌘0/⌘1, space-drag pan, ⌘-wheel.
+// Touch: one finger pans, two fingers pinch-zoom and pan. A tool that wants the
+// finger for itself (dragging a widget, steering a field) calls preventDefault()
+// on its own stage pointerdown — the pan listener sits on document and yields.
 //
 // The stage may have no layout yet when a tool first renders — a background tab,
 // a hidden panel, a restored session. A stage with no content width measures 64
@@ -130,6 +133,38 @@
       const r = stage.getBoundingClientRect();
       set((pct() ?? 100) * Math.exp(-e.deltaY * 0.01), e.clientX - r.left, e.clientY - r.top);
     }, { passive: false });
+
+    // ---------- touch: one finger pans, two fingers pinch + pan ----------
+    stage.style.touchAction = "none";                    // the stage owns its touches, no native scroll/zoom
+    const fingers = new Map();                           // pointerId → {x, y}
+    let pinch = null;                                    // {dist, pct} at gesture start
+    const centre = () => { const [a, b] = [...fingers.values()]; return {x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y)}; };
+    document.addEventListener("pointerdown", e => {
+      if (e.pointerType !== "touch" || !stage.contains(e.target) || e.defaultPrevented) return;
+      fingers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+      stage.setPointerCapture(e.pointerId);
+      pinch = null;
+    });
+    document.addEventListener("pointermove", e => {
+      const f = fingers.get(e.pointerId);
+      if (!f) return;
+      if (fingers.size === 1) {                          // pan
+        stage.scrollLeft -= e.clientX - f.x; stage.scrollTop -= e.clientY - f.y;
+      } else if (fingers.size === 2) {                   // pinch about the midpoint, and pan with it
+        const before = centre();
+        f.x = e.clientX; f.y = e.clientY;
+        const after = centre();
+        if (!pinch) pinch = {dist: before.d, pct: pct() ?? 100};
+        const r = stage.getBoundingClientRect();
+        set(pinch.pct * after.d / pinch.dist, after.x - r.left, after.y - r.top);
+        stage.scrollLeft -= after.x - before.x; stage.scrollTop -= after.y - before.y;
+        return;
+      }
+      f.x = e.clientX; f.y = e.clientY;
+    });
+    const lift = e => { fingers.delete(e.pointerId); pinch = null; };
+    document.addEventListener("pointerup", lift);
+    document.addEventListener("pointercancel", lift);
 
     apply();
     return { apply, set, pct, get mode() { return mode; }, get panning() { return space; } };
