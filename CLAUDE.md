@@ -59,6 +59,24 @@ convention below. Shortest diff against the house pattern wins.
   frames.
 - Round coordinates (`+n.toFixed(2)`) to keep files small.
 
+## Responsive embed (p5) — arrow-maze is the reference
+
+A tool whose output should live on websites (responsive, smooth motion) moves
+its generator into `tools/<slug>.embed.js`, one classic script shared by the
+tool page and the exported artefact:
+
+- `layout(p, W, H, env) → scene`: the pure generator for any box. It returns
+  the static SVG (`scene.svg`, still the SVG export) plus plain geometry.
+- `drawScene(ctx, scene, t)`: Canvas 2D painter for any instant, which also
+  drives PNG/GIF.
+- `<slug>` custom element: p5 instance mode owns the canvas, pixel density
+  and loop; attributes `fit` / `playback` / `cell`; idles when nothing moves.
+- DEFS live in the embed file (`<Tool>.DEFS`), so the embed has defaults.
+- The tool previews with the element (`fit="contain"`, `regenerate` for the
+  responsive preview) and adds an **Embed** export. No SMIL in these tools:
+  the SVG export is the static picture. Keep the static SVG byte-stable when
+  refactoring the generator — diff it against the old output.
+
 ## Export + review
 
 - Wire `wireExport({SVG, PNG, GIF})`; GIF via `rasterise`/`encodeGIF` over one

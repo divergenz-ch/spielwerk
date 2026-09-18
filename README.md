@@ -13,6 +13,27 @@ no build, no dependencies, works from `file://` or any static host.
    in a sheet that opens when the `<h1>` is tapped). It assumes the usual
    `#panel` > `h1` / `#stage` / `#viewbox` structure.
 
+## Embedding a design on a website (arrow-maze)
+
+arrow-maze exports **Embed**: a demo page with a ready-to-paste snippet, plus
+`arrow-maze.embed.js` (the same runtime the tool previews with):
+
+```html
+<script src="arrow-maze.embed.js" defer></script>
+<arrow-maze fit="regenerate" playback="loop" style="height: 100vh">
+  <script type="application/json">{"params": {…}, "fonts": {…}}</script>
+</arrow-maze>
+```
+
+The element fills its box; with no height it keeps the artboard's proportions.
+Attributes: `fit` (`regenerate`: re-lays the maze out for the box at a fixed
+cell size · `contain` · `cover` · `fixed`), `playback` (`loop` · `once` ·
+`in-view` · `static`), `cell` (px), `pause-offscreen="false"`,
+`reduced-motion="ignore"`, `src` (config JSON URL instead of the inline one),
+`p5-src`. It loads p5 2.x from jsDelivr unless the page already has `p5` —
+self-host `tools/p5.min.js` and set `p5-src` to avoid the CDN. JS:
+`el.config = {…}`, `play()`, `pause()`, `restart()`, `seek(sec)`.
+
 ## Hosting
 
 GitHub Pages, from the repo root of `main`. The index lists tools from
