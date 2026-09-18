@@ -9,8 +9,10 @@
 //   const userFont = fontPicker({onChange: () => render()});
 //   somegroup.append(userFont.row);
 //   userFont.font  // {family, dataURL} — both null until a file is picked
-function fontPicker({label = "typeface", onChange}) {
-  const KEY = "font:" + SLUG;
+// A second face for the same tool passes its own storage key:
+//   fontPicker({label: "accent face", key: "font:" + SLUG + ":accent", onChange})
+function fontPicker({label = "typeface", key, onChange}) {
+  const KEY = key || "font:" + SLUG;
   const row = document.createElement("label");
   const name = document.createElement("span");
   name.textContent = label;

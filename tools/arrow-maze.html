@@ -78,14 +78,15 @@
 <script src="sliders.js"></script>
 <script src="snapshots.js"></script>
 <script src="fontpick.js"></script>
+<script src="opentype.min.js"></script>
 <script>
 // ---------- parameters ----------
 // A ["", "group", …] row opens a new collapsible section; rows after it land in it.
 const DEFS = [
   ["", "group", {label: "arrows"}],
   ["seed",   "range", {min: 1, max: 9999, step: 1, value: 42, hint: "every other setting equal, the same seed gives the same picture"}],
-  ["cols",   "range", {min: 3, max: 60, step: 1, value: 12, label: "columns", hint: "the grid across the width — fewer columns, bigger arrows"}],
-  ["count",  "range", {min: 1, max: 150, step: 1, value: 30, label: "max arrows", hint: "a cap, forks included; the grid usually fills before it is reached"}],
+  ["cols",   "range", {min: 2, max: 60, step: 1, value: 12, label: "columns", hint: "the grid across the width — fewer columns, bigger arrows"}],
+  ["amount", "range", {min: 5, max: 100, step: 5, value: 100, label: "arrow amount %", hint: "share of the grid seeded with arrows — 100 packs it full, every step down removes arrows evenly"}],
   ["length", "range", {min: 1, max: 80, step: 1, value: 14, label: "max length", hint: "cells per arrow, drawn between 3 and this"}],
   ["turn",   "range", {min: 0, max: 100, step: 5, value: 30, label: "bend chance %", hint: "chance to bend at each cell once the straight run is done"}],
   ["run",    "range", {min: 1, max: 6, step: 1, value: 2, label: "min straight", hint: "cells to go straight between bends"}],
@@ -96,25 +97,33 @@ const DEFS = [
   ["dots",   "range", {min: 0, max: 12, step: 1, value: 1, label: "filler dots", hint: "at most this many discs in holes the arrows left"}],
   ["", "group", {label: "geometry"}],
   ["shaft",  "range", {min: 10, max: 98, step: 1, value: 77, label: "shaft % cell", hint: "the rest of the cell is spacing — contours take their room from the shaft"}],
-  ["headW",  "range", {min: 100, max: 300, step: 5, value: 200, label: "head width %", hint: "of the shaft width"}],
-  ["headL",  "range", {min: 50, max: 250, step: 5, value: 130, label: "head length %", hint: "of the shaft width"}],
+  ["headW",  "range", {min: 60, max: 400, step: 5, value: 200, label: "head width %", hint: "of the shaft width"}],
+  ["headL",  "range", {min: 30, max: 400, step: 5, value: 130, label: "head length %", hint: "of the shaft width"}],
   ["round",  "range", {min: 0, max: 100, step: 5, value: 50, label: "rounded bends %", hint: "share of bends drawn as arcs instead of sharp corners"}],
   ["radius", "range", {min: 10, max: 100, step: 5, value: 100, label: "bend radius %", hint: "of a cell, for rounded bends"}],
   ["mix",    "select", {options: ["per arrow", "per bend"], value: "per arrow", label: "rounding mix", hint: "decide round or sharp once per arrow, or at every bend"}],
   ["arcs",   "range", {min: 0, max: 100, step: 5, value: 40, label: "wide arcs %", hint: "chance a 90° bend sweeps a quarter circle several cells wide"}],
-  ["arcR",   "range", {min: 1, max: 4, step: 1, value: 3, label: "arc radius", hint: "in cells, the widest sweep"}],
+  ["arcR",   "range", {min: 1, max: 6, step: 1, value: 3, label: "arc radius", hint: "in cells, the widest sweep"}],
+  ["uturn",  "range", {min: 0, max: 100, step: 5, value: 0, label: "u-turn %", hint: "chance a straight run ends in a 180° sweep back — hairpins, S- and P-shapes"}],
+  ["big",    "range", {min: 0, max: 100, step: 5, value: 0, label: "big arrows %", hint: "chance an arrow draws at the large scale: a wider lane walked in coarser steps"}],
+  ["bigk",   "range", {min: 1.5, max: 4, step: 0.5, value: 2, label: "big scale ×", hint: "lane width of the large arrows, in cells of the base grid"}],
   ["vary",   "range", {min: 0, max: 80, step: 5, value: 30, label: "shaft taper %", hint: "how much the shaft thins along alternate runs"}],
   ["", "group", {label: "panels"}],
-  ["panels", "range", {min: 1, max: 8, step: 1, value: 4, label: "panels"}],
+  ["panels", "range", {min: 1, max: 32, step: 1, value: 4, label: "panel amount", hint: "number of nested panel subdivisions"}],
   ["invert", "range", {min: 0, max: 100, step: 5, value: 40, label: "inverted %", hint: "share of panels drawn paper-on-ink"}],
   ["line",   "range", {min: 0, max: 12, step: 0.5, value: 3, label: "divider px"}],
   ["", "group", {label: "text"}],
-  ["words",  "text",  {value: "", label: "words"}],
+  ["words",  "text",  {value: "", label: "words", hint: "entries split on | — a / inside an entry breaks it into fixed lines"}],
   ["textmin","range", {min: 10, max: 100, step: 5, value: 40, label: "shrink to %", hint: "how small a word may go to find a pocket"}],
+  ["tgap",   "range", {min: 0, max: 100, step: 5, value: 15, label: "text gap % cell", hint: "breathing room the arrows keep around the words — 0 lets them almost touch"}],
+  ["tblock", "checkbox", {value: true, label: "text clears arrows", hint: "the words claim their ground before the arrows walk — untick and the arrows run beneath, the text simply overlays them (with flip per panel the letters invert against whatever they cross)"}],
   ["weight", "range", {min: 100, max: 900, step: 100, value: 700, label: "weight"}],
+  ["aweight","range", {min: 100, max: 900, step: 100, value: 400, label: "accent weight", hint: "weight of words set in the accent face"}],
+  ["textcol","select", {options: ["home panel", "flip per panel"], value: "home panel", label: "word colour", hint: "flip per panel: letters invert against the true ground beneath them — panels, arrows and dots alike — like white type under a difference filter"}],
   ["", "group", {label: "layers"}],
   ["", "group", {label: "colour"}],
   ["ringcol","select", {options: ["ring masters", "home panel"], value: "ring masters", label: "ring colour", hint: "home panel: rings take the arrow's own panel ground, so they only show where it crosses onto another panel"}],
+  ["hollow", "range", {min: 0, max: 100, step: 5, value: 0, label: "hollow %", hint: "chance an arrow is drawn as ground fill with a counter-colour contour — signage-style outline arrows"}],
   ["cwidth", "range", {min: 0, max: 16, step: 0.5, value: 4, label: "arrow contour", hint: "px per ring around the arrows"}],
   ["tcwidth","range", {min: 0, max: 16, step: 0.5, value: 4, label: "text contour", hint: "px per ring around the words"}],
   ["steps",  "range", {min: 1, max: 8, step: 1, value: 4, label: "contour rings"}],
@@ -125,11 +134,15 @@ const DEFS = [
   ["stagger","range", {min: 0, max: 100, step: 5, value: 50, label: "stagger %", hint: "how far apart the arrows start"}],
   ["timing", "select", {options: ["ease out", "linear", "snap"], value: "ease out", label: "timing"}],
   ["", "group", {label: "export"}],
+  ["outline","checkbox", {value: true, label: "outline words", hint: "render words as vector paths so the SVG needs no font (Paper, print); needs the faces re-parsed, uploads only"}],
   ["fps",    "range", {min: 5, max: 30, step: 1, value: 20, label: "gif fps"}],
   ["gifpx",  "range", {min: 200, max: 1000, step: 50, value: 600, label: "gif px"}]
 ];
 const p = {};
 const saved = JSON.parse(localStorage.getItem("arrow-maze") || "{}");
+// Carry the short-lived across/down controls back into the nested panel amount.
+if (!("panels" in saved) && ("panelCols" in saved || "panelRows" in saved))
+  saved.panels = Math.min(32, Math.max(1, (saved.panelCols || 1) * (saved.panelRows || 1)));
 const controls = document.getElementById("controls");
 
 // ---------- collapsible groups ----------
@@ -158,7 +171,7 @@ p.margin = +saved.margin || 0;
   const wIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.wpx});
   const hIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.hpx});
   const preset = document.createElement("select");
-  for (const o of ["custom", "2:3", "3:4", "4:5", "1:1", "9:16"]) preset.append(new Option(o, o));
+  for (const o of ["custom", "2:3", "3:4", "4:5", "1:1", "9:16", "16:9"]) preset.append(new Option(o, o));
   const swap = Object.assign(document.createElement("button"), {textContent: "⇄", title: "swap width/height"});
   swap.style.cssText = "font:inherit;border:1px solid #ccc;background:#fff;border-radius:6px;cursor:pointer";
   p.lock = saved.lock ?? false;
@@ -253,7 +266,19 @@ group("snapshots").append(snapshotPanel());
 
 // custom typeface for the words — FontFace renders it live, and the data: URL
 // is embedded as an @font-face in the SVG so exports keep the face
-const userFont = fontPicker({onChange: () => render()});
+// opentype.js parses each uploaded face so "outline words" can bake real glyph
+// paths — the exported SVG then renders identically with no font installed
+const OT = {main: null, accent: null};
+async function parseOT(slot, f) {
+  OT[slot] = null;
+  if (f?.dataURL) try {
+    OT[slot] = opentype.parse(await (await fetch(f.dataURL)).arrayBuffer());
+  } catch (e) { console.warn("cannot outline " + slot + " face:", e.message); }
+  render();
+}
+const userFont = fontPicker({onChange: f => parseOT("main", f)});
+// a second face (say, a light italic) for single words — the toggle per entry
+const accentFont = fontPicker({label: "accent face", key: "font:" + SLUG + ":accent", onChange: f => parseOT("accent", f)});
 // one size slider per entry; position is auto until the entry is dragged on the stage
 const entries = () => p.words.split("|").map(s => s.trim()).filter(Boolean);
 p.nodes = saved.nodes || {};                          // text → {size: % cell, x, y: fraction of the artboard or null}
@@ -268,6 +293,7 @@ function syncNodeRows() {
   for (const t of es) {
     const nd = p.nodes[t] ??= {size: 60, x: null, y: null};
     const label = document.createElement("label"), name = document.createElement("span");
+    label.style.gridTemplateColumns = "92px 1fr 30px 16px";   // room for the accent toggle
     name.textContent = t;
     name.title = "size % cell — drag the words on the stage to place them, double-click to snap back";
     const input = Object.assign(document.createElement("input"), {type: "range", min: 20, max: 300, step: 5, value: nd.size});
@@ -275,11 +301,15 @@ function syncNodeRows() {
     const out = document.createElement("output");
     out.value = nd.size;
     input.addEventListener("input", () => { nd.size = +input.value; out.value = input.value; render(); });
-    label.append(name, input, out);
+    const acc = Object.assign(document.createElement("input"), {type: "checkbox", checked: !!nd.acc,
+      title: "set this word in the accent face"});
+    acc.style.cssText = "justify-self:end;grid-column:auto";
+    acc.addEventListener("input", () => { nd.acc = acc.checked; render(); });
+    label.append(name, input, out, acc);
     nodeRows.append(label);
   }
 }
-group("text").append(nodeRows, userFont.row);
+group("text").append(nodeRows, userFont.row, accentFont.row);
 
 // ---------- layers: order (bottom first), visibility, opacity, blend ----------
 const LAYERS = ["paper", "panels", "arrows", "dots", "text"];
@@ -325,13 +355,13 @@ buildLayers();
 group("layers").append(layerBox);
 
 // ---------- colour masters ----------
-// A master is a named swatch. The four built-ins are what everything uses by
-// default (ink/paper by panel polarity, the ring pair for contours); any master
+// A master is a named swatch. The built-ins are what everything uses by
+// default (ink/paper by panel polarity, arrow fill, the ring pair for contours); any master
 // can also be pinned to single elements: press its "pick" button, then click
 // arrows, words, panels, dots or the dividers on the stage. Assignments are
 // keyed by element: words by their text, arrows/panels/dots by index.
 // ponytail: arrow and dot indices shift when the seed or grid changes — those pins then land on other arrows
-const FIXED = [["ink", "ink", "#111111"], ["paper", "paper", "#f4f1ea"], ["gradA", "inner ring", "#1c1c1c"], ["gradB", "outer ring", "#f5c518"]];
+const FIXED = [["ink", "ink", "#111111"], ["paper", "paper", "#f4f1ea"], ["arrow", "arrow", "#111111"], ["gradA", "inner ring", "#1c1c1c"], ["gradB", "outer ring", "#f5c518"]];
 for (const [k, , def] of FIXED) p[k] = saved[k] ?? def;
 p.masters = saved.masters || [];                      // custom: [{id, name, color}]
 p.assign = saved.assign || {};                        // element key → master id
@@ -380,6 +410,7 @@ buildMasters();
 group("colour").prepend(masterBox);
 addEventListener("keydown", e => { if (e.key === "Escape" && active) { active = null; stage.style.cursor = ""; buildMasters(); } });
 const ctx = document.createElement("canvas").getContext("2d");   // measures words in the live face
+ctx.textBaseline = "middle";                          // ink bounds relative to the same central baseline the SVG uses
 
 // ---------- Lab gradient (same as arrow-poster) ----------
 const hex2lab = h => {
@@ -429,7 +460,9 @@ function makeSVG(time = null) {
   };
   const rnd = mulberry(p.seed), rnd3 = mulberry(p.seed * 97 + 13), rnd4 = mulberry(p.seed * 131 + 19),
         rnd5 = mulberry(p.seed * 167 + 23),            // contour widths only, so the other streams stay put
-        rnd6 = mulberry(p.seed * 193 + 29);            // panel crossing only
+        rnd6 = mulberry(p.seed * 193 + 29),            // panel crossing only
+        rnd7 = mulberry(p.seed * 229 + 37),            // hollow arrows only
+        rnd8 = mulberry(p.seed * 251 + 41);            // big-arrow scale only
   const g = gradient(p.gradA, p.gradB);
   const pal = Array.from({length: p.steps}, (_, i) => g(p.steps === 1 ? 0.5 : i / (p.steps - 1)));
   const f = n => +n.toFixed(2), f3 = n => +n.toFixed(3);
@@ -462,20 +495,25 @@ function makeSVG(time = null) {
   const M = Math.min(p.margin, Math.min(W, H) / 2 - 50), gw = W - 2 * M, gh = H - 2 * M;   // margin stays paper
   const cols = p.cols, cell = gw / cols, rows = Math.max(2, Math.floor(gh / cell));
   const ox = M, oy = M + (gh - rows * cell) / 2;       // grid is centred vertically, panels stretch to the margin
+  // Guillotine subdivisions preserve the irregular, nested panel structure.
+  // Always split the largest eligible panel so the amount reaches its target
+  // instead of stopping early once panels become smaller than six cells.
   const panels = [{x0: 0, y0: 0, x1: cols, y1: rows}];
-  for (let k = 1; k < p.panels; k++) {                 // guillotine: cut the largest panel across its long side
-    const q = panels.reduce((a, b) => (b.x1 - b.x0) * (b.y1 - b.y0) > (a.x1 - a.x0) * (a.y1 - a.y0) ? b : a);
+  for (let k = 1; k < p.panels; k++) {
+    const eligible = panels.filter(q => q.x1 - q.x0 > 1 || q.y1 - q.y0 > 1);
+    if (!eligible.length) break;                       // every panel is one grid cell
+    const q = eligible.reduce((a, b) => (b.x1 - b.x0) * (b.y1 - b.y0) > (a.x1 - a.x0) * (a.y1 - a.y0) ? b : a);
     const w = q.x1 - q.x0, h = q.y1 - q.y0;
-    if (Math.max(w, h) < 6) break;
-    const vert = w === h ? rnd() < 0.5 : w > h;
-    const cut = Math.round((vert ? w : h) * (0.3 + rnd() * 0.4));
+    const vert = w <= 1 ? false : h <= 1 ? true : w === h ? rnd() < 0.5 : w > h;
+    const span = vert ? w : h;
+    const cut = Math.max(1, Math.min(span - 1, Math.round(span * (0.3 + rnd() * 0.4))));
     const r = {...q};
     if (vert) { q.x1 = q.x0 + cut; r.x0 = q.x1; } else { q.y1 = q.y0 + cut; r.y0 = q.y1; }
     panels.push(r);
   }
   for (const q of panels) q.inv = rnd() < p.invert / 100;
   const N = cols * rows;
-  const pid = new Int8Array(N);                        // panel per cell
+  const pid = new Uint8Array(N);                       // panel per cell
   panels.forEach((q, i) => { for (let y = q.y0; y < q.y1; y++) for (let x = q.x0; x < q.x1; x++) pid[y * cols + x] = i; });
   const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = (rnd() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const starts = shuffle(Array.from({length: N}, (_, i) => i));
@@ -509,11 +547,11 @@ function makeSVG(time = null) {
     const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
     return Math.hypot(x - ax - t * dx, y - ay - t * dy);
   };
-  const rect = (a, b, ca, cb) => {                      // a lane a→b, one cell wide, caps ca behind / cb ahead
-    const [ux, uy] = unit0([b[0] - a[0], b[1] - a[1]]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = 0.5 + Math.max(ca, cb);
+  const rect = (a, b, ca, cb, half = 0.5) => {          // a lane a→b, 2·half wide, caps ca behind / cb ahead
+    const [ux, uy] = unit0([b[0] - a[0], b[1] - a[1]]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = half + Math.max(ca, cb);
     return subs(Math.min(a[0], b[0]) - m, Math.min(a[1], b[1]) - m, Math.max(a[0], b[0]) + m, Math.max(a[1], b[1]) + m, (x, y) => {
       const px = x - a[0], py = y - a[1], al = px * ux + py * uy;
-      return al >= -ca && al <= L + cb && Math.abs(py * ux - px * uy) <= 0.5;
+      return al >= -ca && al <= L + cb && Math.abs(py * ux - px * uy) <= half;
     });
   };
   const tri = (P, m) => {                               // triangle P grown by m
@@ -523,13 +561,13 @@ function makeSVG(time = null) {
       inside(x, y) || P.some((a, i) => dSeg(x, y, a[0], a[1], P[(i + 1) % 3][0], P[(i + 1) % 3][1]) <= m));
   };
   const disc = ([cx, cy], R) => subs(cx - R, cy - R, cx + R, cy + R, (x, y) => Math.hypot(x - cx, y - cy) <= R);
-  const annulus = (V, u1, u2, r, th) => {               // a round bend's arc band: its inner edge can leave the lanes
+  const annulus = (V, u1, u2, r, th, half = 0.5) => {   // a round bend's arc band: its inner edge can leave the lanes
     const sg = Math.sign(u1[0] * u2[1] - u1[1] * u2[0]), t = r * Math.tan(th / 2);
     const cx = V[0] - u1[0] * t - u1[1] * sg * r, cy = V[1] - u1[1] * t + u1[0] * sg * r;
     const mx = V[0] - cx, my = V[1] - cy, ml = Math.hypot(mx, my), cs = Math.cos(th / 2);
-    return subs(cx - r - 0.5, cy - r - 0.5, cx + r + 0.5, cy + r + 0.5, (x, y) => {
+    return subs(cx - r - half, cy - r - half, cx + r + half, cy + r + half, (x, y) => {
       const dx = x - cx, dy = y - cy, dd = Math.hypot(dx, dy);
-      return Math.abs(dd - r) <= 0.5 && dx * mx + dy * my >= cs * dd * ml;
+      return Math.abs(dd - r) <= half && dx * mx + dy * my >= cs * dd * ml;
     });
   };
 
@@ -542,8 +580,11 @@ function makeSVG(time = null) {
   // may share that arrow's claims for the steps into and out of the fork cell,
   // nothing else. bleed: the tail sits on a border cell and runs off the edge.
   const grid = {x0: 0, y0: 0, x1: cols, y1: rows};
-  const walk = (s, d, id, q, {fork = null, bleed = false, cross = false} = {}) => {   // one attempt from cell s heading d; claims subcells on success
+  const walk = (s, d, id, q, {fork = null, bleed = false, cross = false, scale = 1} = {}) => {   // one attempt from cell s heading d; claims subcells on success
     const qi = cross ? -1 : panels.indexOf(q), B = cross ? grid : q;   // a crossing arrow keeps q as its home for colour, roams the whole grid
+    // scale > 1: the arrow walks the same grid in steps of `scale` cells and every
+    // claim, cap and head grows by the same factor — a big arrow among small ones
+    const K = scale, hmK = hg * K + 1 / SUB, hwK = hw * K, hlK = hl * K, eK = (K - 1) / 2;
     const own = (j, k) => (fid[j] === id && fst[j] >= k - 2)
       || (fork && k <= 2 && fid[j] === fork.id && (fst[j] === fork.k || fst[j] === fork.k + 1));
     const cells = [[s % cols, s / cols | 0]], bends = [], arcs = [], dirs = [d], claimed = [];   // arcs[k]: radius of step k if it sweeps
@@ -560,20 +601,26 @@ function makeSVG(time = null) {
       claimed.push({fresh, shared, k});
     };
     const release = () => { const {fresh, shared, k} = claimed.pop(); for (const j of fresh) fid[j] = -1; for (const j of shared) fst[j] = k - 1; };
-    const inPanel = (x, y) => x >= B.x0 && x < B.x1 && y >= B.y0 && y < B.y1;
+    const inPanel = (x, y) => x >= B.x0 + eK && x <= B.x1 - 1 - eK && y >= B.y0 + eK && y <= B.y1 - 1 - eK;
+    if (K > 1 && !fork && !bleed && !inPanel(cells[0][0], cells[0][1])) return false;   // a wide tail needs its whole lane inside
     const step = t => {                                 // try a step turning by t (45° units)
-      const [x, y] = cells[cells.length - 1], nd = (d + t + 8) % 8, [dx, dy] = D[nd], nx = x + dx, ny = y + dy;
+      const [x, y] = cells[cells.length - 1], nd = (d + t + 8) % 8, [dx, dy] = D[nd], nx = x + dx * K, ny = y + dy * K;
       const k = cells.length;
+      // a branch's first step must leave the parent's axis, or the tail mitre is undefined
+      if (fork && k === 1 && ((nd - arrows[fork.id].dirs[fork.k] + 8) & 3) === 0) return false;
       // a 90° turn may sweep: a quarter circle of n cells radius, vertex n cells
       // ahead, landing n cells along the new heading — on the grid for axis and
       // diagonal headings alike (radius n√2 for the latter)
       if (Math.abs(t) === 2 && rnd() < p.arcs / 100) {
-        const n = 1 + Math.floor(rnd() * p.arcR), [ax, ay] = D[d], vx = x + ax * n, vy = y + ay * n, bx = vx + dx * n, by = vy + dy * n;
+        const n = (1 + Math.floor(rnd() * p.arcR)) * K, [ax, ay] = D[d], vx = x + ax * n, vy = y + ay * n, bx = vx + dx * n, by = vy + dy * n;
         const R = n * Math.hypot(ax, ay);
         if (inPanel(bx, by) && inPanel(vx, vy)) {
-          const list = annulus([vx, vy], unit0(D[d]), unit0(D[nd]), R, Math.PI / 2);
+          const u1 = unit0(D[d]), u2 = unit0(D[nd]);
+          const list = annulus([vx, vy], u1, u2, R, Math.PI / 2, 0.5 * K);
           if (clear(list, qi, j => own(j, k))) {
-            claim(list, k); cells.push([bx, by]); dirs.push(nd); arcs[k] = R; bends[k - 1] = false;
+            claim(list, k); cells.push([bx, by]); dirs.push(nd);
+            arcs[k] = {r: R, th: Math.PI / 2, sg: Math.sign(u1[0] * u2[1] - u1[1] * u2[0])};
+            bends[k - 1] = false;
             lastV = k; run = 2; d = nd;
             return true;
           }
@@ -582,10 +629,10 @@ function makeSVG(time = null) {
       if (!inPanel(nx, ny)) return false;
       const bendRound = rnd3() < p.round / 100;         // one draw per bend, mixing or not
       const round = t !== 0 && (p.mix === "per arrow" ? arrowRound : bendRound);
-      let list = rect([x, y], [nx, ny], k === 1 && !fork && !bleed ? hg : 0.5, 0.5);   // a fork or bleed tail is buried, no gap behind it
+      let list = rect([x, y], [nx, ny], (k === 1 && !fork && !bleed ? hg : 0.5) * K, 0.5 * K, 0.5 * K);   // a fork or bleed tail is buried, no gap behind it
       if (round && r0c > 0) {                            // biggest radius this bend can get; render may shrink it
         const th = Math.abs(t) * Math.PI / 4, prev = Math.hypot(x - cells[lastV][0], y - cells[lastV][1]);
-        list = list.concat(annulus([x, y], unit0(D[d]), unit0(D[nd]), Math.min(r0c, prev / 2 / Math.tan(th / 2)), th));
+        list = list.concat(annulus([x, y], unit0(D[d]), unit0(D[nd]), Math.min(r0c * K, prev / 2 / Math.tan(th / 2)), th, 0.5 * K));
       }
       // our own last two steps may share the corner region, nothing else
       if (!clear(list, qi, j => own(j, k))) return false;
@@ -594,29 +641,51 @@ function makeSVG(time = null) {
       run = t ? 1 : run + 1; d = nd;
       return true;
     };
+    // u-turn: a 180° sweep back — the two legs run 2r apart, the tightest radius
+    // hairpin-close; radius in half-lane steps up to the arc radius
+    const ustep = () => {
+      const [x, y] = cells[cells.length - 1], k = cells.length;
+      const [ux, uy] = unit0(D[d]);
+      const r = K * 0.5 * (1 + Math.floor(rnd() * p.arcR));
+      const sg = rnd() < 0.5 ? 1 : -1;
+      const cx = x - uy * sg * r, cy = y + ux * sg * r;
+      const bx = x - uy * sg * 2 * r, by = y + ux * sg * 2 * r;
+      const nd = (d + 4) % 8;
+      if (!inPanel(bx, by)) return false;
+      const list = subs(cx - r - 0.5 * K, cy - r - 0.5 * K, cx + r + 0.5 * K, cy + r + 0.5 * K, (px, py) => {
+        const dx = px - cx, dy = py - cy;
+        return Math.abs(Math.hypot(dx, dy) - r) <= 0.5 * K && dx * ux + dy * uy >= -1e-9;
+      });
+      if (!clear(list, qi, j => own(j, k))) return false;
+      claim(list, k); cells.push([bx, by]); dirs.push(nd);
+      arcs[k] = {r, th: Math.PI, sg}; bends[k - 1] = false;
+      lastV = k; run = 0; d = nd;
+      return true;
+    };
     // head: its triangle plus half a gap, only overlapping our own last step;
     // the tip must stay on the artboard, the corners may clip at the edge
     const head = () => {
       const [bx, by] = cells[cells.length - 1], [ux, uy] = unit0(D[dirs[dirs.length - 1]]);
-      const tx = bx + ux * hl, ty = by + uy * hl;
-      const P = [[bx - uy * hw, by + ux * hw], [tx, ty], [bx + uy * hw, by - ux * hw]];
+      const tx = bx + ux * hlK, ty = by + uy * hlK;
+      const P = [[bx - uy * hwK, by + ux * hwK], [tx, ty], [bx + uy * hwK, by - ux * hwK]];
       // the tip stays on the grid; with a margin the corners must too (no clipping into it)
       const out = (x, y, m) => x < -0.5 - m || x > cols - 0.5 + m || y < -0.5 - m || y > rows - 0.5 + m;
-      if (out(tx, ty, 0) || (M > 0 && P.some(([x, y]) => out(x, y, -hm)))) return null;
-      const list = tri(P, hm);
+      if (out(tx, ty, 0) || (M > 0 && P.some(([x, y]) => out(x, y, -hmK)))) return null;
+      const list = tri(P, hmK);
       const k = cells.length - 1;
       return clear(list, qi, j => (fid[j] === id && fst[j] === k) || (fork && k <= 2 && own(j, k))) ? list : null;
     };
     let hd = null;
     // walk to the wanted length, then on until the head fits
     while (!(cells.length - 1 >= want && (hd = head())) && cells.length - 1 < want + 6) {
+      if (p.uturn && run >= Math.max(p.run, 1) && rnd() < p.uturn / 100 && ustep()) continue;
       const ts = shuffle([...turns]);
       const order = run >= p.run && rnd() < p.turn / 100 ? [...ts, 0] : [0, ...ts];   // straight runs at least p.run cells
       if (!order.some(step)) break;
     }
     // no room for the head here: back the shaft up one step and try again
     while (cells.length >= 2) {
-      if (hd ||= head()) { claim(hd, cells.length - 1); arrows.push({cells, bends, arcs, dirs, dip, q, fork, bleed, cross}); return true; }
+      if (hd ||= head()) { claim(hd, cells.length - 1); arrows.push({cells, bends, arcs, dirs, dip, q, fork, bleed, cross, k: K}); return true; }
       release(); cells.pop(); dirs.pop();
     }
     while (claimed.length) release();
@@ -629,9 +698,11 @@ function makeSVG(time = null) {
   // ponytail: exhaustive subcell scan over a summed-area table; ~1M O(1) checks worst case
   // Hand-placed entries are claimed before the walks so the arrows keep clear
   // of them; auto entries go after, into the pockets the arrows left.
-  const lh = 1.1, hm0 = 0.5 - p.shaft / 200 + 1 / SUB;   // leading in em; text keeps the plain lane gap from the contours' edge
+  const lh = 1.1, hm0 = p.tgap / 100 * 0.5 + 1 / SUB;   // leading in em; the words' clearance is its own dial, plus one subcell of sampling safety
   const tct = p.tcwidth * p.steps / cell;             // the words' own contour budget, cell units
   const fam = userFont.font.family ? `${userFont.font.family}, Helvetica, sans-serif` : "Helvetica Neue, Helvetica, Arial, sans-serif";
+  const famAcc = accentFont.font.family ? `${accentFont.font.family}, Helvetica, sans-serif` : fam;
+  const famOf = nd => nd?.acc ? famAcc : fam, weightOf = nd => nd?.acc ? p.aweight : p.weight;
   const W1 = fw + 1;
   let sat;                                            // occupied count over subcell prefixes
   const buildSAT = () => {
@@ -648,10 +719,14 @@ function makeSVG(time = null) {
   const placeWords = manual => { buildSAT(); for (const t of entries()) {
     const nd = p.nodes[t] || {size: 60, x: null, y: null}, px0 = cell * nd.size / 100;
     if ((nd.x !== null) !== manual) continue;
-    ctx.font = `${p.weight} ${px0}px ${fam}`;
+    ctx.font = `${weightOf(nd)} ${px0}px ${famOf(nd)}`;
     const ws = t.split(/\s+/), ww = ws.map(w => ctx.measureText(w).width), sp = ctx.measureText(" ").width;
     const total = ww.reduce((a, b) => a + b) + sp * (ws.length - 1);
     const wraps = [], seen = new Set();                // distinct greedy wraps, fewest lines first
+    if (t.includes("/")) {                             // "/" sets the line breaks by hand: exactly these lines, no auto wrap
+      const parts = t.split("/").map(x => x.trim()).filter(Boolean);
+      wraps.push({lines: parts, width: Math.max(...parts.map(l => ctx.measureText(l).width))});
+    } else
     for (let n = 1; n <= ws.length; n++) {
       const maxW = Math.max(...ww, total / n), lines = [[]];
       let cw = -sp;
@@ -664,22 +739,40 @@ function makeSVG(time = null) {
       wraps.push({lines: lines.map(l => l.map(i => ws[i]).join(" ")),
                   width: Math.max(...lines.map(l => l.reduce((a, i) => a + ww[i], 0) + sp * (l.length - 1)))});
     }
+    // tight ink bounds: the claimed box hugs the letters' actual extents (cap
+    // height, descenders, italic overhang) instead of the em box, so arrows can
+    // sit as close as the gap dial allows. cx/cy: ink centre off the anchor centre.
+    const inkBox = lines => {
+      let L = 1e9, R = -1e9, T = 1e9, B = -1e9;
+      lines.forEach((l, k) => {
+        const m = ctx.measureText(l), ly = (k - (lines.length - 1) / 2) * lh * px0;
+        T = Math.min(T, ly - m.actualBoundingBoxAscent); B = Math.max(B, ly + m.actualBoundingBoxDescent);
+        L = Math.min(L, -m.width / 2 - m.actualBoundingBoxLeft); R = Math.max(R, -m.width / 2 + m.actualBoundingBoxRight);
+      });
+      return {w: R - L, h: B - T, cx: (L + R) / 2, cy: (T + B) / 2};
+    };
+    for (const w of wraps) w.ink = inkBox(w.lines);
     let best = null;
     if (nd.x !== null) {                               // placed by hand: fewest lines that fit the grid's width
       const ci = (nd.x * W - ox) / cell * SUB, cj = (nd.y * H - oy) / cell * SUB;
       const q = panels[pid[clamp(cj / SUB | 0, 0, rows - 1) * cols + clamp(ci / SUB | 0, 0, cols - 1)]];
-      const fit = wraps.find(w => (w.width / cell + 2 * (hm0 + tct)) * SUB <= fw) || wraps[wraps.length - 1];   // wraps only against the whole grid: dragged words may span panels
-      const bw = Math.ceil((fit.width / cell + 2 * (hm0 + tct)) * SUB), bh = Math.ceil((fit.lines.length * lh * px0 / cell + 2 * (hm0 + tct)) * SUB);
-      best = {i0: ci - bw / 2, j0: cj - bh / 2, bw, bh, q, lines: fit.lines, px: px0};
+      const fit = wraps.find(w => (w.ink.w / cell + 2 * (hm0 + tct)) * SUB <= fw) || wraps[wraps.length - 1];   // wraps only against the whole grid: dragged words may span panels
+      const bw = Math.ceil((fit.ink.w / cell + 2 * (hm0 + tct)) * SUB), bh = Math.ceil((fit.ink.h / cell + 2 * (hm0 + tct)) * SUB);
+      best = {i0: ci + fit.ink.cx / cell * SUB - bw / 2, j0: cj + fit.ink.cy / cell * SUB - bh / 2, bw, bh, q, lines: fit.lines, px: px0, ink: fit.ink, s: 1};
     }
-    else search: for (const s of scales) for (const {lines, width} of wraps) {
-      const bw = Math.ceil((width * s / cell + 2 * (hm0 + tct)) * SUB), bh = Math.ceil((lines.length * lh * px0 * s / cell + 2 * (hm0 + tct)) * SUB);
+    else search: for (const s of scales) for (const {lines, ink} of wraps) {
+      const bw = Math.ceil((ink.w * s / cell + 2 * (hm0 + tct)) * SUB), bh = Math.ceil((ink.h * s / cell + 2 * (hm0 + tct)) * SUB);
       for (const q of panels)
         for (let j0 = q.y0 * SUB; j0 + bh <= q.y1 * SUB; j0++) for (let i0 = q.x0 * SUB; i0 + bw <= q.x1 * SUB; i0++) {
-          if (blocked(q, i0, j0, i0 + bw - 1, j0 + bh - 1)) continue;
+          // loop bounds keep the box inside the panel, so occupancy is the only test left
+          const occ = sat[(j0 + bh) * W1 + i0 + bw] - sat[j0 * W1 + i0 + bw] - sat[(j0 + bh) * W1 + i0] + sat[j0 * W1 + i0];
+          if (occ && p.tblock) continue;               // words must sit on free ground — unless they may overlay
           let k = 0;                                   // clearance: how far the box can grow before it touches
-          while (!blocked(q, i0 - k - 1, j0 - k - 1, i0 + bw + k, j0 + bh + k)) k++;
-          if (!best || k > best.k) best = {k, i0, j0, bw, bh, q, lines, px: px0 * s};
+          if (!occ) while (!blocked(q, i0 - k - 1, j0 - k - 1, i0 + bw + k, j0 + bh + k)) k++;
+          // free beats overlapped, least overlap beats more, deepest pocket breaks ties —
+          // in overlay mode a full-size fit always exists, so words stop shrinking to dodge arrows
+          if (!best || occ < best.occ || (occ === best.occ && k > best.k))
+            best = {occ, k, i0, j0, bw, bh, q, lines, px: px0 * s, ink, s};
         }
       if (best) break search;
     }
@@ -689,31 +782,45 @@ function makeSVG(time = null) {
     buildSAT();
     words.push({...best, t});
   } };
-  placeWords(true);
+  if (p.tblock) placeWords(true);                     // hand-placed words claim ground first: the walks keep clear
 
   const d0 = p.dirs === "orthogonal" ? [0, 2, 4, 6] : [0, 1, 2, 3, 4, 5, 6, 7];
   // headings whose reverse leaves the panel from cell x,y: a tail there can bleed off the edge
   const exits = (x, y, q) => d0.filter(d => { const bx = x - D[d][0], by = y - D[d][1]; return bx < q.x0 || bx >= q.x1 || by < q.y0 || by >= q.y1; });
   for (const s of starts) {
-    if (arrows.length >= p.count) break;
     const x = s % cols, y = s / cols | 0, q = panels[pid[s]];
     if (fid[(y * SUB + SUB / 2) * fw + x * SUB + SUB / 2] !== -1) continue;
     const cross = !q.inv && rnd6() < p.cross / 100;    // only ink arrows cross: a paper arrow on paper would read as a hollow outline
+    const scale = rnd8() < p.big / 100 ? p.bigk : 1;   // dedicated stream, so 0 % leaves every other draw untouched
     const ex = exits(x, y, cross ? grid : q), bleed = ex.length > 0 && rnd() < p.bleed / 100, id = arrows.length;
-    if (!shuffle(bleed ? ex : [...d0]).some(d => walk(s, d, id, q, {bleed, cross}))) continue;
+    if (!shuffle(bleed ? ex : [...d0]).some(d => walk(s, d, id, q, {bleed, cross, scale}))) continue;
     // fork: a branch leaves an interior cell of the fresh arrow, turning off its heading there
     // only where the parent runs straight through the cell, so its centreline
     // passes the centre and the branch's tail can be buried along it; never
     // near the head
     if (rnd() < p.fork / 100) {
       const A = arrows[id], ks = [];
-      for (let k = 1; k <= A.cells.length - 4; k++) if (A.dirs[k] === A.dirs[k + 1] && !A.arcs[k] && !A.arcs[k + 1]) ks.push(k);
+      for (let k = 1; k <= A.cells.length - 4; k++) if (A.dirs[k] === A.dirs[k + 1] && !A.arcs[k] && !A.arcs[k + 1]
+        && Number.isInteger(A.cells[k][0]) && Number.isInteger(A.cells[k][1])) ks.push(k);   // u-turns can leave the integer grid; forks stay on it
       if (ks.length) {
         const k = ks[Math.floor(rnd() * ks.length)], [fx, fy] = A.cells[k];
-        shuffle([...turns]).some(t => walk(fy * cols + fx, (A.dirs[k] + t + 8) % 8, arrows.length, q, {fork: {id, k}, cross}));
+        shuffle([...turns]).some(t => walk(fy * cols + fx, (A.dirs[k] + t + 8) % 8, arrows.length, q, {fork: {id, k}, cross, scale: A.k}));
       }
     }
   }
+  // arrow amount: the fill always runs to saturation, then the slider keeps the
+  // first share of the arrows (branches ride with their root) and releases the
+  // rest's claims — so the count scales evenly and the freed room goes to the
+  // words and dots below
+  {
+    const roots = arrows.filter(A => !A.fork).length;
+    const keep = Math.max(1, Math.round(p.amount / 100 * roots));
+    let r = 0;
+    arrows.forEach(A => { if (!A.fork) r++; A.skip = r > keep; });
+    if (keep < roots) for (let j = 0; j < fid.length; j++)
+      if (fid[j] >= 0 && fid[j] < arrows.length && arrows[fid[j]].skip) fid[j] = -1;
+  }
+  if (!p.tblock) placeWords(true);   // overlay: hand-placed words drop in over the finished arrows — their claim still steers the auto words and dots
   placeWords(false);
 
   // dots fill leftover holes
@@ -728,61 +835,132 @@ function makeSVG(time = null) {
 
   // ---- draw
   const sw = 2 * sc * cell, hwp = hw * cell, hlp = hl * cell, r0 = r0c * cell;
-  const fontDefs = userFont.font.dataURL
-    ? `<defs><style>@font-face{font-family:"${userFont.font.family}";src:url(${userFont.font.dataURL});}</style></defs>`
-    : "";
+  let textUsed = false;                                // any word that fell back to <text> needs the @font-face defs
   const LY = Object.fromEntries(LAYERS.map(id => [id, []]));   // svg per layer
   LY.paper.push(`<rect width="${W}" height="${H}" fill="${p.paper}"/>`);
-  const lines = [];
+  const lines = [], ppR = [], piR = [];                // panel rects by polarity, for the words' flip clips
   panels.forEach((q, qi) => {
     const x0 = q.x0 ? ox + q.x0 * cell : M, x1 = q.x1 < cols ? ox + q.x1 * cell : W - M;
     const y0 = q.y0 ? oy + q.y0 * cell : M, y1 = q.y1 < rows ? oy + q.y1 * cell : H - M;
     LY.panels.push(`<rect x="${f(x0)}" y="${f(y0)}" width="${f(x1 - x0)}" height="${f(y1 - y0)}" fill="${colorOf("panel:" + qi, q.inv ? p.ink : p.paper)}" data-el="panel:${qi}"/>`);
     q.px = `<rect x="${f(x0)}" y="${f(y0)}" width="${f(x1 - x0)}" height="${f(y1 - y0)}"/>`;
+    (q.inv ? piR : ppR).push(q.px);
     if (q.x1 < cols) lines.push(`M${f(x1)} ${f(y0)}V${f(y1)}`);   // inner edges only, so the artboard rim stays clean
     if (q.y1 < rows) lines.push(`M${f(x0)} ${f(y1)}H${f(x1)}`);
   });
   if (M > 0) lines.push(`M${f(M)} ${f(M)}H${f(W - M)}V${f(H - M)}H${f(M)}Z`);   // inside a margin the panels need their frame
   if (p.line && lines.length) LY.panels.push(`<path d="${lines.join("")}" fill="none" stroke="${colorOf("lines", p.ink)}" stroke-width="${p.line}" data-el="lines"/>`);
-  dots.forEach(({x, y, q}, j) =>
-    LY.dots.push(`<circle cx="${f(ox + (x + 0.5) * cell)}" cy="${f(oy + (y + 0.5) * cell)}" r="${f(1.25 * cell)}" fill="${colorOf("dot:" + j, q.inv ? p.paper : p.ink)}" data-el="dot:${j}"/>`));
+  // covers: every shape that can end up under a word. The flip below re-draws
+  // the letters clipped to each one in its fill's counter colour, so the text
+  // reacts to the true ground beneath it — panels, arrows and dots alike —
+  // exactly like white type under a difference filter, but as editable fills
+  const covers = [];
+  const layerOn = id => p.layers.some(l => l.id === id && l.on && l.opacity > 0);
+  const lum = c => { const m = /^#([0-9a-f]{6})$/i.exec(c); if (!m) return 0.5;
+    const n = parseInt(m[1], 16);
+    return (0.2126 * (n >> 16 & 255) + 0.7152 * (n >> 8 & 255) + 0.0722 * (n & 255)) / 255; };
+  const counter = c => Math.abs(lum(c) - lum(p.ink)) >= Math.abs(lum(c) - lum(p.paper)) ? p.ink : p.paper;
+  dots.forEach(({x, y, q}, j) => {
+    const cx = f(ox + (x + 0.5) * cell), cy = f(oy + (y + 0.5) * cell), r = f(1.25 * cell);
+    const fill = colorOf("dot:" + j, q.inv ? p.paper : p.ink);
+    LY.dots.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" data-el="dot:${j}"/>`);
+    if (layerOn("dots")) covers.push({el: `<circle cx="${cx}" cy="${cy}" r="${r}"/>`, fill, bb: [cx - r, cy - r, cx + r, cy + r]});
+  });
   const esc = s => s.replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
   // words get the arrows' contour stack too: even ring steps, every line's rings
   // before any line's fill so a wide ring never sits on the neighbouring line
   const tr = p.tcwidth ? pal.map((c, k) => ({c, w: p.tcwidth * (k + 1)})).reverse() : [];
-  words.forEach(({i0, j0, bw, bh, q, lines, px, t}, n) => {   // data-node lets the stage drag it
-    const cx = f(ox + (i0 + bw / 2) / SUB * cell), cy = oy + (j0 + bh / 2) / SUB * cell;
-    const line = (l, k, paint) => `<text x="${cx}" y="${f(cy + (k - (lines.length - 1) / 2) * lh * px)}" font-family="${fam}"`
-      + ` font-size="${f(px)}" font-weight="${p.weight}" text-anchor="middle" dominant-baseline="central"${paint}>${esc(l)}</text>`;
-    LY.text.push(`<g data-node="${n}" data-el="word:${n}" data-cx="${cx}" data-cy="${f(cy)}">`
-      + tr.map(r => lines.map((l, k) => line(l, k, ` fill="none" stroke="${r.c}" stroke-width="${f(2 * r.w)}" stroke-linejoin="round"`)).join("")).join("")
-      + lines.map((l, k) => line(l, k, ` fill="${colorOf("word:" + t, q.inv ? p.paper : p.ink)}"`)).join("") + `</g>`);
+  // flip per panel: every word is drawn twice, ink clipped to the paper panels
+  // and paper clipped to the ink panels — letters flip polarity at panel edges.
+  // The margin frame counts as paper.
+  if (p.textcol === "flip per panel" && words.length) {
+    if (M > 0) ppR.push(`<rect x="0" y="0" width="${W}" height="${M}"/><rect x="0" y="${f(H - M)}" width="${W}" height="${M}"/>`,
+                        `<rect x="0" y="0" width="${M}" height="${H}"/><rect x="${f(W - M)}" y="0" width="${M}" height="${H}"/>`);
+    LY.text.push(`<defs><clipPath id="tpp">${ppR.join("")}</clipPath><clipPath id="tpi">${piR.join("")}</clipPath></defs>`);
+  }
+  // words render AFTER the arrows loop (drawWords below), so the covers exist —
+  // the flip needs every shape's final geometry and fill
+  const drawWords = () => { const parts = [], usedCovers = new Set();
+  words.forEach(({i0, j0, bw, bh, q, lines, px, ink, s: sc2, t}, n) => {   // data-node lets the stage drag it
+    const nd = p.nodes[t];
+    // the box hugs the ink; the anchor centre sits off it by the ink offsets
+    const cx = f(ox + (i0 + bw / 2) / SUB * cell - ink.cx * sc2), cy = oy + (j0 + bh / 2) / SUB * cell - ink.cy * sc2;
+    const ot = nd?.acc ? OT.accent : OT.main;
+    const dOf = (l, k) => {                            // one line as a glyph path
+      const ly = cy + (k - (lines.length - 1) / 2) * lh * px;
+      // own serializer — opentype 2.0.0's toPathData emits NaNs on longer strings
+      const s = px / ot.unitsPerEm;
+      return ot.getPath(l, cx - ot.getAdvanceWidth(l, px) / 2, ly + (ot.ascender + ot.descender) / 2 * s, px)
+        .commands.map(c =>
+          c.type === "M" ? `M${f(c.x)} ${f(c.y)}` :
+          c.type === "L" ? `L${f(c.x)} ${f(c.y)}` :
+          c.type === "C" ? `C${f(c.x1)} ${f(c.y1)} ${f(c.x2)} ${f(c.y2)} ${f(c.x)} ${f(c.y)}` :
+          c.type === "Q" ? `Q${f(c.x1)} ${f(c.y1)} ${f(c.x)} ${f(c.y)}` : "Z").join("");
+    };
+    // outlined words merge the whole block into ONE path per paint — the export
+    // stays a flat stack of editable compound paths, not a path per line
+    const blockD = p.outline && ot ? lines.map(dOf).join("") : null;
+    const line = (l, k, paint) => {
+      const ly = cy + (k - (lines.length - 1) / 2) * lh * px;
+      textUsed = true;
+      return `<text x="${cx}" y="${f(ly)}" font-family="${famOf(nd)}"`
+        + ` font-size="${f(px)}" font-weight="${weightOf(nd)}" text-anchor="middle" dominant-baseline="central"${paint}>${esc(l)}</text>`;
+    };
+    const draw = paint => blockD ? `<path d="${blockD}"${paint}/>` : lines.map((l, k) => line(l, k, paint)).join("");
+    const assigned = masterColor(p.assign["word:" + t]);
+    // the panel flip lays the base; every arrow or dot crossing the word's box
+    // then re-draws it clipped to that shape, in its fill's counter colour —
+    // shapes never overlap each other, so exactly one cover owns any point
+    const wx0 = ox + i0 / SUB * cell, wy0 = oy + j0 / SUB * cell;
+    const wx1 = wx0 + bw / SUB * cell, wy1 = wy0 + bh / SUB * cell;
+    const overs = !assigned && p.textcol === "flip per panel"
+      ? covers.map((c, ci) => ci).filter(ci => { const b = covers[ci].bb; return b[0] < wx1 && b[2] > wx0 && b[1] < wy1 && b[3] > wy0; })
+      : [];
+    for (const ci of overs) usedCovers.add(ci);
+    const fills = !assigned && p.textcol === "flip per panel"
+      ? `<g clip-path="url(#tpp)">` + draw(` fill="${p.ink}"`) + `</g>`
+        + `<g clip-path="url(#tpi)">` + draw(` fill="${p.paper}"`) + `</g>`
+        + overs.map(ci => `<g clip-path="url(#tc${ci})">` + draw(` fill="${counter(covers[ci].fill)}"`) + `</g>`).join("")
+      : draw(` fill="${assigned ?? (q.inv ? p.paper : p.ink)}"`);
+    parts.push(`<g id="word-${n}" data-node="${n}" data-el="word:${n}" data-cx="${cx}" data-cy="${f(cy)}">`
+      + tr.map(r => draw(` fill="none" stroke="${r.c}" stroke-width="${f(2 * r.w)}" stroke-linejoin="round"`)).join("")
+      + fills + `</g>`);
   });
+  if (usedCovers.size) LY.text.push(`<defs>${[...usedCovers].map(ci => `<clipPath id="tc${ci}">${covers[ci].el}</clipPath>`).join("")}</defs>`);
+  LY.text.push(...parts); };
 
   const unit = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [dx / l, dy / l]; };
   // rings are drawn level by level across all arrows (widest level first), then
   // every fill: where a branch meets its parent the union then reads as one
   // shape's contour instead of the branch's rings sitting on the parent's.
   // Bleed arrows are clipped to their panel.
-  const defs = panels.map((q, qi) => `<clipPath id="q${qi}">${q.px}</clipPath>`), ringLevels = pal.map(() => []), fillParts = [];
+  const defs = [], usedClips = new Set();
   arrows.forEach((A, i) => {
+    if (A.skip) return;                                  // amount slider dropped it; skipping after the fill keeps every random stream aligned
+    const K = A.k || 1, swA = sw * K, hwpA = hwp * K, hlpA = hlp * K, r0A = r0 * K;   // big arrows scale every stroke of their own
     const pts = A.cells.map(([x, y]) => [ox + (x + 0.5) * cell, oy + (y + 0.5) * cell]);
     // contours: the outline and head stroked at growing widths, widest first, the
     // fill on top — ring widths vary per arrow but the stack never exceeds the
     // budget the shaft gave up, so neighbours' contours can at most meet
     let acc = 0, rings;
     const home = colorOf("panel:" + panels.indexOf(A.q), A.q.inv ? p.ink : p.paper);   // the ground the arrow sits on
+    const oppo = p.arrow;                                // hollow contours use the same explicit arrow colour
+    const hv = rnd7() < p.hollow / 100;                  // one draw per arrow keeps the stream aligned
+    A.hollow = A.fork ? arrows[A.fork.id].hollow : hv;   // a branch keeps its parent's look
     if (A.fork) rings = arrows[A.fork.id].rings;         // a branch's bands continue its parent's
     else {
-      rings = p.cwidth ? pal.map(c => { acc += p.cwidth * (0.4 + rnd5() * 1.2); return {c: p.ringcol === "home panel" ? home : c, w: acc}; }) : [];
-      const cap = Math.min(1, ctot * cell / (acc || 1));
+      const cw = A.hollow ? Math.max(p.cwidth, 2) : p.cwidth;   // a hollow arrow always needs its contour
+      rings = cw ? pal.map(c => { acc += cw * (0.4 + rnd5() * 1.2); return {c: A.hollow ? oppo : p.ringcol === "home panel" ? home : c, w: acc}; }) : [];
+      const cap = Math.min(1, cw * p.steps / (acc || 1));
       rings.forEach(r => r.w *= cap);
       rings.reverse();
     }
     A.rings = rings;
     const w1 = rings.length ? rings[0].w : 0;
-    // a bleed tail starts well past the panel edge; the clip trims it flush
-    const u1 = unit0(D[A.dirs[1]]), ext = A.bleed ? 0.75 * cell + w1 + 2 * sc * cell : 0;
+    // a bleed tail starts well past the panel edge; the clip trims it flush.
+    // It extends along the walk's INITIAL heading (dirs[0]) — dirs[1] is already
+    // the post-bend heading when the first step sweeps an arc or u-turn
+    const u1 = unit0(D[A.dirs[0]]), ext = A.bleed ? (0.75 * cell + 2 * sc * cell) * K + w1 : 0;
     const tail = [pts[0][0] - u1[0] * ext, pts[0][1] - u1[1] * ext];
     // centreline as lines, with each bend either sharp or a true arc (radius
     // clamped so a cut never eats more than half a segment). The same string is
@@ -806,12 +984,13 @@ function makeSVG(time = null) {
     // neighbouring run, which is exactly what the walk reserved for it
     const bendAt = k => k > 0 && k < pts.length - 1 && (A.arcs[k] || A.arcs[k + 1] || A.dirs[k] !== A.dirs[k + 1]);
     const runLen = (k, dir) => { let j = k; do j += dir; while (j > 0 && j < pts.length - 1 && !bendAt(j)); return Math.hypot(pts[j][0] - pts[k][0], pts[j][1] - pts[k][1]); };
+    if (ext) { line(tail, pts[0]); cur = pts[0]; }   // the lead-in is its own straight segment, so a first-step arc starts where it was claimed
     for (let k = 1; k < pts.length; k++) {
       sAt[k - 1] = L;
       const P = pts[k], nx = pts[k + 1];
-      if (A.arcs[k]) {                                   // sweeping step: a quarter circle from cur to P
-        const u1 = unit0(D[A.dirs[k - 1]]), u2 = unit0(D[A.dirs[k]]);
-        arc(cur, u1, Math.sign(u1[0] * u2[1] - u1[1] * u2[0]), A.arcs[k] * cell, Math.PI / 2, P);
+      if (A.arcs[k]) {                                   // sweeping step: a quarter or half circle from cur to P
+        const ao = A.arcs[k];
+        arc(cur, unit0(D[A.dirs[k - 1]]), ao.sg, ao.r * cell, ao.th, P);
         cur = P;
         continue;
       }
@@ -820,7 +999,7 @@ function makeSVG(time = null) {
         const cross = u1[0] * u2[1] - u1[1] * u2[0];
         if (Math.abs(cross) > 1e-9 && A.bends[k] && r0 > 0) {
           const th = Math.atan2(Math.abs(cross), u1[0] * u2[0] + u1[1] * u2[1]), tan = Math.tan(th / 2);
-          const r = Math.min(r0, runLen(k, -1) / 2 / tan, runLen(k, 1) / 2 / tan);
+          const r = Math.min(r0A, runLen(k, -1) / 2 / tan, runLen(k, 1) / 2 / tan);
           const t = r * tan, sg = Math.sign(cross);
           const a = [P[0] - u1[0] * t, P[1] - u1[1] * t], b = [P[0] + u2[0] * t, P[1] + u2[1] * t];
           line(cur, a);
@@ -847,11 +1026,11 @@ function makeSVG(time = null) {
     // full / thinner starting full, and the width switches only at angled bends,
     // where the two runs' offset edges cross (a square junction for 90°); arcs
     // and the runs after them keep the width they came in with
-    let w = sw, k = 0;
+    let w = swA, k = 0;
     const same = (g, h) => g.u && h.u && g.u[0] * h.u[0] + g.u[1] * h.u[1] > 1 - 1e-6;
     const wid = segs.map((g, i) => {
       const prev = segs[i - 1];
-      if (g.u && prev && prev.u && !same(g, prev)) w = ++k % 2 ? sw * (1 - A.dip * (0.6 + 0.4 * rnd3())) : sw;
+      if (g.u && prev && prev.u && !same(g, prev)) w = ++k % 2 ? swA * (1 - A.dip * (0.6 + 0.4 * rnd3())) : swA;
       return w;
     });
     const st = [];                                             // stations: x, y, tangent, width
@@ -884,15 +1063,15 @@ function makeSVG(time = null) {
       if (i === 0 && A.fork) {                                 // a branch's tail is cut along the parent's centreline, so
         const [vx, vy] = unit0(D[arrows[A.fork.id].dirs[A.fork.k]]);   // both corners (and their rings) stay inside the parent
         const dot = -ox * vy + oy * vx, den = -tx * vy + ty * vx;      // offsets and tangent against the parent's normal
-        lx -= tx * dot / den; ly -= ty * dot / den; rx += tx * dot / den; ry += ty * dot / den;
+        if (Math.abs(den) > 1e-6) { lx -= tx * dot / den; ly -= ty * dot / den; rx += tx * dot / den; ry += ty * dot / den; }
       }
       left.push(`${f(lx)} ${f(ly)}`);
       right.push(`${f(rx)} ${f(ry)}`);
     }
     const outline = `M${left.join("L")}L${right.reverse().join("L")}Z`;
 
-    const col = colorOf("arrow:" + i, A.q.inv ? p.paper : p.ink), tab = f(Math.min(sw / 2, hwp));
-    const headD = `M0 ${f(hwp)} L${f(hlp)} 0 L0 ${f(-hwp)} L-0.5 ${-tab} L-0.5 ${tab} Z`;
+    const col = colorOf("arrow:" + i, A.hollow ? home : p.arrow), tab = f(Math.min(swA / 2, hwpA));
+    const headD = `M0 ${f(hwpA)} L${f(hlpA)} 0 L0 ${f(-hwpA)} L-0.5 ${-tab} L-0.5 ${tab} Z`;
     // phase: on a 1/8 grid for a free arrow; a branch starts the moment its
     // parent's head passes the fork (undoing the easing to find that moment)
     let ph;
@@ -912,7 +1091,7 @@ function makeSVG(time = null) {
       // cap covers the contour's end; the reveal front then lags the head by at
       // most that much, early on, and closes up as it goes
       const g0 = segs[0], u0 = g0.u || [-g0.sg * Math.sin(g0.a0), g0.sg * Math.cos(g0.a0)];
-      const back = w1 + (A.fork ? sw / 2 : 0);            // a mitred tail reaches half a shaft further back
+      const back = w1 + (A.fork ? swA / 2 : 0);           // a mitred tail reaches half a shaft further back
       const dm = `M${f(tail[0] - u0[0] * back)} ${f(tail[1] - u0[1] * back)}L` + d.slice(1);
       const Lf = f(L + back + 1);
       let wipe = "", off = 0;
@@ -932,21 +1111,57 @@ function makeSVG(time = null) {
       }
       mk = ` mask="url(#k${i})"`;
       mask = `<mask id="k${i}" maskUnits="userSpaceOnUse" x="0" y="0" width="${W}" height="${H}">`
-        + `<path d="${dm}" fill="none" stroke="#fff" stroke-width="${f(sw + 2 * w1 + 2)}" stroke-linejoin="miter"`
+        + `<path d="${dm}" fill="none" stroke="#fff" stroke-width="${f(swA + 2 * w1 + 2)}" stroke-linejoin="miter"`
         + ` stroke-dasharray="${Lf} ${Lf}" stroke-dashoffset="${off}">${wipe}</path></mask>`;
     }
     const headG = inner => `<g transform="${headT}">${headAnim ? `<g>${headAnim}${inner}</g>` : inner}</g>`;
     const cp = A.bleed && !A.cross ? ` clip-path="url(#q${panels.indexOf(A.q)})"` : "";   // a crossing tail runs off the artboard anyway
+    if (cp) usedClips.add(panels.indexOf(A.q));
     if (mask) defs.push(mask);
-    rings.forEach((r, j) => ringLevels[j].push(`<g${cp} data-el="arrow:${i}">`
-      + `<path d="${outline}" fill="none" stroke="${r.c}" stroke-width="${f(2 * r.w)}" stroke-linejoin="round"${mk}/>`
-      + headG(`<path d="${headD}" fill="none" stroke="${r.c}" stroke-width="${f(2 * r.w)}" stroke-linejoin="round"/>`) + `</g>`));
-    fillParts.push(`<g${cp} data-el="arrow:${i}"><path d="${outline}" fill="${col}"${mk}/>` + headG(`<path d="${headD}" fill="${col}"/>`) + `</g>`);
+    // static picture: the head bakes into the shaft's path data, so each paint
+    // is ONE editable compound path — no transformed groups in the export.
+    // The final-pose shape is always built: the words' flip clips against it
+    const [hx2, hy2, ha2] = poseAt(1), co = Math.cos(ha2), si = Math.sin(ha2);
+    const pt = (x, y) => `${f(hx2 + x * co - y * si)} ${f(hy2 + x * si + y * co)}`;
+    const shapeD = outline + `M${pt(0, hwpA)}L${pt(hlpA, 0)}L${pt(0, -hwpA)}L${pt(-0.5, -tab)}L${pt(-0.5, tab)}Z`;
+    const shape = moving ? null : shapeD;
+    const piece = paint => shape
+      ? `<path d="${shape}"${paint}${cp} data-el="arrow:${i}"/>`
+      : `<g${cp} data-el="arrow:${i}"><path d="${outline}"${paint}${mk}/>` + headG(`<path d="${headD}"${paint}/>`) + `</g>`;
+    A.draw = {
+      rings: rings.map(r => piece(` fill="none" stroke="${r.c}" stroke-width="${f(2 * r.w)}" stroke-linejoin="round"`)),
+      fill: piece(` fill="${col}"`)
+    };
+    if (layerOn("arrows")) {
+      // tight bbox from the real geometry: shaft edge stations plus head corners,
+      // grown by the ring stack — it only gates which words clip against the shape
+      let bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
+      const grow = (x, y, e) => { bx0 = Math.min(bx0, x - e); by0 = Math.min(by0, y - e); bx1 = Math.max(bx1, x + e); by1 = Math.max(by1, y + e); };
+      for (const [x, y, , , w] of st) grow(x, y, w / 2 + w1);
+      for (const [x, y] of [[0, hwpA], [hlpA, 0], [0, -hwpA]])
+        grow(hx2 + x * co - y * si, hy2 + x * si + y * co, w1);
+      covers.push({el: `<path d="${shapeD}"${cp}/>`, fill: col, bb: [bx0, by0, bx1, by1]});
+    }
   });
-  LY.arrows.push(`<defs>${defs.join("")}</defs>`, ...ringLevels.flat(), ...fillParts);
+  // families: a branch draws inside its parent's group — rings (widest level
+  // first) before every fill, so the union still reads as one shape with one
+  // contour, and the export groups sanely: one <g> per arrow
+  for (const qi of usedClips) defs.push(`<clipPath id="q${qi}">${panels[qi].px}</clipPath>`);
+  if (defs.length) LY.arrows.push(`<defs>${defs.join("")}</defs>`);
+  const fams = new Map();
+  arrows.forEach((A, i) => { if (A.skip) return; const r = A.fork ? A.fork.id : i; fams.has(r) ? fams.get(r).push(i) : fams.set(r, [i]); });
+  for (const [r, members] of fams) {
+    const ringP = [];
+    for (let j = 0; j < pal.length; j++) for (const i of members) if (arrows[i].draw.rings[j]) ringP.push(arrows[i].draw.rings[j]);
+    LY.arrows.push(`<g id="arrow-${r}">${ringP.join("")}${members.map(i => arrows[i].draw.fill).join("")}</g>`);
+  }
+  drawWords();                                         // now that every cover shape is known
+  const faces = textUsed ? [userFont.font, accentFont.font].filter(f => f.dataURL)
+    .map(f => `@font-face{font-family:"${f.family}";src:url(${f.dataURL});}`).join("") : "";
+  const fontDefs = faces ? `<defs><style>${faces}</style></defs>` : "";
   // layers bottom-up in the panel's order; hidden ones are left out entirely
   const layers = p.layers.filter(l => l.on && l.opacity > 0).map(l =>
-    `<g${l.opacity < 100 ? ` opacity="${l.opacity / 100}"` : ""}${l.blend !== "normal" ? ` style="mix-blend-mode:${l.blend}"` : ""}>${LY[l.id].join("")}</g>`).join("");
+    `<g id="${l.id}"${l.opacity < 100 ? ` opacity="${l.opacity / 100}"` : ""}${l.blend !== "normal" ? ` style="mix-blend-mode:${l.blend}"` : ""}>${LY[l.id].join("")}</g>`).join("");
   return {w: W, h: H, svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${fontDefs}${layers}</svg>`};
 }
 
@@ -1035,8 +1250,10 @@ async function exportGIF(setLabel) {
     render();                                          // restore the live SVG
   }
 }
+// the export drops the stage-only data-* handles so Illustrator sees clean groups
+const cleanSVG = svg => svg.replace(/ data-(?:el|node|cx|cy)="[^"]*"/g, "");
 wireExport({
-  SVG: () => saveAs(`arrow-maze-${p.seed}.svg`, svgBlob(art.svg)),
+  SVG: () => saveAs(`arrow-maze-${p.seed}.svg`, svgBlob(cleanSVG(art.svg))),
   PNG: async () => saveAs(`arrow-maze-${p.seed}.png`, await svgToPNG(art.svg, art.w, art.h)),
   GIF: exportGIF,
 });

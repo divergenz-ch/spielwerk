@@ -34,7 +34,8 @@ convention below. Shortest diff against the house pattern wins.
   "artboard" group.
 - Snapshots: after the DEFS loop, `group("snapshots").append(snapshotPanel());`
   (shared `snapshots.js`). A snapshot is the tool's localStorage blob plus the
-  uploaded typeface, stored in IndexedDB; loading writes both back and reloads,
+  uploaded typeface — stored in `~/Documents/spielwerk-snapshots/<slug>.json`
+  when served by `serve.py`, else in IndexedDB; loading writes both back and reloads,
   so anything a tool keeps outside `p` (uploaded images, stamps) is not carried.
 - **REQUIRED: any tool that renders text lets the user upload their own
   typeface.** Use the shared `fontpick.js` (`fontPicker({onChange})`) — it

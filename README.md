@@ -17,3 +17,10 @@ no build, no dependencies, works from `file://` or any static host.
 
 GitHub Pages, from the repo root of `main`. The index lists tools from
 its inline manifest.
+
+## Working locally
+
+Run `python3 serve.py` (port 8765) instead of a plain static server: it
+also persists snapshots as JSON files in `~/Documents/spielwerk-snapshots/`,
+one file per tool — shared across browsers and origins. Without it,
+snapshots fall back to the browser's per-origin IndexedDB.
