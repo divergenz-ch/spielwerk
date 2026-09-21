@@ -103,8 +103,9 @@ const saved = JSON.parse(localStorage.getItem("arrow-maze") || "{}");
 // Carry the short-lived across/down controls back into the nested panel amount.
 if (!("panels" in saved) && ("panelCols" in saved || "panelRows" in saved))
   saved.panels = Math.min(32, Math.max(1, (saved.panelCols || 1) * (saved.panelRows || 1)));
-ArrowMaze.migrate(saved);                              // px sizes → % of artboard width
+ArrowMaze.migrate(saved);                              // px sizes → % of artboard size, cols → area density
 p.rel = saved.rel;
+p.area = saved.area;
 // before ecellv: 1 the embed cell defaulted to 0 (the artboard's own, giant on a
 // website) — lift it to 60 CSS px once; a 0 chosen afterwards stays
 if (!saved.ecellv && !+saved.ecell) saved.ecell = 60;
@@ -198,7 +199,7 @@ let setArtboard;                                 // (w, h) — the stage's resiz
     preset.value = "custom";
     apply();
   });
-  const marginLimit = () => +(ArrowMaze.marginLimit(p.wpx, p.hpx) / p.wpx * 100).toFixed(2);   // % of width
+  const marginLimit = () => +(ArrowMaze.marginLimit(p.wpx, p.hpx) / ArrowMaze.sizeOf(p.wpx, p.hpx) * 100).toFixed(2);   // % of size
   const mIn = Object.assign(document.createElement("input"), {type: "number", min: 0, step: 0.1, value: p.margin});
   const syncMargin = () => {
     mIn.max = marginLimit();
@@ -207,7 +208,7 @@ let setArtboard;                                 // (w, h) — the stage's resiz
   };
   syncMargin();
   const marginRow = document.createElement("label");
-  marginRow.title = "global foreground inset as % of the artboard width — arrows, dots, text and dividers; paper and background panels stay full-bleed";
+  marginRow.title = "global foreground inset as % of the artboard size (√ width × height) — arrows, dots, text and dividers; paper and background panels stay full-bleed";
   marginRow.innerHTML = "<span>margin %</span>";
   marginRow.append(mIn);
   mIn.addEventListener("input", () => { p.margin = Math.max(0, Math.min(+mIn.value || 0, marginLimit())); render(); });

@@ -60,6 +60,12 @@ convention below. Shortest diff against the house pattern wins.
   / `makeSVG()`), from a `REL` key list and a `basis` width (the artboard
   width; an embed that regenerates at another scale passes its own basis).
   Everything downstream keeps working in px.
+- Grid tools that should keep their element count across aspect changes
+  (arrow-maze is the reference) size the grid by area instead: `cols` counts
+  the columns of a square board of the same area (≈ cols² cells at any
+  aspect, cell ∝ √(W·H)), and their `%` sizes resolve against
+  `basis = √(W·H)` — labelled "% of artboard size" — so strokes keep their
+  ratio to the cells. Old saves migrate once behind an `area: 1` flag.
 - Exceptions: output sizes (`gif px`, embed CSS-px cell) and time.
 - If a tool ever stored px, migrate old saves and snapshots once on load
   (`rel: 1` flag, px ÷ width × 100) — see `ArrowMaze.migrate`.

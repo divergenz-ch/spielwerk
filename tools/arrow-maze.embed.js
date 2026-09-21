@@ -18,7 +18,7 @@
 const DEFS = [
   ["", "group", {label: "arrows"}],
   ["seed",   "range", {min: 1, max: 9999, step: 1, value: 42, hint: "every other setting equal, the same seed gives the same picture"}],
-  ["cols",   "range", {min: 2, max: 60, step: 1, value: 12, label: "columns", hint: "the grid across the width — fewer columns, bigger arrows"}],
+  ["cols",   "range", {min: 2, max: 60, step: 1, value: 14, label: "columns", hint: "grid density: the columns of a square board of the same area — the grid keeps about columns² cells at any aspect, so resizing the artboard keeps the arrow count and scales the arrows with it; fewer columns, bigger arrows"}],
   ["amount", "range", {min: 5, max: 100, step: 5, value: 100, label: "arrow amount %", hint: "share of the grid seeded with arrows — 100 packs it full, every step down removes arrows evenly"}],
   ["length", "range", {min: 1, max: 80, step: 1, value: 14, label: "max length", hint: "cells per arrow, drawn between 3 and this"}],
   ["turn",   "range", {min: 0, max: 100, step: 5, value: 30, label: "bend chance %", hint: "chance to bend at each cell once the straight run is done"}],
@@ -26,7 +26,7 @@ const DEFS = [
   ["dirs",   "select", {options: ["mixed", "orthogonal", "diagonal"], value: "mixed", label: "bend angles", hint: "orthogonal: 90° only — diagonal: 45° only"}],
   ["fork",   "range", {min: 0, max: 100, step: 5, value: 30, label: "fork chance %", hint: "chance an arrow grows a second branch"}],
   ["bleed",  "range", {min: 0, max: 100, step: 5, value: 30, label: "edge bleed %", hint: "chance an arrow on a border cell starts off the edge"}],
-  ["headMargin", "range", {min: 0, max: 1.5, step: 0.01, value: 0, label: "head margin %", hint: "% of artboard width — fine inset from the actual outer head contour, inside the global margin — 0 keeps the original head bleed; shafts can still bleed"}],
+  ["headMargin", "range", {min: 0, max: 1.5, step: 0.01, value: 0, label: "head margin %", hint: "% of artboard size — fine inset from the actual outer head contour, inside the global margin — 0 keeps the original head bleed; shafts can still bleed"}],
   ["cross",  "range", {min: 0, max: 100, step: 5, value: 0, label: "cross panels %", hint: "chance an arrow from a paper panel ignores the panel edges — set ring colour to home panel so it keeps a paper gap where it crosses ink"}],
   ["dots",   "range", {min: 0, max: 12, step: 1, value: 1, label: "filler dots", hint: "at most this many discs in holes the arrows left"}],
   ["", "group", {label: "geometry"}],
@@ -45,7 +45,7 @@ const DEFS = [
   ["", "group", {label: "panels"}],
   ["panels", "range", {min: 1, max: 32, step: 1, value: 4, label: "panel amount", hint: "number of nested panel subdivisions"}],
   ["invert", "range", {min: 0, max: 100, step: 5, value: 40, label: "inverted %", hint: "share of panels drawn paper-on-ink"}],
-  ["line",   "range", {min: 0, max: 0.8, step: 0.01, value: 0.2, label: "divider %", hint: "% of artboard width"}],
+  ["line",   "range", {min: 0, max: 0.8, step: 0.01, value: 0.17, label: "divider %", hint: "% of artboard size (√ width × height)"}],
   ["", "group", {label: "text"}],
   ["words",  "text",  {value: "", label: "words", hint: "entries split on | — a / inside an entry breaks it into fixed lines"}],
   ["textmin","range", {min: 10, max: 100, step: 5, value: 40, label: "shrink to %", hint: "how small a word may go to find a pocket"}],
@@ -59,8 +59,8 @@ const DEFS = [
   ["", "group", {label: "contours"}],
   ["ringcol","select", {options: ["ring masters", "home panel"], value: "ring masters", label: "ring colour", hint: "home panel: rings take the arrow's own panel ground, so they only show where it crosses onto another panel"}],
   ["hollow", "range", {min: 0, max: 100, step: 5, value: 0, label: "hollow %", hint: "chance an arrow is drawn as ground fill with a counter-colour contour — signage-style outline arrows; the arrow colour master then paints their outline, not a fill"}],
-  ["cwidth", "range", {min: 0, max: 1, step: 0.01, value: 0.27, label: "arrow contour %", hint: "% of artboard width per ring around the arrows"}],
-  ["tcwidth","range", {min: 0, max: 1, step: 0.01, value: 0.27, label: "text contour %", hint: "% of artboard width per ring around the words"}],
+  ["cwidth", "range", {min: 0, max: 1, step: 0.01, value: 0.23, label: "arrow contour %", hint: "% of artboard size per ring around the arrows"}],
+  ["tcwidth","range", {min: 0, max: 1, step: 0.01, value: 0.23, label: "text contour %", hint: "% of artboard size per ring around the words"}],
   ["steps",  "range", {min: 1, max: 8, step: 1, value: 4, label: "contour rings"}],
   ["cjoin",  "select", {options: ["rounded", "sharp", "beveled"], value: "rounded", label: "contour edges", hint: "corner joins for arrow and text contours — rounded: round joins; sharp: miter joins; beveled: clipped corners"}],
   ["", "group", {label: "motion"}],
@@ -80,19 +80,33 @@ const DEFS = [
 const LAYERS = ["paper", "panels", "arrows", "dots", "text"];
 const BLENDS = ["normal", "multiply", "screen", "overlay", "difference"];
 const FIXED = [["ink", "ink", "#111111"], ["paper", "paper", "#f4f1ea"], ["arrow", "arrow", "#111111"], ["gradA", "inner ring", "#1c1c1c"], ["gradB", "outer ring", "#f5c518"]];
-// Every size not counted in grid cells is stored as % of the artboard width
-// (margin, head margin, divider, contours), so the whole picture scales with
-// the artboard. layout() resolves them to px against its basis width.
+// Every size not counted in grid cells is stored as % of the artboard size
+// √(W·H) (margin, head margin, divider, contours) — the same measure the grid
+// cell follows, so the whole picture scales with the artboard at any aspect.
+// layout() resolves them to px against its basis.
 const REL = ["margin", "headMargin", "line", "cwidth", "tcwidth"];
-// configs from before rel: 1 hold these in artboard px — convert once, in place
+const sizeOf = (w, h) => Math.sqrt(w * h);
+const toPx = (v, basis) => +(v * basis / 100).toFixed(4);
+// Old configs, converted once, in place: before rel: 1 these sizes were artboard
+// px; before area: 1 they were % of the width and cols counted the columns
+// across the width — cols becomes the square-equivalent count of the same grid.
 const migrate = src => {
-  if (src && !src.rel) {
-    for (const k of REL) if (k in src) src[k] = +src[k] / (+src.wpx || 1500) * 100;
+  if (!src) return src;
+  const w = +src.wpx || 1500, h = +src.hpx || 2000;
+  if (!src.rel) {
+    for (const k of REL) if (k in src) src[k] = +src[k] / w * 100;
     src.rel = 1;
+  }
+  if (!src.area) {
+    if ("cols" in src) {
+      const M = insetMargin(toPx(+src.margin || 0, w), w, h);
+      src.cols = +(+src.cols * Math.sqrt((h - 2 * M) / (w - 2 * M))).toFixed(3);
+    }
+    for (const k of REL) if (k in src) src[k] = +src[k] * w / sizeOf(w, h);   // unrounded: the px stay exact
+    src.area = 1;
   }
   return src;
 };
-const toPx = (v, basis) => +(v * basis / 100).toFixed(4);
 // a partial or older config gets every missing key from the defaults
 const normalize = src => {
   const p = migrate({wpx: 1500, hpx: 2000, margin: 0, nodes: {}, masters: [], assign: {}, ...src});
@@ -139,6 +153,15 @@ const gradient = (a, b) => {
 // A near-zero grid width would otherwise create thousands of rows on tall boxes.
 const marginLimit = (w, h) => { const side = Math.min(w, h); return Math.max(0, (side - Math.min(100, side / 2)) / 2); };
 const insetMargin = (m, w, h) => Math.max(0, Math.min(+m || 0, marginLimit(w, h)));
+// The grid for a gw × gh box: about cols² square cells whatever the aspect
+// (cols counts the columns of a square box of the same area), so resizing keeps
+// the arrow count and the cell scales with √(gw·gh). fixed: a cell in px
+// instead (the regenerating embed). The leftover is centred.
+const gridOf = (cols, gw, gh, fixed = 0) => {
+  const a = Math.sqrt(gw / gh);
+  const nc = Math.max(2, Math.round(fixed ? gw / fixed : cols * a)), nr = Math.max(2, Math.round(fixed ? gh / fixed : cols / a));
+  return {cols: nc, rows: nr, cell: Math.min(gw / nc, gh / nr)};
+};
 const headShape = (halfShaft, halfHead, length) => {
   const tab = +Math.min(halfShaft, halfHead).toFixed(2);
   return [[0, halfHead], [length, 0], [0, -halfHead], [-0.5, -tab], [-0.5, tab]];
@@ -184,10 +207,11 @@ const strokeBounds = (P, width, join) => {
 // env: {ctx: a 2D context to measure words, fonts: {main, accent: {family,
 // dataURL}}, OT: {main, accent} opentype faces for outlined SVG words}
 const measureCtx = () => measureCtx.c ??= Object.assign(document.createElement("canvas").getContext("2d"), {textBaseline: "middle"});
-// env.basis: the width the relative sizes resolve against — W unless a
-// regenerating embed lays the design out at another scale
+// env.basis: the size the relative sizes resolve against — √(W·H) unless a
+// regenerating embed lays the design out at another scale; env.cell: a fixed
+// grid cell in px instead of the cols density (that embed again)
 function layout(src, W, H, env = {}) {
-  const p = normalize(src), basis = env.basis ?? W;
+  const p = normalize(src), basis = env.basis ?? sizeOf(W, H);
   for (const k of REL) p[k] = toPx(p[k], basis);
   const contourJoin = {rounded: "round", sharp: "miter", beveled: "bevel"}[p.cjoin] || "round";
   const ctx = env.ctx || measureCtx();                 // measures words in the live face
@@ -222,9 +246,8 @@ function layout(src, W, H, env = {}) {
 
   // ---- grid + panels
   const M = insetMargin(p.margin, W, H), gw = W - 2 * M, gh = H - 2 * M;   // foreground only; backgrounds stay full-bleed
-  const cols = p.cols, short = gh < 2 * (gw / cols);   // box under two cells tall: shrink the cell so two rows fit
-  const cell = short ? gh / 2 : gw / cols, rows = Math.max(2, Math.floor(gh / cell));
-  const ox = short ? M + (gw - cols * cell) / 2 : M, oy = M + (gh - rows * cell) / 2;   // foreground grid is centred within its inset
+  const {cols, rows, cell} = gridOf(p.cols, gw, gh, env.cell);
+  const ox = M + (gw - cols * cell) / 2, oy = M + (gh - rows * cell) / 2;   // foreground grid is centred within its inset
   // Guillotine subdivisions preserve the irregular, nested panel structure.
   // Always split the largest eligible panel so the amount reaches its target
   // instead of stopping early once panels become smaller than six cells.
@@ -1245,18 +1268,18 @@ class ArrowMazeElement extends HTMLElement {
     if (waits.length) { Promise.all(waits).then(() => this.#relayout()); return; }
     const p = normalize(params);
     p.motion = MOTION[this.#playback()];
-    let W = p.wpx, H = p.hpx, basis;
+    let W = p.wpx, H = p.hpx, basis, cell;
     if (this.fit === "regenerate") {
       ({w: W, h: H} = this.#size);
       if (!(W > 0 && H > 0)) return;                    // no box yet: the first resize lays it out
-      const M = (b, w, h) => insetMargin(toPx(p.margin, b), w, h);
-      const own = (p.wpx - 2 * M(p.wpx, p.wpx, p.hpx)) / p.cols, cell = +this.getAttribute("cell") || p.ecell || own;
+      const size = sizeOf(p.wpx, p.hpx), M = insetMargin(toPx(p.margin, size), p.wpx, p.hpx);
+      const own = gridOf(p.cols, p.wpx - 2 * M, p.hpx - 2 * M).cell;
+      cell = +this.getAttribute("cell") || p.ecell || own;
       // a different cell is the design at another scale: the relative sizes
       // (contours, divider, margin) resolve against the artboard scaled with it
-      basis = p.wpx * cell / own;
-      p.cols = Math.max(2, Math.round((W - 2 * M(basis, W, H)) / cell));
+      basis = size * cell / own;
     }
-    this.#scene = layout(p, W, H, {fonts, ...this.env, basis});
+    this.#scene = layout(p, W, H, {fonts, ...this.env, basis, cell});
     this.#stale = false;
     this.dispatchEvent(new CustomEvent("arrowmaze:layout", {detail: this.#scene}));
     this.#kick();
@@ -1342,6 +1365,6 @@ class ArrowMazeElement extends HTMLElement {
 // source(): this whole runtime as script text, so the tool can write the
 // embed file (or inline it) without fetching — fetch fails from file://
 const source = () => `// <arrow-maze> runtime — spielwerk arrow-maze.embed.js\n(${runtime})();\n`;
-window.ArrowMaze = {DEFS, LAYERS, BLENDS, FIXED, REL, migrate, normalize, entries, marginLimit, layout, drawScene, progress, hitTest, P5_SRC, source};
+window.ArrowMaze = {DEFS, LAYERS, BLENDS, FIXED, REL, sizeOf, migrate, normalize, entries, marginLimit, layout, drawScene, progress, hitTest, P5_SRC, source};
 if (!customElements.get("arrow-maze")) customElements.define("arrow-maze", ArrowMazeElement);
 })();
