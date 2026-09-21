@@ -116,6 +116,7 @@ const group = name => cur = groups[name] ??= (() => {
 p.wpx = +saved.wpx || 1500;
 p.hpx = +saved.hpx || 2000;
 p.margin = +saved.margin || 0;
+let setArtboard;                                 // (w, h) — the stage's resize handles drive the size fields
 {
   const wIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.wpx});
   const hIn = Object.assign(document.createElement("input"), {type: "number", min: 100, max: 8000, value: p.hpx});
@@ -151,6 +152,7 @@ p.margin = +saved.margin || 0;
     p.wpx = Math.max(100, Math.min(8000, +wIn.value || p.wpx));
     p.hpx = Math.max(100, Math.min(8000, +hIn.value || p.hpx));
     if (!soft) { wIn.value = p.wpx; hIn.value = p.hpx; ratio = p.hpx / p.wpx; }
+    syncMargin();
     render();                                    // render() persists — saves on every keystroke
   };
   const onEdit = (src, other, factor) => soft => {
@@ -169,16 +171,30 @@ p.margin = +saved.margin || 0;
     hIn.value = Math.round(p.wpx * b / a);   // width is the anchor
     apply();
   });
+  setArtboard = (w, h) => {                      // soft: keeps the locked ratio frozen
+    wIn.value = w; hIn.value = h;
+    if (!p.lock) preset.value = "custom";
+    apply(true);
+  };
   swap.addEventListener("click", () => {
     [wIn.value, hIn.value] = [hIn.value, wIn.value];
     preset.value = "custom";
     apply();
   });
-  const mIn = Object.assign(document.createElement("input"), {type: "number", min: 0, max: 4000, value: p.margin});
+  const marginLimit = () => ArrowMaze.marginLimit(p.wpx, p.hpx);
+  const mIn = Object.assign(document.createElement("input"), {type: "number", min: 0, step: 0.1, value: p.margin});
+  const syncMargin = () => {
+    mIn.max = marginLimit();
+    p.margin = Math.max(0, Math.min(p.margin, marginLimit()));
+    mIn.value = p.margin;
+  };
+  syncMargin();
   const marginRow = document.createElement("label");
+  marginRow.title = "global foreground inset in artboard pixels — arrows, dots, text and dividers; paper and background panels stay full-bleed";
   marginRow.innerHTML = "<span>margin px</span>";
   marginRow.append(mIn);
-  mIn.addEventListener("input", () => { p.margin = Math.max(0, +mIn.value || 0); render(); });
+  mIn.addEventListener("input", () => { p.margin = Math.max(0, Math.min(+mIn.value || 0, marginLimit())); render(); });
+  mIn.addEventListener("change", syncMargin);
   // responsive preview: the stage becomes the embed's box (regenerate) — resize
   // the window to see how the maze re-lays itself out on a website
   p.responsive = saved.responsive ?? false;
@@ -208,6 +224,7 @@ for (const [key, type, opt] of DEFS) {
     input.type = type;
     if (type === "range") { Object.assign(input, {min: opt.min, max: opt.max, step: opt.step}); input.dataset.def = opt.value; }
     if (type === "checkbox") input.checked = p[key]; else input.value = p[key];
+    if (type === "range") p[key] = +input.value;      // keep restored settings in sync with the slider's limits/step
     if (type === "text") input.placeholder = "one | two | three";
   }
   label.append(input);
@@ -377,6 +394,8 @@ const view = createZoom({
   stage, select: zoomEl, zoom: p.zoom,
   size: () => ({w: p.wpx, h: p.hpx}),
   onChange: z => { p.zoom = z; localStorage.setItem("arrow-maze", JSON.stringify(p)); },
+  // drag the artboard's edges/corners like a window; the responsive preview has no artboard to drag
+  resize: {set: setArtboard, locked: () => p.lock, enabled: () => !p.responsive, min: 100, max: 8000},
 });
 const fonts = () => ({main: userFont.font, accent: accentFont.font});
 // the artboard scene, for exports; the preview's own scene may be a responsive one
