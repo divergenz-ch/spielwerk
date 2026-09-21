@@ -383,6 +383,7 @@ group("layers").append(layerBox);
 // can also be pinned to single elements: press its "pick" button, then click
 // arrows, words, panels, dots or the dividers on the stage. Assignments are
 // keyed by element: words by their text, arrows/panels/dots by index.
+// ponytail: arrow and dot indices shift when the seed or grid changes — those pins then land on other arrows
 for (const [k, , def] of FIXED) p[k] = saved[k] ?? def;
 p.masters = saved.masters || [];                      // custom: [{id, name, color}]
 p.assign = saved.assign || {};                        // element key → master id
@@ -426,33 +427,8 @@ function buildMasters() {
     p.masters.push({id: "m" + Date.now().toString(36), name: "colour " + (p.masters.length + 1), color: "#e84f5e"});
     buildMasters(); render();
   });
-  const help = Object.assign(document.createElement("p"), {textContent: pinNote || "pick a colour, then click things on the stage"});
-  pinNote = "";
+  const help = Object.assign(document.createElement("p"), {textContent: "pick a colour, then click things on the stage"});
   masterBox.append(add, help);
-}
-// Index-keyed pins (arrows, panels, dots) would land on other elements once the
-// layout changes, so a change to any placement parameter releases them; word
-// and divider pins stay. The signature rides in p, so a reload or a snapshot
-// keeps its own pins.
-const GEO = ["wpx", "hpx", "margin", "nodes", "cwidth", "tcwidth", "steps"];   // contour budgets steer placement too
-{ let g; for (const [k, type, opt] of DEFS) if (type === "group") g = opt.label;
-  else if (["arrows", "geometry", "panels", "text"].includes(g) && k !== "textcol") GEO.push(k); }
-const pinSig = () => {                                // FNV-1a over the placement values
-  let h = 2166136261;
-  for (const ch of JSON.stringify(GEO.map(k => p[k]))) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
-  return (h >>> 0).toString(36);
-};
-p.pinSig = saved.pinSig;
-let pinNote = "";
-function pinCheck() {
-  const sig = pinSig(), was = p.pinSig;
-  p.pinSig = sig;
-  if (was === undefined || was === sig) return;
-  const ks = Object.keys(p.assign).filter(k => /^(arrow|panel|dot):/.test(k));
-  if (!ks.length) return;
-  for (const k of ks) delete p.assign[k];
-  pinNote = "layout changed — arrow/panel/dot pins cleared";
-  buildMasters();
 }
 buildMasters();
 group("colour").prepend(masterBox);
@@ -508,7 +484,6 @@ const fonts = () => ({main: userFont.font, accent: accentFont.font});
 const artboard = () => ArrowMaze.layout(p, p.wpx, p.hpx, {fonts: fonts(), OT});
 function render() {
   syncNodeRows();
-  pinCheck();
   localStorage.setItem("arrow-maze", JSON.stringify(p));
   stage.classList.toggle("responsive", p.responsive);
   maze.setAttribute("fit", p.responsive ? "regenerate" : "contain");
@@ -592,7 +567,7 @@ async function exportGIF(setLabel) {
   await saveAs(`arrow-maze-${p.seed}.gif`, encodeGIF(frames, {width: w, height: h, delay: Math.max(2, Math.round(100 / p.fps))}));
 }
 // embed: a ready-to-paste snippet (in a demo page) plus the runtime next to it
-const UI_ONLY = ["open", "zoom", "lock", "responsive", "vw", "vh", "fps", "gifpx", "outline", "efit", "eplay", "ecellv", "pinSig", "hints"];   // ecell rides along: the embed reads it
+const UI_ONLY = ["open", "zoom", "lock", "responsive", "vw", "vh", "fps", "gifpx", "outline", "efit", "eplay", "ecellv", "hints"];   // ecell rides along: the embed reads it
 async function exportEmbed() {
   const params = Object.fromEntries(Object.entries(p).filter(([k]) => !UI_ONLY.includes(k)));
   const fs = Object.fromEntries(Object.entries(fonts()).filter(([, f]) => f.dataURL).map(([k, f]) => [k, {...f}]));
