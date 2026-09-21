@@ -46,6 +46,24 @@ convention below. Shortest diff against the house pattern wins.
   needs no embedding. The binary is never persisted — localStorage quota is
   origin-wide and shared by every tool.
 
+## Relative geometry (REQUIRED)
+
+- The artboard is resizable like a dev-tools device viewport (zoom.js
+  `resize`: grey drag bars on its right edge, bottom edge and corner, size
+  readout above), and the whole graphic must scale with it. **No geometry parameter is stored in absolute
+  pixels.** Each one is either a count/fraction of a grid (columns, % of a
+  cell, fractions of the artboard) or **% of the artboard width**:
+  `px = artboard width × value / 100`.
+- Label and hint such sliders "… %" / "% of artboard width", with a fine step
+  (e.g. 0.01) so thin strokes stay adjustable.
+- Resolve to px in exactly one place, at the top of the generator (`layout()`
+  / `makeSVG()`), from a `REL` key list and a `basis` width (the artboard
+  width; an embed that regenerates at another scale passes its own basis).
+  Everything downstream keeps working in px.
+- Exceptions: output sizes (`gif px`, embed CSS-px cell) and time.
+- If a tool ever stored px, migrate old saves and snapshots once on load
+  (`rel: 1` flag, px ÷ width × 100) — see `ArrowMaze.migrate`.
+
 ## Generator
 
 - One deterministic `makeSVG(time = null)` returning `{w, h, svg}` — seeded
@@ -73,7 +91,10 @@ tool page and the exported artefact:
   and loop; attributes `fit` / `playback` / `cell`; idles when nothing moves.
 - DEFS live in the embed file (`<Tool>.DEFS`), so the embed has defaults.
 - The tool previews with the element (`fit="contain"`, `regenerate` for the
-  responsive preview) and adds an **Embed** export. No SMIL in these tools:
+  responsive preview) and adds an **Embed** export. The responsive preview
+  works like Safari's responsive design mode: the element sits in a box of
+  `vw × vh` CSS px at 1:1 (zoom.js `fixed`), and the same resize handles
+  drag that box instead of the artboard. No SMIL in these tools:
   the SVG export is the static picture. Keep the static SVG byte-stable when
   refactoring the generator — diff it against the old output.
 

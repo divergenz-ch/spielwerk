@@ -21,6 +21,10 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(ROOT), **kw)
 
+    def end_headers(self):  # always revalidate, so an edited tool never runs a stale script
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
     def _slug(self):
         if not self.path.startswith("/snaps/"):
             return None

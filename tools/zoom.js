@@ -26,6 +26,7 @@
     max = 1,                     // fit never scales past this (1 = no upscaling)
     onChange = () => {},         // persist the new zoom
     resize = null,               // {set(w,h), locked(), enabled?(), min, max}; changes design pixels, not zoom
+    fixed = () => false,         // true: show the board at 100% whatever the zoom, like a device viewport
   }) {
     let mode = zoom === "fit" || typeof zoom === "number" ? zoom : "fit";
     // phones open fit-to-screen whatever percent the desktop session saved —
@@ -37,6 +38,7 @@
     // null = stage not laid out yet, so any fit would be a guess
     function pct() {
       if (drag) return drag.scale * 100;       // never re-fit underneath a moving resize handle
+      if (fixed()) return 100;
       if (mode !== "fit") return mode;
       const { w, h } = size();
       const aw = stage.clientWidth - pad, ah = stage.clientHeight - pad;
@@ -79,15 +81,7 @@
       const { w, h } = size();
       el.style.width = w * z / 100 + "px";
       el.style.height = h * z / 100 + "px";   // both set — box matches viewBox, no letterbox
-      if (drag) {
-        // Flex normally recentres the board. During a drag hold the opposite
-        // edge still, even when a renderer replaces the entire SVG each frame.
-        el.style.translate = "";
-        const r = el.getBoundingClientRect();
-        const x = drag.rect.left + (drag.dir.includes("w") ? (drag.w - w) * drag.scale : 0);
-        const y = drag.rect.top + (drag.dir.includes("n") ? (drag.h - h) * drag.scale : 0);
-        el.style.translate = `${x - r.left}px ${y - r.top}px`;
-      }
+      pin(el);
       sync();
       updateHandles();
     }
@@ -110,54 +104,71 @@
     }
 
     // ---------- artboard resize ----------
-    // Outside the stage: renderers replace its children, and these controls
-    // must never enter an SVG/PNG export or intercept on-canvas editing.
+    // Illustrator's artboard tool: a thin selection-blue frame with eight hollow
+    // square handles, the artboard name above its top-left corner, and a
+    // measurement tag at the pointer while dragging. A handle moves its own
+    // side and holds the opposite one; Alt/Option resizes from the centre,
+    // Shift keeps proportions, Esc cancels. The controls live outside the
+    // stage: renderers replace its children, and they must never reach an export.
     const overlay = resize && document.body.appendChild(document.createElement("div"));
     const handles = [];
-    let outline, dimensions;
+    let frame, name, tag;
     if (overlay) {
+      document.head.appendChild(document.createElement("style")).textContent = `
+        .artboard-resize { position: fixed; pointer-events: none; overflow: hidden; z-index: 1; --ai: #4f80ff; }
+        .artboard-resize .ar-frame { position: absolute; box-sizing: border-box; border: 1px solid var(--ai); }
+        .artboard-resize button { position: absolute; pointer-events: auto; touch-action: none; padding: 0; margin: 0; border: 0; background: none; }
+        .artboard-resize button::after { content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; translate: -50% -50%;
+          box-sizing: border-box; border: 1px solid var(--ai); background: #fff; }
+        .artboard-resize button:hover::after, .artboard-resize button.active::after, .artboard-resize button:focus-visible::after { background: var(--ai); }
+        .artboard-resize .ar-name { position: absolute; font: 11px/1 system-ui, sans-serif; color: #555; white-space: nowrap; }
+        .artboard-resize .ar-tag { position: absolute; padding: 3px 6px; border-radius: 2px; background: #535353; color: #fff;
+          font: 11px/1.35 system-ui, sans-serif; font-variant-numeric: tabular-nums; white-space: pre; }`;
       overlay.className = "artboard-resize";
-      overlay.style.cssText = "position:fixed;pointer-events:none;overflow:hidden;z-index:1";
-      outline = overlay.appendChild(document.createElement("div"));
-      outline.style.cssText = "position:absolute;box-sizing:border-box;border:1px solid #3b82f680;pointer-events:none";
-      dimensions = overlay.appendChild(document.createElement("output"));
-      dimensions.style.cssText = "position:absolute;padding:3px 7px;background:#fff;color:#444;border-radius:4px;font:11px/1.4 system-ui;white-space:nowrap;box-shadow:0 1px 5px #0002";
-      dimensions.hidden = true;
-      for (const dir of ["n", "e", "s", "w", "nw", "ne", "se", "sw"]) {
+      frame = overlay.appendChild(document.createElement("div"));
+      frame.className = "ar-frame";
+      name = overlay.appendChild(document.createElement("div"));
+      name.className = "ar-name";
+      name.textContent = resize.name ?? "01 - " + (document.title.split(/[—–-]/)[0].trim() || "Artboard 1");
+      tag = overlay.appendChild(document.createElement("output"));
+      tag.className = "ar-tag";
+      tag.hidden = true;
+      for (const dir of ["nw", "n", "ne", "e", "se", "s", "sw", "w"]) {
         const button = overlay.appendChild(document.createElement("button"));
-        const corner = dir.length === 2;
-        const cursor = ({n:"ns", s:"ns", e:"ew", w:"ew", nw:"nwse", se:"nwse", ne:"nesw", sw:"nesw"})[dir] + "-resize";
         button.type = "button";
         button.dataset.resize = dir;
         button.setAttribute("aria-label", `Resize artboard ${dir}`);
-        button.title = "Drag to resize artboard · Shift keeps proportions · arrow keys nudge";
-        button.style.cssText = `position:absolute;pointer-events:auto;touch-action:none;padding:0;margin:0;border:0;background:transparent;cursor:${cursor}`;
-        const dot = button.appendChild(document.createElement("span"));
-        dot.style.cssText = `position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:${corner ? 7 : 5}px;height:${corner ? 7 : 5}px;border:1px solid #3b82f6;background:white;box-sizing:border-box;pointer-events:none`;
+        button.title = "Drag to resize · Alt from centre · Shift keeps proportions · arrow keys nudge";
+        button.style.cursor = ({n: "ns", s: "ns", e: "ew", w: "ew", nw: "nwse", se: "nwse", ne: "nesw", sw: "nesw"})[dir] + "-resize";
         handles.push({button, dir});
         button.addEventListener("pointerdown", e => {
           if (e.button !== 0 || drag || !canResize()) return;
           e.preventDefault(); e.stopPropagation();
-          const rect = target().getBoundingClientRect(), {w, h} = size();
+          const el = target();
+          el.style.transition = "";
+          const rect = el.getBoundingClientRect(), {w, h} = size();
           drag = {id: e.pointerId, button, dir, rect, w, h, scale: rect.width / w,
-            x: e.clientX, y: e.clientY, dx: 0, dy: 0, shift: e.shiftKey,
-            locked: resize.locked?.() ?? false};
+            x: e.clientX, y: e.clientY, px: e.clientX, py: e.clientY, dx: 0, dy: 0,
+            shift: e.shiftKey, alt: e.altKey, locked: resize.locked?.() ?? false};
           button.setPointerCapture(e.pointerId);
-          dimensions.hidden = false;
+          button.classList.add("active");
           updateHandles();
         });
+        const track = e => {
+          const k = e.altKey ? 2 : 1;                     // from the centre both sides move
+          drag.dx = (e.clientX - drag.x) * k / drag.scale;
+          drag.dy = (e.clientY - drag.y) * k / drag.scale;
+          drag.px = e.clientX; drag.py = e.clientY;
+          drag.shift = e.shiftKey; drag.alt = e.altKey;
+        };
         button.addEventListener("pointermove", e => {
           if (!drag || e.pointerId !== drag.id) return;
-          drag.dx = (e.clientX - drag.x) / drag.scale;
-          drag.dy = (e.clientY - drag.y) / drag.scale;
-          drag.shift = e.shiftKey;
+          track(e);
           if (!resizeFrame) resizeFrame = requestAnimationFrame(flushResize);
         });
         button.addEventListener("pointerup", e => {
           if (drag?.id !== e.pointerId) return;
-          drag.dx = (e.clientX - drag.x) / drag.scale;
-          drag.dy = (e.clientY - drag.y) / drag.scale;
-          drag.shift = e.shiftKey;
+          track(e);
           finishResize();
         });
         button.addEventListener("pointercancel", () => finishResize(true));
@@ -176,6 +187,18 @@
     function canResize() {
       return resize && target() && (resize.enabled?.() ?? true);
     }
+    // while dragging, hold the board where the handle says: the opposite side
+    // (or, with Alt, the centre) stays put although flex would recentre it
+    function pin(el) {
+      if (!drag) return;
+      const {w, h} = size(), d = drag;
+      const ax = d.alt ? .5 : d.dir.includes("w") ? 1 : d.dir.includes("e") ? 0 : .5;
+      const ay = d.alt ? .5 : d.dir.includes("n") ? 1 : d.dir.includes("s") ? 0 : .5;
+      el.style.translate = "";
+      const r = el.getBoundingClientRect();
+      const x = d.rect.left + (d.w - w) * d.scale * ax, y = d.rect.top + (d.h - h) * d.scale * ay;
+      el.style.translate = `${x - r.left}px ${y - r.top}px`;
+    }
     function updateHandles() {
       if (!overlay) return;
       const r = target()?.getBoundingClientRect(), s = stage.getBoundingClientRect();
@@ -184,20 +207,25 @@
       Object.assign(overlay.style, {left: s.left + stage.clientLeft + "px", top: s.top + stage.clientTop + "px",
         width: stage.clientWidth + "px", height: stage.clientHeight + "px"});
       const x = r.left - s.left - stage.clientLeft, y = r.top - s.top - stage.clientTop;
-      Object.assign(outline.style, {left:x+"px", top:y+"px", width:r.width+"px", height:r.height+"px"});
+      Object.assign(frame.style, {left: x + "px", top: y + "px", width: r.width + "px", height: r.height + "px"});
+      name.style.left = x + "px";
+      name.style.top = y - 16 + "px";
+      // hit zones: 8px bands along the edges, 14px squares on the handles
+      const H = 14, E = 8;
       for (const {button, dir} of handles) {
-        const corner = dir.length === 2, vertical = dir === "w" || dir === "e";
-        const width = corner || vertical ? 14 : Math.max(0, r.width - 14);
-        const height = corner || !vertical ? 14 : Math.max(0, r.height - 14);
+        const corner = dir.length === 2, side = dir === "e" || dir === "w";
         const cx = x + (dir.includes("w") ? 0 : dir.includes("e") ? r.width : r.width / 2);
         const cy = y + (dir.includes("n") ? 0 : dir.includes("s") ? r.height : r.height / 2);
-        Object.assign(button.style, {left:cx-width/2+"px", top:cy-height/2+"px", width:width+"px", height:height+"px"});
+        const width = corner ? H : side ? E : Math.max(H, r.width - 2 * H);
+        const height = corner ? H : side ? Math.max(H, r.height - 2 * H) : E;
+        Object.assign(button.style, {left: cx - width / 2 + "px", top: cy - height / 2 + "px", width: width + "px", height: height + "px"});
       }
+      tag.hidden = !drag;
       if (drag) {
-        const {w,h} = size();
-        dimensions.value = `${w} × ${h} px`;
-        dimensions.style.left = Math.max(0, Math.min(x, stage.clientWidth - 130)) + "px";
-        dimensions.style.top = Math.max(0, Math.min(y + r.height + 10, stage.clientHeight - 26)) + "px";
+        const {w, h} = size();
+        tag.value = `W: ${w} px\nH: ${h} px`;
+        tag.style.left = Math.min(drag.px - s.left + 14, stage.clientWidth - 90) + "px";
+        tag.style.top = Math.min(drag.py - s.top + 14, stage.clientHeight - 40) + "px";
       }
     }
     function resized(w, h, dir, dx, dy, locked) {
@@ -224,13 +252,23 @@
       if (!drag) return;
       if (!cancel) flushResize();
       cancelAnimationFrame(resizeFrame); resizeFrame = 0;
+      // A committed resize keeps the zoom it was dragged at: re-fitting would
+      // spring the board back to full size and hide what the drag did. ⌘0 fits again.
+      if (!cancel && mode === "fit" && !fixed()) { mode = +(drag.scale * 100).toFixed(1); onChange(mode); }
       const d = drag; drag = null;
-      if (target()) target().style.translate = "";
-      dimensions.hidden = true;
+      d.button.classList.remove("active");
       if (d.button.hasPointerCapture(d.id)) d.button.releasePointerCapture(d.id);
       if (cancel) resize.set(d.w, d.h);
-      // Restore the user's fit/percent view after releasing the pinned board.
       apply();
+      // then ease the held board back to the centre of the stage
+      const el = target();
+      if (el?.style.translate) {
+        el.style.transition = "translate .2s ease-out";
+        el.style.translate = "";
+        const follow = () => { updateHandles(); if (el.style.transition) requestAnimationFrame(follow); };
+        requestAnimationFrame(follow);
+        setTimeout(() => { el.style.transition = ""; updateHandles(); }, 250);   // not transitionend: a hidden tab never sends it
+      }
     }
     addEventListener("keydown", e => {
       if (e.key === "Escape" && drag) { e.preventDefault(); finishResize(true); }

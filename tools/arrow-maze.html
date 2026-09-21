@@ -5,21 +5,29 @@
 <style>
   html, body { height: 100%; overflow: hidden; }
   body { font: 13px/1.4 system-ui, sans-serif; margin: 0; display: flex; background: #e9e7e2; }
-  #panel { width: 264px; margin: 16px; padding: 14px 18px; background: #fff; border-radius: 8px;
+  #panel { --lc: 128px; width: 300px; margin: 16px; padding: 14px 18px; background: #fff; border-radius: 8px;
            box-shadow: 0 2px 12px rgba(0,0,0,.15); box-sizing: border-box; flex-shrink: 0;
            align-self: flex-start; max-height: calc(100vh - 32px); overflow-y: auto; }
-  #panel label { display: grid; grid-template-columns: 100px 1fr 38px; align-items: center; margin: 10px 0; gap: 6px; }
+  #panel label { display: grid; grid-template-columns: var(--lc) 1fr 38px; align-items: center; margin: 10px 0; gap: 6px; }
   #panel label span:first-child { color: #444; }
   #panel input[type=range] { width: 100%; min-width: 0; margin: 0; }
   #panel input[type=color], #panel select, #panel input[type=checkbox] { justify-self: end; grid-column: 2 / 4; }
   #panel output { text-align: right; font-variant-numeric: tabular-nums; }
   #stage { flex: 1; display: flex; overflow: auto; padding: 32px; }
   #stage > arrow-maze { display: block; margin: auto; flex-shrink: 0; box-shadow: 0 4px 24px rgba(0,0,0,.18); }
-  #stage.responsive { padding: 0; overflow: hidden; }
-  #stage.responsive > arrow-maze { width: 100% !important; height: 100% !important; box-shadow: none; }
+  #stage.responsive > arrow-maze { outline: 1px solid #0002; }   /* a device viewport at 1:1 css px */
   #panel input[type=number] { width: 58px; box-sizing: border-box; font: inherit; }
   #panel input[type=text] { grid-column: 2 / 4; width: 100%; box-sizing: border-box; font: inherit; }
   #panel #nodes span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #panel #nodes label.dropped span:first-child { color: #d33; }
+  #panel .hint { display: none; margin: -8px 0 10px; color: #999; font-size: 11px; line-height: 1.35; }
+  #panel.hints .hint { display: block; }
+  #panel details > .hint:last-child { margin-bottom: 12px; }
+  #panel h1 label { display: inline-block; margin: 0; float: right; font: 400 11px/1.6 system-ui; color: #888; cursor: pointer; }
+  #panel h1 label input { vertical-align: -2px; margin: 0 3px 0 0; }
+  #panel button.dice { font: inherit; border: none; background: none; cursor: pointer; padding: 0; }
+  /* phones: mobile.css narrows the label column and hides the hint prose */
+  @media (max-width: 720px) { #panel { --lc: 78px; } #panel h1 label, #panel.hints .hint { display: none; } }
   #layers .layer { margin: 8px 0; }
   #layers .layer div { display: flex; align-items: center; gap: 6px; }
   #layers .layer div + div { margin-top: 3px; }
@@ -40,6 +48,8 @@
              background: #fff; border-radius: 8px; padding: 8px 12px; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
   #viewbox span { color: #444; }
   #viewbox select { font: inherit; padding: 3px 6px; }
+  #viewbox button { font: inherit; padding: 3px 8px; border: 1px solid #ccc; background: #fff; border-radius: 6px; cursor: pointer; }
+  #viewbox button[hidden] { display: none; }
   .btns { display: flex; gap: 8px; margin-top: 16px; }
   .btns a { flex: 1; text-align: center; padding: 7px 0; border-radius: 8px; background: #3b82f6; color: #fff; text-decoration: none; cursor: pointer; }
   .btns select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 1px solid #ccc; background: #fff; }
@@ -56,7 +66,7 @@
 <link rel="stylesheet" href="mobile.css">
 <body>
 <div id="panel">
-  <h1>Arrow Maze</h1>
+  <h1>Arrow Maze <label title="show each control's hint under it"><input type="checkbox" id="hints">hints</label></h1>
   <div id="controls"></div>
   <div class="btns">
     <select id="fmt" title="file type"></select>
@@ -72,6 +82,7 @@
     <option>10%</option><option>25%</option><option>50%</option><option>75%</option>
     <option>100%</option><option>150%</option><option>200%</option>
   </select>
+  <button id="play" title="play the motion once more — the next edit shows the finished picture again">▶ play</button>
 </div>
 <script src="export.js"></script>
 <script src="zoom.js"></script>
@@ -92,6 +103,12 @@ const saved = JSON.parse(localStorage.getItem("arrow-maze") || "{}");
 // Carry the short-lived across/down controls back into the nested panel amount.
 if (!("panels" in saved) && ("panelCols" in saved || "panelRows" in saved))
   saved.panels = Math.min(32, Math.max(1, (saved.panelCols || 1) * (saved.panelRows || 1)));
+ArrowMaze.migrate(saved);                              // px sizes → % of artboard width
+p.rel = saved.rel;
+// before ecellv: 1 the embed cell defaulted to 0 (the artboard's own, giant on a
+// website) — lift it to 60 CSS px once; a 0 chosen afterwards stays
+if (!saved.ecellv && !+saved.ecell) saved.ecell = 60;
+p.ecellv = 1;
 const controls = document.getElementById("controls");
 
 // ---------- collapsible groups ----------
@@ -181,7 +198,7 @@ let setArtboard;                                 // (w, h) — the stage's resiz
     preset.value = "custom";
     apply();
   });
-  const marginLimit = () => ArrowMaze.marginLimit(p.wpx, p.hpx);
+  const marginLimit = () => +(ArrowMaze.marginLimit(p.wpx, p.hpx) / p.wpx * 100).toFixed(2);   // % of width
   const mIn = Object.assign(document.createElement("input"), {type: "number", min: 0, step: 0.1, value: p.margin});
   const syncMargin = () => {
     mIn.max = marginLimit();
@@ -190,19 +207,27 @@ let setArtboard;                                 // (w, h) — the stage's resiz
   };
   syncMargin();
   const marginRow = document.createElement("label");
-  marginRow.title = "global foreground inset in artboard pixels — arrows, dots, text and dividers; paper and background panels stay full-bleed";
-  marginRow.innerHTML = "<span>margin px</span>";
+  marginRow.title = "global foreground inset as % of the artboard width — arrows, dots, text and dividers; paper and background panels stay full-bleed";
+  marginRow.innerHTML = "<span>margin %</span>";
   marginRow.append(mIn);
   mIn.addEventListener("input", () => { p.margin = Math.max(0, Math.min(+mIn.value || 0, marginLimit())); render(); });
   mIn.addEventListener("change", syncMargin);
-  // responsive preview: the stage becomes the embed's box (regenerate) — resize
-  // the window to see how the maze re-lays itself out on a website
+  // responsive preview: like Safari's responsive design mode — the embed in a
+  // box of vw × vh css px; drag its edges and the maze re-lays itself out
   p.responsive = saved.responsive ?? false;
+  p.vw = +saved.vw || 0; p.vh = +saved.vh || 0;          // 0: sized to the stage on first use
   const respRow = document.createElement("label");
-  respRow.title = "fill the stage like the embed does on a website: the maze re-lays itself out for the window, arrows keep their size";
+  respRow.title = "a website-sized box at 1:1 css px, like Safari's responsive design mode: drag its edges and the maze re-lays itself out, arrows keep their size";
   respRow.innerHTML = "<span>responsive preview</span>";
   const resp = Object.assign(document.createElement("input"), {type: "checkbox", checked: p.responsive});
-  resp.addEventListener("input", () => { p.responsive = resp.checked; render(); });
+  resp.addEventListener("input", () => {
+    p.responsive = resp.checked;
+    if (p.responsive && !(p.vw && p.vh)) {                  // first use: the stage's own size
+      const st = document.getElementById("stage");
+      p.vw = Math.max(200, Math.round(st.clientWidth - 64)); p.vh = Math.max(200, Math.round(st.clientHeight - 64));
+    }
+    render();
+  });
   respRow.append(resp);
   group("artboard").append(sizeRow, presetRow, marginRow, respRow);
 }
@@ -230,9 +255,19 @@ for (const [key, type, opt] of DEFS) {
   label.append(input);
   let out;
   if (type === "range") { out = document.createElement("output"); out.value = p[key]; label.append(out); }
+  if (key === "seed") {                                // 🎲: any seed the slider can hold
+    const dice = Object.assign(document.createElement("button"), {type: "button", className: "dice", textContent: "🎲", title: "random seed"});
+    dice.addEventListener("click", () => {
+      input.value = opt.min + Math.floor(Math.random() * ((opt.max - opt.min) / opt.step + 1)) * opt.step;
+      input.dispatchEvent(new Event("input"));
+    });
+    label.style.gridTemplateColumns = "var(--lc) 1fr 38px 18px";
+    label.append(dice);
+  }
   input.addEventListener("input", () => {
     p[key] = type === "checkbox" ? input.checked : type === "range" ? +input.value : input.value;
     if (out) out.value = input.value;
+    if (key === "hollow") buildMasters();              // the arrow master's note follows hollow %
     render();
   });
   cur.append(label);
@@ -258,19 +293,34 @@ const accentFont = fontPicker({label: "accent face", key: "font:" + SLUG + ":acc
 const entries = () => ArrowMaze.entries(p);
 p.nodes = saved.nodes || {};                          // text → {size: % cell, x, y: fraction of the artboard or null}
 const nodeRows = Object.assign(document.createElement("div"), {id: "nodes"});
-let rowsKey;
+let rowsKey, lastScene = null;
+const rowOf = {};                                     // text → its row, for the dropped mark
+const SIZE_TIP = "size % cell — drag the words on the stage to place them, double-click to snap back";
+const DROP_TIP = "no room — dropped from the layout; lower shrink to %, the size, or untick text clears arrows";
+// the preview's scene lists the entries no pocket held: their rows turn red
+function markDropped() {
+  for (const t in rowOf) {
+    const off = !!lastScene?.dropped?.includes(t);
+    rowOf[t].label.classList.toggle("dropped", off);
+    rowOf[t].name.title = off ? DROP_TIP : SIZE_TIP;
+  }
+}
+// capture: the element's event doesn't bubble, and the preview is created further down
+document.addEventListener("arrowmaze:layout", e => { lastScene = e.detail; markDropped(); }, true);
 function syncNodeRows() {
   const es = entries(), key = es.join("|");
   if (key === rowsKey) return;
   rowsKey = key;
   for (const k in p.nodes) if (!es.includes(k)) delete p.nodes[k];
   nodeRows.innerHTML = "";
+  for (const k in rowOf) delete rowOf[k];
   for (const t of es) {
     const nd = p.nodes[t] ??= {size: 60, x: null, y: null};
     const label = document.createElement("label"), name = document.createElement("span");
-    label.style.gridTemplateColumns = "92px 1fr 30px 16px";   // room for the accent toggle
+    label.style.gridTemplateColumns = "var(--lc) 1fr 30px 16px";   // room for the accent toggle
     name.textContent = t;
-    name.title = "size % cell — drag the words on the stage to place them, double-click to snap back";
+    name.title = SIZE_TIP;
+    rowOf[t] = {label, name};
     const input = Object.assign(document.createElement("input"), {type: "range", min: 20, max: 300, step: 5, value: nd.size});
     input.dataset.def = 60;
     const out = document.createElement("output");
@@ -333,7 +383,6 @@ group("layers").append(layerBox);
 // can also be pinned to single elements: press its "pick" button, then click
 // arrows, words, panels, dots or the dividers on the stage. Assignments are
 // keyed by element: words by their text, arrows/panels/dots by index.
-// ponytail: arrow and dot indices shift when the seed or grid changes — those pins then land on other arrows
 for (const [k, , def] of FIXED) p[k] = saved[k] ?? def;
 p.masters = saved.masters || [];                      // custom: [{id, name, color}]
 p.assign = saved.assign || {};                        // element key → master id
@@ -351,6 +400,8 @@ function buildMasters() {
     const name = t.m
       ? Object.assign(document.createElement("input"), {type: "text", value: t.m.name, title: "rename"})
       : Object.assign(document.createElement("span"), {className: "name", textContent: t.name});
+    if (t.id === "arrow" && p.hollow > 0)             // hollow arrows take this colour on their outline
+      name.append(Object.assign(document.createElement("small"), {textContent: "fill · outline of hollow arrows", style: "display:block"}));
     if (t.m) name.addEventListener("input", () => { t.m.name = name.value; localStorage.setItem("arrow-maze", JSON.stringify(p)); });
     const n = Object.values(p.assign).filter(id => id === t.id).length;
     const badge = Object.assign(document.createElement("small"), {textContent: n ? `${n} pinned` : "", title: "elements pinned to this colour"});
@@ -375,36 +426,94 @@ function buildMasters() {
     p.masters.push({id: "m" + Date.now().toString(36), name: "colour " + (p.masters.length + 1), color: "#e84f5e"});
     buildMasters(); render();
   });
-  const help = Object.assign(document.createElement("p"), {textContent: "pick a colour, then click things on the stage"});
+  const help = Object.assign(document.createElement("p"), {textContent: pinNote || "pick a colour, then click things on the stage"});
+  pinNote = "";
   masterBox.append(add, help);
+}
+// Index-keyed pins (arrows, panels, dots) would land on other elements once the
+// layout changes, so a change to any placement parameter releases them; word
+// and divider pins stay. The signature rides in p, so a reload or a snapshot
+// keeps its own pins.
+const GEO = ["wpx", "hpx", "margin", "nodes", "cwidth", "tcwidth", "steps"];   // contour budgets steer placement too
+{ let g; for (const [k, type, opt] of DEFS) if (type === "group") g = opt.label;
+  else if (["arrows", "geometry", "panels", "text"].includes(g) && k !== "textcol") GEO.push(k); }
+const pinSig = () => {                                // FNV-1a over the placement values
+  let h = 2166136261;
+  for (const ch of JSON.stringify(GEO.map(k => p[k]))) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  return (h >>> 0).toString(36);
+};
+p.pinSig = saved.pinSig;
+let pinNote = "";
+function pinCheck() {
+  const sig = pinSig(), was = p.pinSig;
+  p.pinSig = sig;
+  if (was === undefined || was === sig) return;
+  const ks = Object.keys(p.assign).filter(k => /^(arrow|panel|dot):/.test(k));
+  if (!ks.length) return;
+  for (const k of ks) delete p.assign[k];
+  pinNote = "layout changed — arrow/panel/dot pins cleared";
+  buildMasters();
 }
 buildMasters();
 group("colour").prepend(masterBox);
+
+// ---------- hints ----------
+// every titled row gets its hint as grey prose underneath, shown by the toggle
+for (const l of controls.querySelectorAll("label[title]"))
+  l.after(Object.assign(document.createElement("div"), {className: "hint", textContent: l.title}));
+p.hints = saved.hints ?? false;
+{
+  const box = document.getElementById("hints"), panel = document.getElementById("panel");
+  box.checked = p.hints;
+  panel.classList.toggle("hints", p.hints);
+  box.addEventListener("input", () => {
+    p.hints = box.checked;
+    panel.classList.toggle("hints", p.hints);
+    localStorage.setItem("arrow-maze", JSON.stringify(p));
+  });
+}
 addEventListener("keydown", e => { if (e.key === "Escape" && active) { active = null; stage.style.cursor = ""; buildMasters(); } });
 // ---------- render + export ----------
 // The preview is the embed itself: an <arrow-maze> element (p5 + canvas) that
 // lays the scene out and animates it. The SVG export is its static twin.
+// Editing shows the finished picture (playback="static"); ▶ play hands the
+// element back the design's motion until the next edit.
 const stage = document.getElementById("stage");
 const zoomEl = document.getElementById("zoom");
 const maze = document.createElement("arrow-maze");
 maze.setAttribute("fit", "contain");
+maze.setAttribute("playback", "static");
+maze.setAttribute("reduced-motion", "ignore");          // ▶ is an explicit ask
 stage.append(maze);
+const playBtn = document.getElementById("play");
+playBtn.addEventListener("click", () => {
+  maze.removeAttribute("playback");                    // → the design's motion (draw in: once, draw loop: loop)
+  maze.restart(); maze.play();
+});
 p.zoom = saved.zoom === "fit" || typeof saved.zoom === "number" ? saved.zoom : "fit";
 const view = createZoom({
   stage, select: zoomEl, zoom: p.zoom,
-  size: () => ({w: p.wpx, h: p.hpx}),
+  size: () => p.responsive ? {w: p.vw || 1024, h: p.vh || 768} : {w: p.wpx, h: p.hpx},
+  fixed: () => p.responsive,                            // the preview box is shown at 1:1, like a browser window
   onChange: z => { p.zoom = z; localStorage.setItem("arrow-maze", JSON.stringify(p)); },
-  // drag the artboard's edges/corners like a window; the responsive preview has no artboard to drag
-  resize: {set: setArtboard, locked: () => p.lock, enabled: () => !p.responsive, min: 100, max: 8000},
+  // drag the edges/corners like a window: the artboard (design px, geometry
+  // scales along) or, in responsive preview, the website box the embed re-lays out in
+  resize: {
+    set: (w, h) => { if (p.responsive) { p.vw = w; p.vh = h; render(); } else setArtboard(w, h); },
+    locked: () => !p.responsive && p.lock, min: 100, max: 8000,
+  },
 });
 const fonts = () => ({main: userFont.font, accent: accentFont.font});
 // the artboard scene, for exports; the preview's own scene may be a responsive one
 const artboard = () => ArrowMaze.layout(p, p.wpx, p.hpx, {fonts: fonts(), OT});
 function render() {
   syncNodeRows();
+  pinCheck();
   localStorage.setItem("arrow-maze", JSON.stringify(p));
   stage.classList.toggle("responsive", p.responsive);
   maze.setAttribute("fit", p.responsive ? "regenerate" : "contain");
+  maze.setAttribute("playback", "static");
+  playBtn.hidden = p.motion === "none";
   maze.config = {params: p, fonts: fonts()};
   view.apply();
 }
@@ -483,10 +592,12 @@ async function exportGIF(setLabel) {
   await saveAs(`arrow-maze-${p.seed}.gif`, encodeGIF(frames, {width: w, height: h, delay: Math.max(2, Math.round(100 / p.fps))}));
 }
 // embed: a ready-to-paste snippet (in a demo page) plus the runtime next to it
-const UI_ONLY = ["open", "zoom", "lock", "responsive", "fps", "gifpx", "outline", "efit", "eplay"];   // ecell rides along: the embed reads it
+const UI_ONLY = ["open", "zoom", "lock", "responsive", "vw", "vh", "fps", "gifpx", "outline", "efit", "eplay", "ecellv", "pinSig", "hints"];   // ecell rides along: the embed reads it
 async function exportEmbed() {
   const params = Object.fromEntries(Object.entries(p).filter(([k]) => !UI_ONLY.includes(k)));
   const fs = Object.fromEntries(Object.entries(fonts()).filter(([, f]) => f.dataURL).map(([k, f]) => [k, {...f}]));
+  // the same file as both faces travels once: the accent just names the main face
+  if (fs.accent && fs.accent.dataURL === fs.main?.dataURL) fs.accent = {family: fs.main.family};
   const json = JSON.stringify({params, fonts: fs}).replace(/</g, "\\u003c");   // never closes the <script>
   const attrs = `fit="${p.efit}"` + (p.eplay === "from motion" ? "" : ` playback="${p.eplay}"`);
   const element = `<arrow-maze ${attrs}>\n  <script type="application/json">${json}<\/script>\n</arrow-maze>`;

@@ -26,7 +26,7 @@ const DEFS = [
   ["dirs",   "select", {options: ["mixed", "orthogonal", "diagonal"], value: "mixed", label: "bend angles", hint: "orthogonal: 90° only — diagonal: 45° only"}],
   ["fork",   "range", {min: 0, max: 100, step: 5, value: 30, label: "fork chance %", hint: "chance an arrow grows a second branch"}],
   ["bleed",  "range", {min: 0, max: 100, step: 5, value: 30, label: "edge bleed %", hint: "chance an arrow on a border cell starts off the edge"}],
-  ["headMargin", "range", {min: 0, max: 20, step: 0.5, value: 0, label: "head margin px", hint: "fine inset from the actual outer head contour, inside the global margin — 0 keeps the original head bleed; shafts can still bleed"}],
+  ["headMargin", "range", {min: 0, max: 1.5, step: 0.01, value: 0, label: "head margin %", hint: "% of artboard width — fine inset from the actual outer head contour, inside the global margin — 0 keeps the original head bleed; shafts can still bleed"}],
   ["cross",  "range", {min: 0, max: 100, step: 5, value: 0, label: "cross panels %", hint: "chance an arrow from a paper panel ignores the panel edges — set ring colour to home panel so it keeps a paper gap where it crosses ink"}],
   ["dots",   "range", {min: 0, max: 12, step: 1, value: 1, label: "filler dots", hint: "at most this many discs in holes the arrows left"}],
   ["", "group", {label: "geometry"}],
@@ -45,7 +45,7 @@ const DEFS = [
   ["", "group", {label: "panels"}],
   ["panels", "range", {min: 1, max: 32, step: 1, value: 4, label: "panel amount", hint: "number of nested panel subdivisions"}],
   ["invert", "range", {min: 0, max: 100, step: 5, value: 40, label: "inverted %", hint: "share of panels drawn paper-on-ink"}],
-  ["line",   "range", {min: 0, max: 12, step: 0.5, value: 3, label: "divider px"}],
+  ["line",   "range", {min: 0, max: 0.8, step: 0.01, value: 0.2, label: "divider %", hint: "% of artboard width"}],
   ["", "group", {label: "text"}],
   ["words",  "text",  {value: "", label: "words", hint: "entries split on | — a / inside an entry breaks it into fixed lines"}],
   ["textmin","range", {min: 10, max: 100, step: 5, value: 40, label: "shrink to %", hint: "how small a word may go to find a pocket"}],
@@ -58,9 +58,9 @@ const DEFS = [
   ["", "group", {label: "colour"}],
   ["", "group", {label: "contours"}],
   ["ringcol","select", {options: ["ring masters", "home panel"], value: "ring masters", label: "ring colour", hint: "home panel: rings take the arrow's own panel ground, so they only show where it crosses onto another panel"}],
-  ["hollow", "range", {min: 0, max: 100, step: 5, value: 0, label: "hollow %", hint: "chance an arrow is drawn as ground fill with a counter-colour contour — signage-style outline arrows"}],
-  ["cwidth", "range", {min: 0, max: 16, step: 0.5, value: 4, label: "arrow contour", hint: "px per ring around the arrows"}],
-  ["tcwidth","range", {min: 0, max: 16, step: 0.5, value: 4, label: "text contour", hint: "px per ring around the words"}],
+  ["hollow", "range", {min: 0, max: 100, step: 5, value: 0, label: "hollow %", hint: "chance an arrow is drawn as ground fill with a counter-colour contour — signage-style outline arrows; the arrow colour master then paints their outline, not a fill"}],
+  ["cwidth", "range", {min: 0, max: 1, step: 0.01, value: 0.27, label: "arrow contour %", hint: "% of artboard width per ring around the arrows"}],
+  ["tcwidth","range", {min: 0, max: 1, step: 0.01, value: 0.27, label: "text contour %", hint: "% of artboard width per ring around the words"}],
   ["steps",  "range", {min: 1, max: 8, step: 1, value: 4, label: "contour rings"}],
   ["cjoin",  "select", {options: ["rounded", "sharp", "beveled"], value: "rounded", label: "contour edges", hint: "corner joins for arrow and text contours — rounded: round joins; sharp: miter joins; beveled: clipped corners"}],
   ["", "group", {label: "motion"}],
@@ -74,15 +74,28 @@ const DEFS = [
   ["fps",    "range", {min: 5, max: 30, step: 1, value: 20, label: "gif fps"}],
   ["gifpx",  "range", {min: 200, max: 1000, step: 50, value: 600, label: "gif px"}],
   ["efit",   "select", {options: ["regenerate", "contain", "cover"], value: "regenerate", label: "embed resize", hint: "regenerate: the maze re-lays itself out for any box, arrows keep their size — contain / cover: this artboard, scaled"}],
-  ["ecell",  "range", {min: 0, max: 200, step: 1, value: 0, label: "embed cell px", hint: "regenerate: grid cell on the website in CSS px — 0 keeps the artboard's own cell (artboard px = CSS px)"}],
+  ["ecell",  "range", {min: 0, max: 200, step: 1, value: 60, label: "embed cell px", hint: "regenerate: grid cell on the website in CSS px — 0 = the artboard's own cell (artboard px = CSS px, huge on a big artboard)"}],
   ["eplay",  "select", {options: ["from motion", "loop", "once", "in-view", "static"], value: "from motion", label: "embed playback", hint: "in-view replays the draw-in whenever it scrolls into view; visitors asking for reduced motion get the still picture"}]
 ];
 const LAYERS = ["paper", "panels", "arrows", "dots", "text"];
 const BLENDS = ["normal", "multiply", "screen", "overlay", "difference"];
 const FIXED = [["ink", "ink", "#111111"], ["paper", "paper", "#f4f1ea"], ["arrow", "arrow", "#111111"], ["gradA", "inner ring", "#1c1c1c"], ["gradB", "outer ring", "#f5c518"]];
+// Every size not counted in grid cells is stored as % of the artboard width
+// (margin, head margin, divider, contours), so the whole picture scales with
+// the artboard. layout() resolves them to px against its basis width.
+const REL = ["margin", "headMargin", "line", "cwidth", "tcwidth"];
+// configs from before rel: 1 hold these in artboard px — convert once, in place
+const migrate = src => {
+  if (src && !src.rel) {
+    for (const k of REL) if (k in src) src[k] = +src[k] / (+src.wpx || 1500) * 100;
+    src.rel = 1;
+  }
+  return src;
+};
+const toPx = (v, basis) => +(v * basis / 100).toFixed(4);
 // a partial or older config gets every missing key from the defaults
 const normalize = src => {
-  const p = {wpx: 1500, hpx: 2000, margin: 0, nodes: {}, masters: [], assign: {}, ...src};
+  const p = migrate({wpx: 1500, hpx: 2000, margin: 0, nodes: {}, masters: [], assign: {}, ...src});
   for (const [key, type, opt] of DEFS) if (type !== "group" && !(key in p)) p[key] = opt.value;
   for (const [k, , def] of FIXED) p[k] ??= def;
   p.layers = (p.layers || []).filter(l => LAYERS.includes(l.id));
@@ -166,8 +179,11 @@ const strokeBounds = (P, width, join) => {
 // env: {ctx: a 2D context to measure words, fonts: {main, accent: {family,
 // dataURL}}, OT: {main, accent} opentype faces for outlined SVG words}
 const measureCtx = () => measureCtx.c ??= Object.assign(document.createElement("canvas").getContext("2d"), {textBaseline: "middle"});
+// env.basis: the width the relative sizes resolve against — W unless a
+// regenerating embed lays the design out at another scale
 function layout(src, W, H, env = {}) {
-  const p = normalize(src);
+  const p = normalize(src), basis = env.basis ?? W;
+  for (const k of REL) p[k] = toPx(p[k], basis);
   const contourJoin = {rounded: "round", sharp: "miter", beveled: "bevel"}[p.cjoin] || "round";
   const ctx = env.ctx || measureCtx();                 // measures words in the live face
   const userFont = {font: env.fonts?.main || {}}, accentFont = {font: env.fonts?.accent || {}};
@@ -201,8 +217,9 @@ function layout(src, W, H, env = {}) {
 
   // ---- grid + panels
   const M = insetMargin(p.margin, W, H), gw = W - 2 * M, gh = H - 2 * M;   // foreground only; backgrounds stay full-bleed
-  const cols = p.cols, cell = gw / cols, rows = Math.max(2, Math.floor(gh / cell));
-  const ox = M, oy = M + (gh - rows * cell) / 2;       // foreground grid is centred within its inset
+  const cols = p.cols, short = gh < 2 * (gw / cols);   // box under two cells tall: shrink the cell so two rows fit
+  const cell = short ? gh / 2 : gw / cols, rows = Math.max(2, Math.floor(gh / cell));
+  const ox = short ? M + (gw - cols * cell) / 2 : M, oy = M + (gh - rows * cell) / 2;   // foreground grid is centred within its inset
   // Guillotine subdivisions preserve the irregular, nested panel structure.
   // Always split the largest eligible panel so the amount reaches its target
   // instead of stopping early once panels become smaller than six cells.
@@ -443,7 +460,29 @@ function layout(src, W, H, env = {}) {
         if (tx < -0.5 || tx > cols - 0.5 || ty < -0.5 || ty > rows - 0.5) return null;
       }
       const list = tri(P, hmK);
-      return clear(list, qi, j => (fid[j] === id && fst[j] === k) || (fork && k <= 2 && own(j, k)))
+      // Of its own arrow the head may share only the last step's claim, and of
+      // that only its lane around the head (within half a lane of the final
+      // heading line) or what lies off every earlier step's lane. A u-turn, wide
+      // arc or round corner claims its whole band, which reaches the incoming
+      // leg — sharing that would fuse the head into its own shaft.
+      const [px, py, hx, hy] = pose(t);
+      const at = (i, s) => {                            // centreline of step i at fraction s
+        const a = arcs[i], [x0, y0] = cells[i - 1];
+        if (!a) return [x0 + (cells[i][0] - x0) * s, y0 + (cells[i][1] - y0) * s];
+        const [vx, vy] = unit0(D[dirs[i - 1]]), g = a.sg * a.th * s, co = Math.cos(g), si = Math.sin(g);
+        return [x0 + a.sg * a.r * (vx * si + vy * co - vy), y0 - a.sg * a.r * (vx * co - vy * si - vx)];
+      };
+      const mine = j => {
+        const x = ((j % fw) + 0.5) / SUB - 0.5, y = ((j / fw | 0) + 0.5) / SUB - 0.5;
+        if (Math.abs((x - px) * hy - (y - py) * hx) <= 0.5 * K + 1e-9) return true;
+        for (let i = 1; i < k; i++) for (let m = 0, n = arcs[i] ? 16 : 1, a = at(i, 0); m < n; m++) {
+          const b = at(i, (m + 1) / n);
+          if (dSeg(x, y, a[0], a[1], b[0], b[1]) <= 0.5 * K) return false;
+          a = b;
+        }
+        return true;
+      };
+      return clear(list, qi, j => fid[j] === id ? fst[j] === k && mine(j) : fork && k <= 2 && own(j, k))
         ? {list, end: t === 1 ? end : pose(t).slice(0, 2), th: ao ? ao.th * t : null} : null;
     };
     let hd = null;
@@ -492,7 +531,7 @@ function layout(src, W, H, env = {}) {
     || sat[(j1 + 1) * W1 + i1 + 1] - sat[j0 * W1 + i1 + 1] - sat[(j1 + 1) * W1 + i0] + sat[j0 * W1 + i0] > 0;
   const scales = [];
   for (let s = 1; s >= p.textmin / 100 - 1e-9; s -= 0.1) scales.push(s);
-  const words = [];
+  const words = [], dropped = [];                     // dropped: entries no pocket held, for the panel
   const placeWords = manual => { buildSAT(); for (const t of entries(p)) {
     const nd = p.nodes[t] || {size: 60, x: null, y: null}, px0 = cell * nd.size / 100;
     if ((nd.x !== null) !== manual) continue;
@@ -553,7 +592,7 @@ function layout(src, W, H, env = {}) {
         }
       if (best) break search;
     }
-    if (!best) continue;                               // no pocket holds it even at the minimum: dropped
+    if (!best) { dropped.push(t); continue; }          // no pocket holds it even at the minimum: dropped
     for (let j = Math.max(0, best.j0 | 0); j < Math.min(fh, best.j0 + best.bh); j++)
       for (let i = Math.max(0, best.i0 | 0); i < Math.min(fw, best.i0 + best.bw); i++) fid[j * fw + i] = WORD;
     buildSAT();
@@ -616,7 +655,7 @@ function layout(src, W, H, env = {}) {
   const LY = Object.fromEntries(LAYERS.map(id => [id, []]));   // svg per layer
   LY.paper.push(`<rect width="${W}" height="${H}" fill="${p.paper}"/>`);
   // the canvas twin of the SVG: the same shapes as plain numbers for drawScene()
-  const S = {w: W, h: H, paper: p.paper, ink: p.ink, panels: [], lines: null, dots: [], families: [], words: [], covers: [],
+  const S = {w: W, h: H, paper: p.paper, ink: p.ink, panels: [], lines: null, dots: [], families: [], words: [], covers: [], dropped,
              contourJoin, contentRect: M > 0 ? [M, M, gw, gh] : null,
              flipPaper: [], flipInk: [], layers: p.layers.filter(l => l.on && l.opacity > 0).map(l => ({...l})),
              timing: {moving, loop, m, T, speed: p.speed, timing: p.timing}};
@@ -675,11 +714,19 @@ function layout(src, W, H, env = {}) {
     // the box hugs the ink; the anchor centre sits off it by the ink offsets
     const cx = f(ox + (i0 + bw / 2) / SUB * cell - ink.cx * sc2), cy = oy + (j0 + bh / 2) / SUB * cell - ink.cy * sc2;
     const ot = nd?.acc ? OT.accent : OT.main;
+    // canvas draws each line with textBaseline "middle"; the SVG sets the alphabetic
+    // baseline where canvas puts it (ink ascent above "alphabetic" minus above
+    // "middle"), in the same font string, so preview, PNG and SVG line up whatever the face's metrics
+    ctx.font = `${weightOf(nd)} ${px}px ${famOf(nd)}`;
+    const tb0 = ctx.textBaseline;
+    ctx.textBaseline = "alphabetic"; const aA = ctx.measureText("H").actualBoundingBoxAscent;
+    ctx.textBaseline = "middle"; const aM = ctx.measureText("H").actualBoundingBoxAscent;
+    ctx.textBaseline = tb0;
+    const base = aA - aM;                              // middle line → alphabetic baseline, px down
     const dOf = (l, k) => {                            // one line as a glyph path
       const ly = cy + (k - (lines.length - 1) / 2) * lh * px;
       // own serializer — opentype 2.0.0's toPathData emits NaNs on longer strings
-      const s = px / ot.unitsPerEm;
-      return ot.getPath(l, cx - ot.getAdvanceWidth(l, px) / 2, ly + (ot.ascender + ot.descender) / 2 * s, px)
+      return ot.getPath(l, cx - ot.getAdvanceWidth(l, px) / 2, ly + base, px)
         .commands.map(c =>
           c.type === "M" ? `M${f(c.x)} ${f(c.y)}` :
           c.type === "L" ? `L${f(c.x)} ${f(c.y)}` :
@@ -692,8 +739,8 @@ function layout(src, W, H, env = {}) {
     const line = (l, k, paint) => {
       const ly = cy + (k - (lines.length - 1) / 2) * lh * px;
       textUsed = true;
-      return `<text x="${cx}" y="${f(ly)}" font-family="${famOf(nd)}"`
-        + ` font-size="${f(px)}" font-weight="${weightOf(nd)}" text-anchor="middle" dominant-baseline="central"${paint}>${esc(l)}</text>`;
+      return `<text x="${cx}" y="${f(ly + base)}" font-family="${famOf(nd)}"`
+        + ` font-size="${f(px)}" font-weight="${weightOf(nd)}" text-anchor="middle"${paint}>${esc(l)}</text>`;
     };
     const draw = paint => blockD ? `<path d="${blockD}"${paint}/>` : lines.map((l, k) => line(l, k, paint)).join("");
     const assigned = masterColor(p.assign["word:" + t]);
@@ -1096,6 +1143,7 @@ function hitTest(S, x, y) {
 //                   <script type="application/json"> child
 //   p5-src          where to load p5 from when the page has none
 // Config: {params: {…tool settings…}, fonts: {main, accent: {family, dataURL}}}
+//   (an accent without dataURL names a face registered elsewhere — the main one)
 // JS: el.config = {…}; el.play(); el.pause(); el.restart(); el.seek(sec);
 //     el.scene; events "arrowmaze:layout" and "arrowmaze:ready".
 const P5_SRC = "https://cdn.jsdelivr.net/npm/p5@2.3.3/lib/p5.min.js";
@@ -1192,19 +1240,18 @@ class ArrowMazeElement extends HTMLElement {
     if (waits.length) { Promise.all(waits).then(() => this.#relayout()); return; }
     const p = normalize(params);
     p.motion = MOTION[this.#playback()];
-    let W = p.wpx, H = p.hpx;
+    let W = p.wpx, H = p.hpx, basis;
     if (this.fit === "regenerate") {
       ({w: W, h: H} = this.#size);
       if (!(W > 0 && H > 0)) return;                    // no box yet: the first resize lays it out
-      const M = (w, h) => insetMargin(p.margin, w, h);
-      const own = (p.wpx - 2 * M(p.wpx, p.hpx)) / p.cols, cell = +this.getAttribute("cell") || p.ecell || own;
-      // a different cell is the design at another scale: the pixel settings
-      // (contours, divider, margin) scale with it, so the proportions hold
-      const k = cell / own;
-      for (const key of ["cwidth", "tcwidth", "line", "margin", "headMargin"]) p[key] *= k;
-      p.cols = Math.max(2, Math.round((W - 2 * M(W, H)) / cell));
+      const M = (b, w, h) => insetMargin(toPx(p.margin, b), w, h);
+      const own = (p.wpx - 2 * M(p.wpx, p.wpx, p.hpx)) / p.cols, cell = +this.getAttribute("cell") || p.ecell || own;
+      // a different cell is the design at another scale: the relative sizes
+      // (contours, divider, margin) resolve against the artboard scaled with it
+      basis = p.wpx * cell / own;
+      p.cols = Math.max(2, Math.round((W - 2 * M(basis, W, H)) / cell));
     }
-    this.#scene = layout(p, W, H, {fonts, ...this.env});
+    this.#scene = layout(p, W, H, {fonts, ...this.env, basis});
     this.#stale = false;
     this.dispatchEvent(new CustomEvent("arrowmaze:layout", {detail: this.#scene}));
     this.#kick();
@@ -1244,13 +1291,16 @@ class ArrowMazeElement extends HTMLElement {
     if (this.#sk || !this.isConnected) return;
     new P5(sk => {
       sk.setup = () => {
+        // p5 2.x sets up async: drop an instance whose element left (or was
+        // re-started) in the meantime
+        if (!this.isConnected || this.#sk) { sk.remove(); return; }
         this.#sk = sk;
         sk.createCanvas(1, 1);
         this.#fitCanvas();
         this.#kick();
         this.dispatchEvent(new CustomEvent("arrowmaze:ready"));
       };
-      sk.draw = () => this.#frame();
+      sk.draw = () => { if (this.#sk === sk) this.#frame(); };   // a removed instance may still draw once
     }, this.shadowRoot.getElementById("box"));
   }
   #fitCanvas() {
@@ -1287,6 +1337,6 @@ class ArrowMazeElement extends HTMLElement {
 // source(): this whole runtime as script text, so the tool can write the
 // embed file (or inline it) without fetching — fetch fails from file://
 const source = () => `// <arrow-maze> runtime — spielwerk arrow-maze.embed.js\n(${runtime})();\n`;
-window.ArrowMaze = {DEFS, LAYERS, BLENDS, FIXED, normalize, entries, marginLimit, layout, drawScene, progress, hitTest, P5_SRC, source};
+window.ArrowMaze = {DEFS, LAYERS, BLENDS, FIXED, REL, migrate, normalize, entries, marginLimit, layout, drawScene, progress, hitTest, P5_SRC, source};
 if (!customElements.get("arrow-maze")) customElements.define("arrow-maze", ArrowMazeElement);
 })();
