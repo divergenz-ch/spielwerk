@@ -108,11 +108,13 @@
     // square handles, the artboard name above its top-left corner, and a
     // measurement tag at the pointer while dragging. A handle moves its own
     // side and holds the opposite one; Alt/Option resizes from the centre,
-    // Shift keeps proportions, Esc cancels. The controls live outside the
-    // stage: renderers replace its children, and they must never reach an export.
+    // Shift keeps proportions, Esc cancels. Like entering the artboard tool,
+    // the frame only shows after a double-click on the board; Esc or a click on
+    // the empty stage puts it away. The controls live outside the stage:
+    // renderers replace its children, and they must never reach an export.
     const overlay = resize && document.body.appendChild(document.createElement("div"));
     const handles = [];
-    let frame, name, tag;
+    let frame, name, tag, editing = false, claimed = false;
     if (overlay) {
       document.head.appendChild(document.createElement("style")).textContent = `
         .artboard-resize { position: fixed; pointer-events: none; overflow: hidden; z-index: 1; --ai: #4f80ff; }
@@ -202,7 +204,7 @@
     function updateHandles() {
       if (!overlay) return;
       const r = target()?.getBoundingClientRect(), s = stage.getBoundingClientRect();
-      overlay.hidden = !canResize() || !r?.width || !r?.height || !stage.clientWidth || !stage.clientHeight;
+      overlay.hidden = !editing || !canResize() || !r?.width || !r?.height || !stage.clientWidth || !stage.clientHeight;
       if (overlay.hidden) return;
       Object.assign(overlay.style, {left: s.left + stage.clientLeft + "px", top: s.top + stage.clientTop + "px",
         width: stage.clientWidth + "px", height: stage.clientHeight + "px"});
@@ -272,8 +274,24 @@
     }
     addEventListener("keydown", e => {
       if (e.key === "Escape" && drag) { e.preventDefault(); finishResize(true); }
+      else if (e.key === "Escape" && editing) { editing = false; updateHandles(); }
     });
     addEventListener("blur", () => finishResize());
+    if (resize) {
+      const onBoard = e => { const r = target()?.getBoundingClientRect();
+        return r && e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom; };
+      // a tool that claims the pointer (dragging a word, picking a colour) keeps
+      // its own double-click: it runs after this, so read the claim on document
+      document.addEventListener("pointerdown", e => {
+        if (!stage.contains(e.target)) return;
+        claimed = e.defaultPrevented;
+        if (editing && !drag && !onBoard(e)) { editing = false; updateHandles(); }
+      });
+      stage.addEventListener("dblclick", e => {
+        if (claimed || space || !onBoard(e) || !canResize()) return;
+        editing = true; updateHandles();
+      });
+    }
     stage.addEventListener("scroll", updateHandles, {passive: true});
     addEventListener("resize", updateHandles);
 

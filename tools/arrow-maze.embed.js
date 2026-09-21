@@ -143,7 +143,12 @@ const headShape = (halfShaft, halfHead, length) => {
   const tab = +Math.min(halfShaft, halfHead).toFixed(2);
   return [[0, halfHead], [length, 0], [0, -halfHead], [-0.5, -tab], [-0.5, tab]];
 };
-// Bounds of the actual closed head contour, using Canvas/SVG's miter limit 4.
+// "sharp" contours keep their points: arrow-head wings are often narrower than
+// the 29° that SVG/Canvas's default miter limit 4 allows, and would be bevelled.
+// 20 keeps corners down to ~6° pointed. Canvas, SVG and the bounds share it.
+const MITER = 20;
+const miterAttr = join => join === "miter" ? ` stroke-miterlimit="${MITER}"` : "";
+// Bounds of the actual closed head contour, using the contours' miter limit.
 // Round joins expand the fill bbox by the radius; bevel/miter use edge offsets
 // and only the outward corner intersections, not a blanket 4× padding.
 const strokeBounds = (P, width, join) => {
@@ -163,7 +168,7 @@ const strokeBounds = (P, width, join) => {
     if (den < 1e-9) return;
     const dx = (a[0] + b[0]) / den, dy = (a[1] + b[1]) / den;
     // headShape is clockwise; its left normals point outwards.
-    if (Math.hypot(dx, dy) <= 4) add(x + width * dx, y + width * dy);
+    if (Math.hypot(dx, dy) <= MITER) add(x + width * dx, y + width * dy);
   });
   return box;
 };
@@ -763,7 +768,7 @@ function layout(src, W, H, env = {}) {
       fill: flip ? null : assigned ?? (q.inv ? p.paper : p.ink), overs: overs.map(ci => ({ci, fill: counter(covers[ci].fill)})),
       box: [wx0, wy0, wx1, wy1]});
     parts.push(`<g id="word-${n}" data-node="${n}" data-el="word:${n}" data-cx="${cx}" data-cy="${f(cy)}">`
-      + tr.map(r => draw(` fill="none" stroke="${r.c}" stroke-width="${f(2 * r.w)}" stroke-linejoin="${contourJoin}"`)).join("")
+      + tr.map(r => draw(` fill="none" stroke="${r.c}" stroke-width="${f(2 * r.w)}" stroke-linejoin="${contourJoin}"${miterAttr(contourJoin)}`)).join("")
       + fills + `</g>`);
   });
   if (usedCovers.size) LY.text.push(`<defs>${[...usedCovers].map(ci => `<clipPath id="tc${ci}">${covers[ci].el}</clipPath>`).join("")}</defs>`);
@@ -928,7 +933,7 @@ function layout(src, W, H, env = {}) {
     A.scene = {key: "arrow:" + i, ph, L, rings, fill: col, clip: cp ? A.q.rc : null,
                st, edges, poseAt, head, ring, shapeD};
     A.draw = {
-      rings: rings.map(r => piece(` fill="none" stroke="${r.c}" stroke-width="${f(2 * r.w)}" stroke-linejoin="${contourJoin}"`)),
+      rings: rings.map(r => piece(` fill="none" stroke="${r.c}" stroke-width="${f(2 * r.w)}" stroke-linejoin="${contourJoin}"${miterAttr(contourJoin)}`)),
       fill: piece(` fill="${col}"`)
     };
     if (layerOn("arrows")) {
@@ -1041,7 +1046,7 @@ function drawLayer(ctx, S, id, t, opt) {
       const paint = (A, fn) => {
         if (A.clip) { ctx.save(); rectClip(ctx, [A.clip]); fn(); ctx.restore(); } else fn();
       };
-      ctx.lineJoin = S.contourJoin; ctx.miterLimit = 4;   // match SVG's default miter limit
+      ctx.lineJoin = S.contourJoin; ctx.miterLimit = MITER;   // same limit as the SVG
       for (let j = 0; j < levels; j++) for (const {A, paths} of drawn) {
         const rg = A.rings[j];
         if (!rg) continue;
@@ -1053,7 +1058,7 @@ function drawLayer(ctx, S, id, t, opt) {
   }
   if (id === "text") {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.lineJoin = S.contourJoin; ctx.miterLimit = 4;
+    ctx.lineJoin = S.contourJoin; ctx.miterLimit = MITER;
     for (const w of S.words) {
       const drag = opt.drag && opt.drag.n === w.n ? opt.drag : null;
       ctx.save();

@@ -48,9 +48,9 @@ convention below. Shortest diff against the house pattern wins.
 
 ## Relative geometry (REQUIRED)
 
-- The artboard is resizable like a dev-tools device viewport (zoom.js
-  `resize`: grey drag bars on its right edge, bottom edge and corner, size
-  readout above), and the whole graphic must scale with it. **No geometry parameter is stored in absolute
+- The artboard is resizable like Illustrator's artboard tool (zoom.js
+  `resize`: double-click the board for a frame with eight handles, Esc or a
+  click on the empty stage leaves), and the whole graphic must scale with it. **No geometry parameter is stored in absolute
   pixels.** Each one is either a count/fraction of a grid (columns, % of a
   cell, fractions of the artboard) or **% of the artboard width**:
   `px = artboard width × value / 100`.
