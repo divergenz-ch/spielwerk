@@ -8,7 +8,7 @@ Deliver the actual portable packages consumed by independent websites and shared
 
 **Size:** M
 **Files:** `src/embeds/packages.ts`, `src/embeds/templates.ts`, `src/workspace/ExportPanel.svelte`, `tests/embeds/packages.test.ts`
-**Touches:** [src/embeds/packages.ts, src/embeds/templates.ts, src/workspace/ExportPanel.svelte, tests/embeds/packages.test.ts]
+**Touches:** [src/embeds/**, src/workspace/ExportPanel.svelte, src/workspace/exports.ts, src/main.ts, src/engine/build.mjs, tests/embeds/packages.test.ts]
 
 ### Approach
 
@@ -43,3 +43,4 @@ TBD
 - Commits:
 - Tests:
 - PRs:
+
