@@ -14,9 +14,24 @@ const pageErrors = new WeakMap<object, string[]>();
 test.beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'spielwerk-controls-'));
   const entry = join(directory, 'entry.js');
+  const harness = join(directory, 'ControlsHarness.svelte');
+  await writeFile(harness, `
+    <script>
+      import Controls from ${JSON.stringify(resolve('src/workspace/Controls.svelte'))};
+      let { controls, defaults } = $props();
+      let params = $state({ ...defaults });
+      let expandedGroups = $state(['Geometry', 'Appearance']);
+      window.edits = [];
+      window.restoreControls = values => { params = { ...values }; };
+    </script>
+    <Controls {controls} {params} {defaults} {expandedGroups}
+      onchange={(key, value) => { window.edits.push({ key, value }); params = { ...params, [key]: value }; }}
+      onexpand={(group, open) => { expandedGroups = open ? [...new Set([...expandedGroups, group])] : expandedGroups.filter(g => g !== group); }} />
+  `);
   await writeFile(entry, `
     import { mount, unmount } from ${JSON.stringify(resolve('node_modules/svelte/src/index-client.js'))};
     import App from ${JSON.stringify(resolve('src/workspace/App.svelte'))};
+    import ControlsHarness from ${JSON.stringify(harness)};
     import { tools } from ${JSON.stringify(resolve('src/workspace/registry.ts'))};
     import { evaluateFixture } from ${JSON.stringify(resolve('src/engine/client.ts'))};
     window.catalog = tools;
@@ -24,9 +39,10 @@ test.beforeAll(async () => {
     const fixture = {
       id: 'internal-fixture', name: 'Internal engine fixture', description: 'Not a named design tool', status: 'ready', accent: true,
       adapter: {
-        id: '__fixture__', defaults: { cellSize: 40, ink: '#112233', text: 'proof', enabled: true, style: 'solid' },
+        id: '__fixture__', defaults: { cellSize: 40, fraction: 0.35, ink: '#112233', text: 'proof', enabled: true, style: 'solid' },
         controls: [
           { key: 'cellSize', label: 'Cell size', group: 'Geometry', type: 'number', min: 10, max: 80, step: 5 },
+          { key: 'fraction', label: 'Fraction', group: 'Geometry', type: 'number', min: 0.15, max: 1.15, step: 0.2 },
           { key: 'style', label: 'Style', group: 'Appearance', type: 'choice', options: ['solid', 'outline'] },
           { key: 'ink', label: 'Ink', group: 'Appearance', type: 'color' },
           { key: 'text', label: 'Text', group: 'Appearance', type: 'text' },
@@ -61,6 +77,10 @@ test.beforeAll(async () => {
     let app;
     window.start = async (mode = 'fixture', capabilityIndex) => {
       if (app) await unmount(app);
+      if (mode === 'controls') {
+        app = mount(ControlsHarness, { target: document.body, props: { controls: fixture.adapter.controls, defaults: fixture.adapter.defaults } });
+        return;
+      }
       let catalog = mode === 'catalog' ? tools : [fixture, fixed];
       if (capabilityIndex !== undefined) catalog = [{ ...fixture, adapter: { ...fixture.adapter, capabilities: tools[capabilityIndex].intendedCapabilities } }];
       app = mount(App, { target: document.body, props: { catalog } });
@@ -180,7 +200,7 @@ test('artboard dimensions, presets, ratio, handles and observed responsive relay
   await page.getByLabel('Zoom', { exact: true }).selectOption('200');
   const stage = page.getByRole('region', { name: 'Pan preview with Space and drag' });
   const stageBox = (await stage.boundingBox())!;
-  await page.keyboard.press('Tab');
+  await stage.click({ position: { x: 20, y: 20 } });
   await page.keyboard.down('Space');
   await page.mouse.move(stageBox.x + 200, stageBox.y + 200); await page.mouse.down(); await page.mouse.move(stageBox.x + 230, stageBox.y + 220); await page.mouse.up(); await page.keyboard.up('Space');
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('internal-fixture')!).pan)).toEqual({ x: 30, y: 20 });
@@ -209,6 +229,75 @@ test('all eight generator capabilities enable responsive controls; fixed excepti
     await page.evaluate(index => (window as any).start('fixture', index), index);
     await expect(scene(page).locator('rect')).toHaveCount(6);
     await expect(page.getByLabel('Layout', { exact: true })).toHaveCount(capabilities[index].responsive ? 1 : 0);
+  }
+});
+
+test('numeric boundaries retain valid values, minimum-relative precision and immediate keyboard steps', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  await expect(scene(page).locator('rect')).toHaveCount(6);
+  const fraction = page.getByRole('spinbutton', { name: 'Fraction exact', exact: true });
+  for (const [value, expected] of [['0.46', '0.55'], ['-1', '0.15'], ['9', '1.15'], ['0.35', '0.35'], ['', '0.35'], ['1e309', '0.35']]) {
+    await fraction.fill(value); await fraction.press('Tab');
+    await expect(fraction).toHaveValue(expected);
+    await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.fraction)).toBe(Number(expected));
+  }
+  await fraction.press('ArrowUp'); await fraction.press('Tab');
+  await expect(fraction).toHaveValue('0.55');
+  const slider = page.getByRole('slider', { name: 'Fraction', exact: true });
+  await slider.press('ArrowRight');
+  await expect(slider).toHaveValue('0.75');
+  await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.fraction)).toBe(0.75);
+});
+
+test('Space activates reset and disclosures without panning while text editing keeps its keys', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  await expect(scene(page).locator('rect')).toHaveCount(6);
+  await edit(page, 'Cell size exact', '60');
+  const reset = page.getByRole('button', { name: 'Reset Cell size', exact: true });
+  await page.getByRole('spinbutton', { name: 'Cell size exact', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(reset).toBeFocused();
+  expect(await reset.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  await reset.press('Space');
+  await expect(page.getByRole('spinbutton', { name: 'Cell size exact', exact: true })).toHaveValue('40');
+  const summary = page.locator('summary').filter({ hasText: /^Appearance$/ });
+  await summary.press('Space');
+  await expect(page.getByLabel('Text', { exact: true })).toBeHidden();
+  await summary.press('Space');
+  const text = page.getByLabel('Text', { exact: true });
+  await text.fill('#aabbcc'); await text.press('End'); await text.press('Space');
+  await expect(text).toHaveValue('#aabbcc ');
+  const stage = page.getByRole('region', { name: 'Pan preview with Space and drag' });
+  const box = (await stage.boundingBox())!;
+  for (const target of [reset, summary, text]) {
+    await target.focus(); await page.keyboard.down('Space');
+    await page.mouse.move(box.x + 200, box.y + 200); await page.mouse.down();
+    await page.mouse.move(box.x + 230, box.y + 220); await page.mouse.up(); await page.keyboard.up('Space');
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('internal-fixture')!).pan)).toBeUndefined();
+  }
+});
+
+test('restores and repeated mounts do not emit edits; invalid values keep canonical controls', async ({ page }) => {
+  for (let mount = 0; mount < 3; mount++) {
+    await page.evaluate(() => (window as any).start('controls'));
+    await expect(page.getByLabel('Text', { exact: true })).toHaveValue('proof');
+    await page.getByText('Appearance', { exact: true }).click();
+    await page.evaluate(() => (window as any).restoreControls({ cellSize: 45, fraction: 0.75, text: '#aabbcc', ink: '#abcdef', enabled: false, style: 'outline' }));
+    await expect(page.getByLabel('Fraction exact', { exact: true })).toHaveValue('0.75');
+    await expect(page.getByLabel('Text', { exact: true })).toBeHidden();
+    await page.getByText('Appearance', { exact: true }).click();
+    await expect(page.getByLabel('Text', { exact: true })).toHaveValue('#aabbcc');
+    await expect(page.getByLabel('Text', { exact: true })).toHaveAttribute('type', 'text');
+    await expect(page.getByLabel('Ink', { exact: true })).toHaveValue('#abcdef');
+    await expect(page.getByLabel('Enabled', { exact: true })).not.toBeChecked();
+    const choice = page.getByLabel('Style', { exact: true });
+    await choice.evaluate((element: HTMLSelectElement) => { element.value = 'invalid'; element.dispatchEvent(new Event('change', { bubbles: true })); });
+    await expect(choice).toHaveValue('outline');
+    await edit(page, 'Cell size exact', '');
+    await edit(page, 'Cell size exact', '1e309');
+    expect(await page.evaluate(() => (window as any).edits)).toEqual([]);
+    await page.getByLabel('Text', { exact: true }).fill('one edit');
+    expect(await page.evaluate(() => (window as any).edits)).toEqual([{ key: 'text', value: 'one edit' }]);
   }
 });
 
