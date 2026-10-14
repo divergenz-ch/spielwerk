@@ -82,7 +82,10 @@ export function parameterPane(container: HTMLElement, controls: readonly Control
               : ['ArrowDown', 'ArrowLeft'].includes(event.key) ? -1 : 0;
             if (!direction || (element === input && ['ArrowLeft', 'ArrowRight'].includes(event.key))) return;
             event.preventDefault(); event.stopImmediatePropagation();
-            commit(Number(canonical[control.key]) + direction * control.step);
+            const previous = canonical[control.key];
+            const base = element === input && input.value.trim() !== ''
+              ? controlValue(control, input.value, previous) : previous;
+            commit(Number(base) + direction * control.step);
           }, true);
         }
         listen(root, 'change', event => {
@@ -105,7 +108,10 @@ export function parameterPane(container: HTMLElement, controls: readonly Control
       } else if (control.type === 'text' && input) {
         listen(input, 'input', () => commit(input.value));
       } else if (control.type === 'color' && input) {
-        listen(input, 'input', () => input.dispatchEvent(new Event('change', { bubbles: true })));
+        listen(input, 'input', () => {
+          // Keep partial hex drafts intact; Tweakpane accepts other formats on change.
+          if (/^#[\da-f]{6}$/i.test(input.value)) input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
         root.querySelector('button')?.setAttribute('aria-label', `Choose ${control.label} color`);
         select?.setAttribute('aria-label', `${control.label} color format`);
         const describeChannels = () => {

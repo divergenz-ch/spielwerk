@@ -70,6 +70,6 @@ Preexisting `tools/arrow-maze.html`, `tools/arrow-maze.embed.js`, `.pi/`, and `A
 
 stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits: ba6a13023e2231be8b3a6d5c856626e2ebaab9e6
-- Tests: npm run build, npx playwright test tests/workspace/controls.test.ts tests/workspace/exports.test.ts tests/workspace/storage.test.ts, npx playwright test tests/generators/arrow-poster-arrow-comb.test.ts --grep 'arrow-poster: legacy pixel settings', node .flow/tmp/fn-7-work/inspect-built.mjs, git diff --check
+- Commits:
+- Tests:
 - PRs:

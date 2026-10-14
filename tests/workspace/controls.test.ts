@@ -318,6 +318,46 @@ test('numeric boundaries retain valid values, minimum-relative precision and imm
   await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.fraction)).toBe(0.75);
 });
 
+test('numeric keyboard steps use the uncommitted draft and retain last-valid fallback', async ({ page }) => {
+  await page.evaluate(() => (window as any).start('controls'));
+  const cell = page.getByRole('spinbutton', { name: 'Cell size exact', exact: true });
+  for (const [draft, key, expected] of [['60', 'ArrowUp', '65'], ['60', 'ArrowDown', '55'], ['', 'ArrowUp', '60'], ['Infinity', 'ArrowDown', '55']]) {
+    await cell.fill(draft); await cell.press(key);
+    await expect(cell).toHaveValue(expected);
+    expect(await page.evaluate(() => (window as any).edits.at(-1))).toEqual({ key: 'cellSize', value: Number(expected) });
+  }
+  const fraction = page.getByRole('spinbutton', { name: 'Fraction exact', exact: true });
+  await fraction.fill('0.55'); await fraction.press('ArrowUp');
+  await expect(fraction).toHaveValue('0.75');
+  expect(await page.evaluate(() => (window as any).edits.at(-1))).toEqual({ key: 'fraction', value: 0.75 });
+});
+
+test('color typing preserves incomplete drafts and previews complete values before blur', async ({ page }) => {
+  await page.evaluate(() => (window as any).start('controls'));
+  const ink = page.getByLabel('Ink', { exact: true });
+  await ink.fill('');
+  for (const [character, draft] of [['#', '#'], ['a', '#a'], ['b', '#ab'], ['c', '#abc'], ['d', '#abcd'], ['e', '#abcde']]) {
+    await ink.pressSequentially(character);
+    await expect(ink).toHaveValue(draft);
+    expect(await page.evaluate(() => (window as any).edits)).toEqual([]);
+  }
+  await ink.pressSequentially('f');
+  await expect(ink).toBeFocused();
+  await expect(ink).toHaveValue('#abcdef');
+  expect(await page.evaluate(() => (window as any).edits)).toEqual([{ key: 'ink', value: '#abcdef' }]);
+  await ink.press('Backspace');
+  await expect(ink).toHaveValue('#abcde');
+  expect(await page.evaluate(() => (window as any).edits)).toHaveLength(1);
+  await ink.pressSequentially('0');
+  await expect(ink).toHaveValue('#abcde0');
+  expect(await page.evaluate(() => (window as any).edits.at(-1))).toEqual({ key: 'ink', value: '#abcde0' });
+  await ink.fill('#abc'); await ink.press('Tab');
+  await expect(ink).toHaveValue('#aabbcc');
+  await ink.fill('#not-a-color'); await ink.press('Tab');
+  await expect(ink).toHaveValue('#aabbcc');
+  expect(await page.evaluate(() => (window as any).edits.at(-1))).toEqual({ key: 'ink', value: '#aabbcc' });
+});
+
 test('Space activates reset and disclosures without panning while text editing keeps its keys', async ({ page }) => {
   await page.evaluate(() => (window as any).start());
   await expect(scene(page).locator('rect')).toHaveCount(6);
