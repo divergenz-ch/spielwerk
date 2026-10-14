@@ -105,7 +105,7 @@ for (const hosting of ['static', 'service']) {
     await expect(page.getByRole('heading', { name: 'Spielwerk', exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Composition preview' })).toBeVisible();
     await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
-    expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['svg', 'png', 'gif']);
+    expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['svg', 'png', 'gif', 'embed']);
     await start(page, false, base);
     await expect(page.getByRole('button', { name: 'Choose export folder' })).toHaveCount(0);
     expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['svg', 'png', 'gif']);

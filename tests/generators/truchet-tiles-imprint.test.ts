@@ -71,7 +71,7 @@ for (const id of ['truchet-tiles', 'imprint']) test(`${id}: registered workspace
   await page.getByRole('combobox', { name: 'Layout', exact: true }).selectOption('responsive');
   for (const [label, value] of [['Container width', '400'], ['Container height', '300']]) { await page.getByLabel(label, { exact: true }).fill(value); await page.getByLabel(label, { exact: true }).press('Tab'); }
   await expect(scene.locator('svg').first()).toHaveAttribute('viewBox', '0 0 400 300');
-  expect(await page.getByRole('combobox', { name: 'Output format' }).locator('option').evaluateAll(options => options.map(o => (o as HTMLOptionElement).value))).toEqual(['svg', 'png']);
+  expect(await page.getByRole('combobox', { name: 'Output format' }).locator('option').evaluateAll(options => options.map(o => (o as HTMLOptionElement).value))).toEqual(['svg', 'png', 'embed']);
   if (id === 'imprint') {
     await page.getByRole('button', { name: 'Play motion', exact: true }).click(); const first = await scene.innerHTML(); await expect.poll(() => scene.innerHTML()).not.toBe(first); await page.getByRole('button', { name: 'Pause motion', exact: true }).click();
   } else await expect(page.getByRole('button', { name: 'Play motion', exact: true })).toHaveCount(0);

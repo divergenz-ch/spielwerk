@@ -36,8 +36,9 @@
   <legend>Artwork export</legend>
   {#if formats.length}
     <label>Output format<select aria-label="Output format" value={format} disabled={busy} onchange={event => { selection = event.currentTarget.value as OutputFormat; }}>
-      {#each formats as value}<option value={value}>{value.toUpperCase()}</option>{/each}
+      {#each formats as value}<option value={value}>{value === 'embed' ? 'Website embed (ZIP)' : value.toUpperCase()}</option>{/each}
     </select></label>
+    {#if format === 'embed'}<p>Extract the ZIP and serve its demo or copy its website snippet. Keep the included runtime, Wasm, and fonts together.</p>{/if}
     <button disabled={busy} onclick={download}>Export artwork</button>
     {#if destination.canPick}<button disabled={busy} onclick={pick}>Choose export folder</button>{/if}
     <p>Destination: {folder ?? 'browser downloads'}</p>
