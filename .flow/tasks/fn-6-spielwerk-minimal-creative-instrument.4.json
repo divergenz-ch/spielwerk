@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-14T19:45:21.692469Z",
+  "depends_on": [
+    "fn-6-spielwerk-minimal-creative-instrument.3"
+  ],
+  "id": "fn-6-spielwerk-minimal-creative-instrument.4",
+  "priority": null,
+  "spec": "fn-6-spielwerk-minimal-creative-instrument",
+  "spec_path": ".flow/tasks/fn-6-spielwerk-minimal-creative-instrument.4.md",
+  "status": "todo",
+  "title": "Document the instrument workflow and evaluation outcome",
+  "updated_at": "2026-10-14T19:45:21.692469Z"
+}
