@@ -261,6 +261,18 @@ fn split(
 fn round(x: f64) -> f64 {
     (x * 100.0).round() / 100.0
 }
+// Prototype row lag is horizontal sampling drift, even for vertical scrolling.
+fn sample_scroll(direction: [f64; 2], tile: [f64; 2], phase: f64, row_lag: f64) -> [f64; 2] {
+    let period = if direction[0] != 0.0 {
+        tile[0]
+    } else {
+        tile[1]
+    };
+    [
+        -direction[0] * period * phase + row_lag * period * phase,
+        -direction[1] * period * phase,
+    ]
+}
 pub fn evaluate(input: Input, font: &[u8]) -> Result<Frame, &'static str> {
     let w = input.dimensions.width as f64;
     let h = input.dimensions.height as f64;
@@ -308,17 +320,20 @@ pub fn evaluate(input: Input, font: &[u8]) -> Result<Frame, &'static str> {
         let slot = b - a;
         let cx = (a + b) / 2.0;
         let cy = r as f64 * rh + bh / 2.0;
-        let row_phase = phase + r as f64 * number(p, "rowlag", 0.0, -100.0, 100.0) / 100.0;
-        let tx = direction[0] * m.adv * row_phase;
-        let ty = direction[1] * m.lh * row_phase;
+        let scroll = sample_scroll(
+            direction,
+            [m.adv, m.lh],
+            phase,
+            r as f64 * number(p, "rowlag", 0.0, -100.0, 100.0) / 100.0,
+        );
         let off = (r as f64 * number(p, "stagger", 0.0, 0.0, 100.0) / 100.0).rem_euclid(1.0) * w;
         let sy = r as f64 * number(p, "rowphase", 0.0, -100.0, 100.0) / 100.0 * m.lh;
         let mut acc = 0.0;
         for i in -1..=1 {
             for j in -1..=1 {
                 acc += m.at(
-                    cx + shear / 2.0 + off - tx + i as f64 * slot / 3.0,
-                    cy - ty + sy + j as f64 * bh / 3.0,
+                    cx + shear / 2.0 + off + scroll[0] + i as f64 * slot / 3.0,
+                    cy + scroll[1] + sy + j as f64 * bh / 3.0,
                 );
             }
         }
@@ -440,6 +455,52 @@ mod tests {
         let wide = evaluate(v, font).unwrap();
         assert_ne!(first.scene.tile, wide.scene.tile);
         assert_ne!(first.scene.svg, evaluate(input(), &[]).unwrap().scene.svg);
+    }
+    #[test]
+    fn row_lag_has_prototype_axis_period_and_phase_progression() {
+        for (direction, at_half) in [
+            ([0.0, -1.0], [10.0, 40.0]),
+            ([0.0, 1.0], [10.0, -40.0]),
+            ([-1.0, 0.0], [125.0, 0.0]),
+            ([1.0, 0.0], [-75.0, 0.0]),
+        ] {
+            assert_eq!(
+                sample_scroll(direction, [200.0, 80.0], 0.0, 0.25),
+                [0.0, 0.0]
+            );
+            assert_eq!(sample_scroll(direction, [200.0, 80.0], 0.5, 0.25), at_half);
+            assert_eq!(
+                sample_scroll(direction, [200.0, 80.0], 0.25, 0.25),
+                at_half.map(|v| v / 2.0)
+            );
+        }
+    }
+    #[test]
+    fn row_lag_starts_at_zero_and_still_preserves_the_field() {
+        for motion in ["up", "down", "left", "right", "none"] {
+            let mut baseline = input();
+            baseline.params["motion"] = serde_json::json!(motion);
+            let mut lagged = baseline.clone();
+            lagged.params["rowlag"] = serde_json::json!(17);
+            assert_eq!(
+                evaluate(baseline.clone(), &[]).unwrap().scene,
+                evaluate(lagged.clone(), &[]).unwrap().scene,
+                "row lag must vanish at phase zero: {motion}"
+            );
+            baseline.time_seconds = 0.35;
+            lagged.time_seconds = 0.35;
+            if motion == "none" {
+                assert_eq!(
+                    evaluate(baseline, &[]).unwrap().scene,
+                    evaluate(lagged, &[]).unwrap().scene
+                );
+            } else {
+                let frame = evaluate(lagged.clone(), &[]).unwrap();
+                assert_ne!(evaluate(baseline, &[]).unwrap().scene, frame.scene);
+                lagged.time_seconds = 1.35;
+                assert_eq!(frame.scene, evaluate(lagged, &[]).unwrap().scene);
+            }
+        }
     }
     #[test]
     fn boundary_and_still_geometry() {
