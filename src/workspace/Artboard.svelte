@@ -224,43 +224,59 @@
 <svelte:window onkeydown={keydown} onkeyup={event => { if (event.code === 'Space') space = false; }} onblur={() => { space = false; finishPointer(true); }} />
 <div class="editor">
   <aside aria-label="Design controls">
+    <div class="inspector-heading">
+      <h2>{tool.name}</h2>
+      <p>{tool.description}</p>
+    </div>
+    <div class="inspector-scroll">
     <Controls controls={tool.adapter.controls} defaults={tool.adapter.defaults} {params} {expandedGroups}
       onchange={setParam} onexpand={(group, open) => { if (expandedGroups.includes(group) !== open) setView({ expandedGroups: open ? [...expandedGroups, group] : expandedGroups.filter(g => g !== group) }); }} />
-    <ExportPanel adapter={tool.adapter} {handlers} {input} {destination} {previewStatus} />
-    <details class="artboard-options">
+    <details class="ui-section">
       <summary>Artboard</summary>
-      <div class="artboard-fields">
+      <div class="ui-section-body">
         {#if tool.adapter.capabilities.responsive}
-          <label>Layout<select aria-label="Layout" value={responsive ? 'responsive' : 'fixed'} onchange={event => setParam('responsive', event.currentTarget.value === 'responsive')}><option value="fixed">Fixed</option><option value="responsive">Responsive</option></select></label>
+          <label class="ui-row">Layout<select class="ui-select" aria-label="Layout" value={responsive ? 'responsive' : 'fixed'} onchange={event => setParam('responsive', event.currentTarget.value === 'responsive')}><option value="fixed">Fixed</option><option value="responsive">Responsive</option></select></label>
         {/if}
         {#if tool.artboard.dimensions || responsive}
-          <label>{responsive ? 'Container width' : 'Width'}<input type="number" min={tool.adapter.dimensions.width.min} max={tool.adapter.dimensions.width.max} value={dimensions.width} onchange={event => dimensionEdit('width', event)} /></label>
-          <label>{responsive ? 'Container height' : 'Height'}<input type="number" min={tool.adapter.dimensions.height.min} max={tool.adapter.dimensions.height.max} value={dimensions.height} onchange={event => dimensionEdit('height', event)} /></label>
+          <label class="ui-row">{responsive ? 'Container width' : 'Width'}<input class="ui-input" type="number" min={tool.adapter.dimensions.width.min} max={tool.adapter.dimensions.width.max} value={dimensions.width} onchange={event => dimensionEdit('width', event)} /></label>
+          <label class="ui-row">{responsive ? 'Container height' : 'Height'}<input class="ui-input" type="number" min={tool.adapter.dimensions.height.min} max={tool.adapter.dimensions.height.max} value={dimensions.height} onchange={event => dimensionEdit('height', event)} /></label>
         {/if}
         {#if tool.artboard.presets.length}
-          <label>Aspect<select aria-label="Aspect" value={aspect} onchange={preset}><option value="">Custom</option>{#each tool.artboard.presets as ratio}<option>{ratio}</option>{/each}</select></label>
+          <label class="ui-row">Aspect<select class="ui-select" aria-label="Aspect" value={aspect} onchange={preset}><option value="">Custom</option>{#each tool.artboard.presets as ratio}<option>{ratio}</option>{/each}</select></label>
         {/if}
-        {#if tool.artboard.swap}<button onclick={() => setSize({ width: dimensions.height, height: dimensions.width })}>Swap dimensions</button>{/if}
-        {#if tool.artboard.ratioLock}<label>Lock ratio<input type="checkbox" checked={Boolean(params.lock)} onchange={event => setParam('lock', event.currentTarget.checked)} /></label>{/if}
+        {#if tool.artboard.swap}<button class="ui-button swap" onclick={() => setSize({ width: dimensions.height, height: dimensions.width })}>Swap dimensions</button>{/if}
+        {#if tool.artboard.ratioLock}<label class="ui-row">Lock ratio<input type="checkbox" checked={Boolean(params.lock)} onchange={event => setParam('lock', event.currentTarget.checked)} /></label>{/if}
       </div>
     </details>
     <SnapshotsPanel slug={tool.id} {persistence} accent={tool.accent} prepareSettings={tool.prepareSettings} onfontchange={fontChange}
       onload={saved => { params = settings(saved.params); persist(); }} />
+    </div>
+    <ExportPanel adapter={tool.adapter} {handlers} {input} {destination} {previewStatus} />
   </aside>
   <section aria-label="Composition preview">
     <div class="view-controls">
-      <label>Zoom<select aria-label="Zoom" value={view.zoom ?? 'fit'} onchange={event => setView({ zoom: event.currentTarget.value === 'fit' ? 'fit' : Number(event.currentTarget.value) })}>
-        <option value="fit">Fit</option>{#each [...new Set([25, 50, 100, 200, 400, ...(typeof view.zoom === 'number' ? [view.zoom] : [])])] as value}<option value={value}>{value}%</option>{/each}
-      </select></label>
-      <button onclick={() => setView({ pan: { x: 0, y: 0 } })}>Reset pan</button>
-      {#if tool.playback}<button onclick={play}>{playing ? 'Pause motion' : 'Play motion'}</button>{/if}
+      <span class="canvas-label">Canvas</span>
+      <span class="dimensions">{dimensions.width} <span>×</span> {dimensions.height} <span>px</span></span>
+      <div class="view-actions">
+        {#if tool.playback}<button class="ui-button quiet playback" aria-label={playing ? 'Pause motion' : 'Play motion'} onclick={play}>
+          <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor">{#if playing}<path d="M4 3h3v10H4zm5 0h3v10H9z"/>{:else}<path d="m5 3 8 5-8 5z"/>{/if}</svg>
+          {playing ? 'Pause' : 'Play'}
+        </button>{/if}
+        <button class="ui-button quiet icon" aria-label="Reset pan" title="Center canvas" onclick={() => setView({ pan: { x: 0, y: 0 } })}>
+          <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M5 2H2v3m9-3h3v3M2 11v3h3m9-3v3h-3"/><rect x="5.5" y="5.5" width="5" height="5" rx=".5"/></svg>
+        </button>
+        <label><span class="sr-only">Zoom</span><select class="ui-select zoom" aria-label="Zoom" value={view.zoom ?? 'fit'} onchange={event => setView({ zoom: event.currentTarget.value === 'fit' ? 'fit' : Number(event.currentTarget.value) })}>
+          <option value="fit">Fit</option>{#each [...new Set([25, 50, 100, 200, 400, ...(typeof view.zoom === 'number' ? [view.zoom] : [])])] as value}<option value={value}>{Number(value.toFixed(1))}%</option>{/each}
+        </select></label>
+      </div>
     </div>
-    <p data-testid="preview-status">{previewMessage}</p>
-    <p class="announcement" role="status" aria-label="Preview status">{playing ? (error ? 'Preview failed. Previous artwork may be retained.' : 'Motion playing. Full-detail preview updates continuously.') : previewMessage}</p>
-    {#if error}<p role="alert">Last preview error: {error}</p>{/if}
-    <div class="stage" bind:this={stage} role="region" aria-label="Pan preview with Space and drag"
+    <p class="sr-only" role="status" aria-label="Preview status">{playing ? (error ? 'Preview failed. Previous artwork may be retained.' : 'Motion playing. Full-detail preview updates continuously.') : previewMessage}</p>
+    {#if error}<p class="preview-error ui-alert" role="alert">Last preview error: {error}</p>{/if}
+    <div class="stage" class:panning={space} bind:this={stage} role="region" aria-label="Pan preview with Space and drag"
       onpointerleave={() => pointer = undefined} onpointerdown={event => { pointer = undefined; start(event); }} onpointermove={move} onpointerup={releasePointer} onpointercancel={() => { if (drag?.handle) setSize(drag.size); finishPointer(true); }}>
       <div class="container" bind:this={container} data-testid="preview-container"
+        style:left={`${Math.max(24, (stageSize.width - dimensions.width * zoom) / 2)}px`}
+        style:top={`${Math.max(24, (stageSize.height - dimensions.height * zoom) / 2)}px`}
         style:width={`${dimensions.width}px`} style:height={`${dimensions.height}px`}
         style:min-width={`${tool.adapter.dimensions.width.min}px`} style:max-width={`${tool.adapter.dimensions.width.max}px`}
         style:min-height={`${tool.adapter.dimensions.height.min}px`} style:max-height={`${tool.adapter.dimensions.height.max}px`}
@@ -272,32 +288,52 @@
         {/each}
       </div>
     </div>
+    <footer class="canvas-footer">
+      <p data-testid="preview-status" class:failed={Boolean(error)} title={previewMessage}>{previewMessage}</p>
+      <span class="pan-hint"><kbd>Space</kbd> + drag to pan</span>
+    </footer>
   </section>
 </div>
 
 <style>
-  .editor { display: grid; grid-template-columns: 20rem minmax(0, 1fr); gap: 1rem; flex: 1; min-height: 0; }
-  aside { min-width: 0; overflow: auto; padding-right: .75rem; }
-  aside :global(fieldset) { min-width: 0; margin: .75rem 0; padding: 0; border: 0; }
-  aside :global(legend), summary { font-weight: 600; }
-  aside :global(input), aside :global(select) { box-sizing: border-box; min-width: 0; max-width: 100%; }
-  aside :global(label) { max-width: 100%; flex-wrap: wrap; }
-  .artboard-options { border-top: 1px solid #ccc; padding: .5rem 0; }
-  summary { cursor: pointer; }
-  .artboard-fields { display: grid; gap: .5rem; padding-top: .5rem; }
-  label { display: flex; gap: .5rem; align-items: center; }
-  input[type=number] { width: 6rem; }
+  .editor { display: grid; grid-template-columns: 304px minmax(0, 1fr); flex: 1; min-height: 0; }
+  aside { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--ui-panel); border-right: 1px solid var(--ui-line); }
+  .inspector-heading { flex: none; padding: 20px 16px 18px; }
+  h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; letter-spacing: -.3px; }
+  .inspector-heading p { margin: 0; max-width: 260px; font-size: 11px; line-height: 1.5; color: var(--ui-muted); }
+  .inspector-scroll { flex: 1; min-height: 80px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: var(--ui-line) transparent; }
+  .swap { justify-self: end; width: 156px; }
   section { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-  .view-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
-  section p { margin: .5rem 0; font-size: .875rem; }
-  .announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .stage { flex: 1; min-height: 0; overflow: auto; background: #d6d4cf; padding: 24px; }
-  @media (max-width: 48rem) {
-    .editor { grid-template-columns: minmax(0, 1fr); }
-    aside { overflow: visible; padding-right: 0; }
-    .stage { flex: none; height: 60vh; min-height: 240px; }
+  .view-controls { display: flex; flex: none; align-items: center; gap: 16px; height: 48px; padding: 0 20px; color: var(--ui-muted); }
+  .canvas-label { font-size: 11px; font-weight: 500; }
+  .dimensions { font: 10px var(--ui-mono); font-variant-numeric: tabular-nums; }
+  .dimensions span { color: var(--ui-muted); }
+  .view-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+  .zoom { width: 72px; background-color: transparent; font-size: 11px; }
+  .playback { font-size: 11px; }
+  .preview-error { padding: 0 20px 8px; }
+  .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+  .stage.panning { cursor: grab; }
+  .stage.panning:active { cursor: grabbing; }
+  .container { position: absolute; transform-origin: top left; }
+  .surface { background: white; box-shadow: 0 1px 3px #00000012, 0 8px 32px #00000008; }
+  .handle { position: absolute; width: 12px; height: 12px; padding: 0; border: 1px solid var(--ui-muted); border-radius: 2px; background: var(--ui-panel); transform: translate(-50%, -50%); touch-action: none; opacity: 0; }
+  .container:hover .handle, .container:focus-within .handle { opacity: 1; }
+  .handle:hover, .handle:focus-visible { border-color: var(--ui-focus); }
+  .canvas-footer { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 16px; height: 36px; padding: 0 20px; color: var(--ui-muted); font-size: 10px; }
+  .canvas-footer p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
+  .canvas-footer .failed { color: var(--ui-danger); }
+  .pan-hint { flex: none; }
+  kbd { font: inherit; border: 1px solid #cdcec7; border-radius: 3px; padding: 2px 4px; }
+  @media (max-width: 900px) { .pan-hint { display: none; } .canvas-label { display: none; } }
+  @media (hover: none) { .handle { opacity: 1; } }
+  @media (max-width: 640px) {
+    .editor { display: flex; flex-direction: column; }
+    section { order: -1; flex: none; height: 52svh; min-height: 320px; }
+    aside { height: 620px; max-height: 85svh; border-right: 0; border-top: 1px solid var(--ui-line); }
+    .inspector-heading { padding: 16px; }
+    .inspector-heading p { max-width: none; }
+    .view-controls { padding: 0 12px; gap: 8px; height: 40px; }
+    .canvas-footer { height: 28px; padding: 0 12px; }
   }
-  .container { position: relative; transform-origin: top left; }
-  .surface { background: white; }
-  .handle { position: absolute; width: 12px; height: 12px; padding: 0; border: 1px solid #2463cf; background: white; transform: translate(-50%, -50%); touch-action: none; }
 </style>

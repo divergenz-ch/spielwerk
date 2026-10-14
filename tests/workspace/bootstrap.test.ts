@@ -83,7 +83,7 @@ for (const mode of ['development', 'static root', 'static subdirectory'] as cons
     await expect(page.getByRole('region', { name: 'Workspace foundation' })).toHaveCount(0);
     await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('arrow-maze');
     await expect(page.getByTestId('scene').locator('svg')).toBeVisible();
-    await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(233, 231, 226)');
+    await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(233, 233, 230)');
     await page.waitForLoadState('networkidle');
     // Initial Maze, delivered Poster, then Maze each discover snapshot storage.
     expect(discovery).toHaveLength(3);

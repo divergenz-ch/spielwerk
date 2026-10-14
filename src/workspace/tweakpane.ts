@@ -94,10 +94,16 @@ export function parameterPane(container: HTMLElement, controls: readonly Control
           commit(input.value);
         }, true);
         listen(slider, 'dblclick', () => commit(defaults[control.key]));
-        const reset = folder.addButton({ title: `Reset ${control.label}` });
-        const resetValue = () => commit(defaults[control.key]);
-        reset.on('click', resetValue);
-        unsubscribe.push(() => reset.off('click', resetValue));
+        // Keep reset in the binding row rather than adding a second blade per value.
+        root.classList.add('parameter-number');
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'parameter-reset';
+        reset.setAttribute('aria-label', `Reset ${control.label}`);
+        reset.title = `Reset ${control.label}`;
+        reset.innerHTML = '<svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6a4.5 4.5 0 1 1 0 4M3.5 2.5V6H7"/></svg>';
+        root.append(reset);
+        listen(reset, 'click', () => commit(defaults[control.key]));
       } else if (control.type === 'choice' && select) {
         select.setAttribute('aria-label', control.label);
         listen(root, 'change', event => {
