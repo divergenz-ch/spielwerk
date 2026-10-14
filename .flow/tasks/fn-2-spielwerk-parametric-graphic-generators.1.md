@@ -211,59 +211,23 @@ intentional root-content update required by the approved Arrow Maze delivery,
 not authorization to weaken export checks or change persistence policy.
 
 ## Done summary
-Blocked:
-# Workspace foundation prerequisite
+Arrow Maze is available at `/` and `/#arrow-maze` with seeded branching Rust/Wasm geometry, bend/arc styles, panel polarity, text clearance, layer visibility, palette controls, word dragging, and preview draw-in motion. Ordinary static SVG, PNG, and animated GIF files use the selected fixed or responsive preview layout; Rust bakes uploaded TTF/OTF glyph outlines into the scene.
 
-This generator entry task is blocked until
-fn-1-spielwerk-shared-design-workspace.2 through .6 have actual verified done
-receipts for static Svelte serving, real Rust/Wasm boundary, compatible
-saved-work/font state, grouped controls/artboards, and output orchestration.
+Measured proof: `npm run test:generators` passed 3 Chromium cases after building actual Wasm. `cargo test --manifest-path crates/spielwerk-engine/Cargo.toml tools` passed 2 native tools cases. `npx playwright test tests/workspace/bootstrap.test.ts tests/workspace/controls.test.ts tests/workspace/exports.test.ts tests/workspace/storage.test.ts` passed 14 focused consumer cases, including plain static root/subdirectory hosting and disposable local/service snapshot checks. Generator tests drove the real root UI, dragged a word, uploaded an authored valid TrueType face, played motion, downloaded SVG/PNG/GIF, decoded raster dimensions and GIF frames, and rejected unavailable Wasm. Native fixtures check shared branch junctions, clearance, panel bounds, allowed unplaced words, seed repeatability, style differences, relayout dimensions, layer opacity, and dimension/time/font boundaries.
 
-Verify done statuses, relevant implementation commit ranges present here,
-focused test results, applicable review receipts/configuration skips, and
-limitations before an authorized release. Preserve this block history before
-reset. Final fn-1.1 is not a prerequisite; foundation is an intermediate
-handoff and does not complete the workspace.
+Baseline: unavailable/red (`npm run test:generators` exited 1 before edits because its script was missing); inconclusive (`cargo test --manifest-path crates/spielwerk-engine/Cargo.toml tools` exited 0 but collected zero tests). The approved bootstrap commit established the build-backed generator command and a real failing root-preview case before implementation. Keep these observations separate from the final green proof. Logs are in `.flow/tmp/work-20261014-fn2/`: `baseline-browser.log`, `baseline-rust.log`, `bootstrap-red.log`, `verify-browser.log`, `verify-rust.log`, and `verify-consumers.log`. Intermediate font-fixture and placement failures were resolved without weakening assertions. A source-only `git diff --check` passed; the parent flowctl task amendment carried an extra EOF blank line in its generated Markdown.
 
-No implementation evidence exists and no release is authorized by planning.
+Decisions: automatic snapshot-service discovery remains unchanged. The supervisor authorized narrow pending-root expectation changes in bootstrap/export tests; bootstrap now checks the exact discovery response, matching static-host 404 console messages, and local fallback while keeping other error/asset/storage assertions strict. Root registration leaves every other named tool pending. Saved parameters/assets/artboard/view ownership remains with the workspace; the renderer paints Rust scene data.
 
-Blocked:
-# Generator startup gate unavailable
+Remaining website work: fn-5 owns responsive visual-only website runtimes and packaging. R12 and the final catalog/downstream gates remain undelivered and unreleased. Uploaded WOFF/WOFF2 decoding and complex-script shaping are outside this TTF/OTF outline handoff. GIF uses a fixed quantized palette and literal LZW blocks, so files can be larger than optimized encoders. No pixel-identical prototype parity or performance benchmark is claimed. Foundation-only wording in `src/engine/README.md` remains outside this task's declared write surface.
 
-BLOCKED: TOOLING_FAILURE
-Task: fn-2-spielwerk-parametric-graphic-generators.1
-Summary: Foundation release passed, but the planned focused generator gates
-are not established in the delivered foundation checkout.
-Impact: No fn-2 writer was dispatched; generator implementation has not begun.
-Suggested resolution: Authorize a bounded generator-harness bootstrap with
-package.json in the declared write surface, establish real browser and Rust
-generator checks, then resume the Arrow Maze proof point.
+The user-owned prototype files retain their supplied SHA-256 values and remain unstaged. `.pi/` and `AGENTS.md` remain untracked. Implementation range before the receipt is `09d7ffe4f061009dae85e4e5d7f08f5c3f9d2c10..a695336e1e8c29348beafb574f67a1d21bc37af1`.
 
-Measured before any application edit at HEAD
-`160bbc2446cbf073e51d47675df7d82f12086995`:
+stage: impl-review - skipped(config: REVIEW_MODE=none)
+Tier: session (jev-unavailable(no_key)) (model: gpt-6.1-sol)
 
-- `npm run test:generators` exited 1: missing script `test:generators`.
-  Full log: `.flow/tmp/release-20261014/generator-gate-baseline.log`.
-- `cargo test --manifest-path crates/spielwerk-engine/Cargo.toml tools`
-  exited 0 but collected 0 tests, with 3 workspace cases filtered out.
-  This is inconclusive, not a passing generator gate.
-  Full log: `.flow/tmp/release-20261014/rust-tools-baseline.log`.
-- `flowctl ready --spec fn-2-spielwerk-parametric-graphic-generators --json`
-  showed .1 ready after the receipt-checked foundation release.
-- `flowctl spec chain` reported eligible with no open dependency.
-
-The historical foundation blocker and verified release evidence remain in
-this task's preserved-history and authorized-release sections. This new
-block is startup tooling, not a reversal of the foundation receipt check.
-fn-3.1 and fn-4.1 remain eligible without implementation dispatch. fn-1.1,
-fn-2.7, and fn-5.1 remain blocked on their original final-delivery gates.
-No generator work, review verdict, completion, publication, or deployment
-is claimed. The existing Arrow Maze edits are untouched.
-
-stage: work - failed(TOOLING_FAILURE: focused generator harness unavailable)
-stage: impl-review - skipped(config: review.backend=none; no implementation)
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 1bd6ab3c5b44027acc6e1e0de13ed033538377da, a695336e1e8c29348beafb574f67a1d21bc37af1
+- Tests: npm run test:generators (exit 0; 3 Chromium generator cases; .flow/tmp/work-20261014-fn2/verify-browser.log), cargo test --manifest-path crates/spielwerk-engine/Cargo.toml tools (exit 0; 2 tools cases; .flow/tmp/work-20261014-fn2/verify-rust.log), npx playwright test tests/workspace/bootstrap.test.ts tests/workspace/controls.test.ts tests/workspace/exports.test.ts tests/workspace/storage.test.ts (exit 0; 14 focused consumer cases; .flow/tmp/work-20261014-fn2/verify-consumers.log)
 - PRs:
-
