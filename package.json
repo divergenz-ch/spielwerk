@@ -16,6 +16,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test:bootstrap": "npm run build && playwright test tests/workspace/bootstrap.test.ts",
     "test:workspace": "npm run build && playwright test tests/workspace",
+    "test:generators": "npm run build && playwright test tests/generators",
     "test:integration": "playwright test tests/integration"
   },
   "spielwerk": {
@@ -28,6 +29,7 @@
       "test:rust": "Run the engine's native workspace-filtered tests using the pinned Rust toolchain and Cargo.lock.",
       "test:bootstrap": "Build and run Chromium mount/asset smoke tests against Vite development and plain static HTTP hosting (Python 3 required).",
       "test:workspace": "Build and run tests/workspace; later foundation tasks add focused tests here.",
+      "test:generators": "Build actual Wasm and run focused Chromium generator user-surface cases; empty collection fails.",
       "test:integration": "Reserved for tests/integration, supplied by final integration. Fails with no tests until that task lands; not a bootstrap acceptance gate."
     }
   },
