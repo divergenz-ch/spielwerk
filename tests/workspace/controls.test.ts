@@ -10,6 +10,7 @@ import { join, resolve } from 'node:path';
 let directory: string;
 let url: string;
 let host: ChildProcess;
+const pageErrors = new WeakMap<object, string[]>();
 test.beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'spielwerk-controls-'));
   const entry = join(directory, 'entry.js');
@@ -83,9 +84,14 @@ test.afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 test.beforeEach(async ({ page }) => {
+  const errors: string[] = [];
+  pageErrors.set(page, errors);
+  page.on('pageerror', error => errors.push(error.message));
   await page.goto(url);
   await page.waitForFunction(() => (window as any).start);
 });
+
+test.afterEach(async ({ page }) => { expect(pageErrors.get(page)).toEqual([]); });
 
 async function edit(page: import('@playwright/test').Page, name: string, value: string) {
   const input = page.getByRole('spinbutton', { name, exact: true });
@@ -115,6 +121,11 @@ test('catalog navigation and grouped controls use registered metadata, reset, ra
   await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveValue('45');
   await page.getByRole('button', { name: 'Reset Cell size' }).click();
   await expect(scene(page).locator('rect')).toHaveCount(6);
+  const slider = page.getByRole('slider', { name: 'Cell size', exact: true });
+  await slider.press('ArrowRight');
+  await expect(slider).toHaveValue('45');
+  await slider.dblclick();
+  await expect(slider).toHaveValue('40');
   await page.getByLabel('Style', { exact: true }).selectOption('outline');
   await page.getByLabel('Text', { exact: true }).fill('changed');
   await page.getByLabel('Enabled', { exact: true }).uncheck();
@@ -146,6 +157,7 @@ test('artboard dimensions, presets, ratio, handles and observed responsive relay
   await expect(scene(page).locator('svg')).toHaveAttribute('height', '180');
   await page.getByRole('button', { name: 'Swap dimensions' }).click();
   await expect(page.getByLabel('Width', { exact: true })).toHaveValue('180');
+  await expect(page.getByLabel('Aspect', { exact: true })).toHaveValue('');
   await page.getByLabel('Lock ratio', { exact: true }).check();
   await edit(page, 'Width', '900');
   await expect(page.getByLabel('Width', { exact: true })).toHaveValue('400');
@@ -221,6 +233,7 @@ test('delayed full-detail evaluations coalesce and never publish stale controls 
   await expect(page.getByRole('status')).toContainText('200 × 80');
   expect(await page.evaluate(() => (window as any).counts)).toEqual([10]);
   const calls = await page.evaluate(() => (window as any).calls);
+  expect(calls.slice(-2).map((call: any) => call.design.params.cellSize)).toEqual([20, 40]);
   expect(calls.at(-1).design.params.cellSize).toBe(40);
   expect(calls.at(-1).design.artboard.dimensions).toEqual({ width: 200, height: 80 });
   expect(calls.every((call: any) => !('zoom' in call.design.params) && !('pan' in call.design.params) && call.timeSeconds === 0)).toBe(true);

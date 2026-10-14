@@ -21,10 +21,14 @@
   let stage: HTMLDivElement;
   let stageSize = $state({ width: 800, height: 600 });
   let space = $state(false);
-  let drag: { id: number; x: number; y: number; size: Dimensions; pan: { x: number; y: number }; handle?: Handle } | undefined;
+  let drag: { id: number; x: number; y: number; scale: number; size: Dimensions; pan: { x: number; y: number }; handle?: Handle } | undefined;
   const responsive = $derived(tool.adapter.capabilities.responsive && Boolean(params.responsive));
   const fixed = $derived(boundedSize({ width: Number(params.wpx) || tool.artboard.initial.width, height: Number(params.hpx) || tool.artboard.initial.height }, tool.adapter.dimensions));
   const dimensions = $derived(responsive ? boundedSize({ width: Number(params.vw) || fixed.width, height: Number(params.vh) || fixed.height }, tool.adapter.dimensions) : fixed);
+  const aspect = $derived(tool.artboard.presets.find(ratio => {
+    const [width, height] = ratio.split(':').map(Number);
+    return Math.abs(dimensions.height - dimensions.width * height / width) < 1;
+  }) ?? '');
   const expandedGroups = $derived(Array.isArray(view.expandedGroups) ? view.expandedGroups as string[] : [...new Set(tool.adapter.controls.map(c => c.group))].filter(group => (view.open as Parameters | undefined)?.[group] !== false));
   const pan = $derived((view.pan as { x: number; y: number } | undefined) ?? { x: 0, y: 0 });
   const zoom = $derived(view.zoom === 'fit' || view.zoom === undefined ? Math.min(1, (stageSize.width - 48) / (displayed?.dimensions.width ?? dimensions.width), (stageSize.height - 48) / (displayed?.dimensions.height ?? dimensions.height)) : clamp(Number(view.zoom) || 100, 2, 800) / 100);
@@ -99,15 +103,16 @@
   function start(event: PointerEvent, handle?: Handle) {
     if (event.button !== 0 || (!handle && !space)) return;
     event.preventDefault(); event.stopPropagation();
-    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, size: { ...dimensions }, pan: { ...pan }, handle };
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, scale: zoom, size: { ...dimensions }, pan: { ...pan }, handle };
+    if (handle && (view.zoom === 'fit' || view.zoom === undefined)) setView({ zoom: zoom * 100 });
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   function move(event: PointerEvent) {
     if (!drag || event.pointerId !== drag.id) return;
     if (!drag.handle) { setView({ pan: { x: drag.pan.x + event.clientX - drag.x, y: drag.pan.y + event.clientY - drag.y } }); return; }
     const handle = drag.handle;
-    const dx = (event.clientX - drag.x) / zoom;
-    const dy = (event.clientY - drag.y) / zoom;
+    const dx = (event.clientX - drag.x) / drag.scale;
+    const dy = (event.clientY - drag.y) / drag.scale;
     setSize(resize(drag.size, drag.size.width + (handle.includes('e') ? dx : handle.includes('w') ? -dx : 0), drag.size.height + (handle.includes('s') ? dy : handle.includes('n') ? -dy : 0), tool.adapter.dimensions, Boolean(params.lock) || event.shiftKey, /[ew]/.test(handle) ? 'width' : 'height'));
   }
   function nudge(handle: Handle, event: KeyboardEvent) {
@@ -139,7 +144,7 @@
         <label>{responsive ? 'Container height' : 'Height'}<input type="number" min={tool.adapter.dimensions.height.min} max={tool.adapter.dimensions.height.max} value={dimensions.height} onchange={event => dimensionEdit('height', event)} /></label>
       {/if}
       {#if tool.artboard.presets.length}
-        <label>Aspect<select aria-label="Aspect" onchange={preset}><option value="">Custom</option>{#each tool.artboard.presets as ratio}<option>{ratio}</option>{/each}</select></label>
+        <label>Aspect<select aria-label="Aspect" value={aspect} onchange={preset}><option value="">Custom</option>{#each tool.artboard.presets as ratio}<option>{ratio}</option>{/each}</select></label>
       {/if}
       {#if tool.artboard.swap}<button onclick={() => setSize({ width: dimensions.height, height: dimensions.width })}>Swap dimensions</button>{/if}
       {#if tool.artboard.ratioLock}<label>Lock ratio<input type="checkbox" checked={Boolean(params.lock)} onchange={event => setParam('lock', event.currentTarget.checked)} /></label>{/if}
