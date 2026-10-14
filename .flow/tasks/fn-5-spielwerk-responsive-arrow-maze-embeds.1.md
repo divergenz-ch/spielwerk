@@ -8,7 +8,7 @@ Prove the runtime can resize and evaluate actual delivered generator computation
 
 **Size:** M
 **Files:** `src/embeds/runtime.ts`, `src/embeds/playback.ts`, `src/embeds/resize.ts`, `tests/embeds/runtime.test.ts`
-**Touches:** [src/embeds/runtime.ts, src/embeds/playback.ts, src/embeds/resize.ts, tests/embeds/runtime.test.ts, package.json]
+**Touches:** [src/embeds/runtime.ts, src/embeds/playback.ts, src/embeds/resize.ts, tests/embeds/runtime.test.ts, package.json, crates/spielwerk-engine/src/tools/arrow_maze.rs, src/engine/client.ts, src/tools/arrow-maze.ts, tests/generators/arrow-maze.test.ts]
 
 ### Approach
 
@@ -89,4 +89,5 @@ above. fn-2 final task .7 waits for actual fn-5 package delivery.
 - Commits:
 - Tests:
 - PRs:
+
 
