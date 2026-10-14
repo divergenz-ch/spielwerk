@@ -195,6 +195,14 @@ test('artboard dimensions, presets, ratio, handles and observed responsive relay
   await page.mouse.move(box.x + 6, box.y + 6); await page.mouse.down(); await page.mouse.move(box.x + 46, box.y + 26); await page.mouse.up();
   await expect(page.getByLabel('Width', { exact: true })).toHaveValue('166');
   await expect(page.getByLabel('Height', { exact: true })).toHaveValue('102');
+  const resizedBox = (await handle.boundingBox())!;
+  await handle.focus();
+  await page.mouse.move(resizedBox.x + 6, resizedBox.y + 6); await page.mouse.down();
+  await page.mouse.move(resizedBox.x + 26, resizedBox.y + 16);
+  await expect(page.getByLabel('Width', { exact: true })).toHaveValue('186');
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  await expect(page.getByLabel('Width', { exact: true })).toHaveValue('166');
+  await expect(page.getByLabel('Height', { exact: true })).toHaveValue('102');
   await expect(page.getByRole('status')).not.toContainText('Updating');
   const before = await page.evaluate(() => (window as any).calls.length);
   const markup = await scene(page).innerHTML();

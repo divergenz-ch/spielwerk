@@ -205,7 +205,8 @@
   }
   function keydown(event: KeyboardEvent) {
     const target = event.target;
-    if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, select, textarea, button, summary, a[href]'))) return;
+    if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, select, textarea'))) return;
+    if (event.code === 'Space' && target instanceof Element && target.closest('button, summary, a[href]')) return;
     if (event.code === 'Space') { event.preventDefault(); space = true; }
     if (event.key === 'Escape' && wordDrag) finishPointer(true);
     if (event.key === 'Escape' && drag) { if (drag.handle) setSize(drag.size); else setView({ pan: drag.pan }); drag = undefined; }
