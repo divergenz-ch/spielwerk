@@ -56,9 +56,118 @@ npx playwright test tests/embeds/packages.test.ts --grep 'package progress, immu
 - [ ] Focused controls/storage, bootstrap, exports, and affected embed-package tests pass and screenshots confirm the R3 hierarchy without ornamental additions.
 
 ## Done summary
-TBD
+Spielwerk now keeps the tool identity in a compact top strip and gives the
+preview the remaining desktop space beside a scrollable control column.
+Artboard and snapshot actions use labeled native disclosures; parameters,
+export, and primary/accent typefaces remain independently reachable.
 
+Tier: session (jev-unavailable(no_key)) (model: gpt-6-astra)
+stage: impl-review - skipped(config: REVIEW_MODE=none)
+
+### Scope and state
+
+The three Svelte script blocks are byte-identical to the task base. Canonical
+parameters, assets, view preferences, routing, font lifecycle, snapshot
+callbacks, and export logic retain their existing owners. The diff changes
+markup and CSS only. Disclosure state adds no persistence keys.
+`task-2-state-ownership.json` records the script comparison.
+
+The conductor explicitly expanded task .2 to disclosure-navigation updates in
+`tests/workspace/bootstrap.test.ts`, `tests/workspace/exports.test.ts`, and
+`tests/embeds/packages.test.ts`. The task's Files/Touches and Quick commands
+were amended through `flowctl task set-spec` before those edits. Five added
+navigation clicks preserve every existing assertion. No fixture or export
+behavior changed. Commits are 5374ed7 and 1c3c1ea.
+
+### Measured validation
+
+Baseline was green before implementation. `npm run build` exited 0 and the
+original controls/storage selection passed 10 tests. Logs are
+`task-2-baseline-build.log` and `task-2-baseline-tests.log`.
+
+Final gates passed with command exit code 0:
+
+- `npm run build`. Log `task-2-gate-build.log`.
+- `npx playwright test tests/workspace/controls.test.ts tests/workspace/storage.test.ts`.
+  All 11 passed. Log `task-2-gate-tests.log`.
+- `npx playwright test tests/workspace/bootstrap.test.ts tests/workspace/exports.test.ts`.
+  All 7 passed. Log `task-2-route-tests.log`.
+- `npx playwright test tests/embeds/packages.test.ts --grep 'package progress, immutable design'`.
+  One selected test passed. Log `task-2-package-test.log`.
+- `node .flow/tmp/fn-6-work/task-2-live.mjs before` and the same command with
+  `after`. Built-app replay passed on disposable hosts and browser profiles.
+- `git diff --check` passed. The staging area is empty.
+
+The new controls test checks preview dominance at both R3 desktop sizes,
+viewport containment, a single tool selector, Tab-reachable disclosures and
+snapshot/typeface actions, visible focus, and unchanged saved state/artwork
+when disclosures toggle. Existing tests retain numeric, resize, responsive,
+pan, restore, callback, invalid-font, and payload assertions. Storage uploads
+both font slots while snapshot management is closed, then verifies their
+callbacks again after reopening and loading a snapshot. Existing
+catalog tests and the live replay cover unknown-link fallback and pending
+unavailability. The new disclosures require intentional navigation in tests;
+one intermediate storage run failed because a role locator excluded a hidden
+save button. Adding includeHidden retained its existing enabled assertion.
+
+`gate classify` returned FULL (exit 1); it noticed the preexisting untracked
+`.pi/flow-next.json`. This task also changes executable Svelte paths. No
+lint/format command is configured. No full repository suite ran.
+
+### Measured browser replay and screenshots
+
+The feature map is absent. Live discovery used the built `/#arrow-maze` page.
+The replay edited Seed to 84, selected fixed width 640, set view zoom to 50%,
+uploaded Arial, saved/exported a snapshot, changed Seed to 126, cleared the
+font, then loaded the snapshot. It also followed the pending tool route and
+an unknown hash. Before/after design and view settings, normalized snapshot
+payloads, font bytes, tool link, and rendered SVG compare identically.
+Only the snapshot timestamp was omitted from the comparison.
+
+`task-2-before-live.json`, `task-2-after-live.json`, and
+`task-2-replay-comparison.json` contain the observations and hashes.
+All artifact names in this summary resolve beside this file.
+
+Inspected screenshots include:
+
+- `task-2-before-1280.png` and `task-2-after-1280.png`.
+- `task-2-after-1024.png` and `task-2-after-1024-export.png`.
+- `task-2-after-1280-zoom200.png` and
+  `task-2-after-1280-zoom200-preview.png`.
+- `task-2-after-1024-zoom200-export.png` and
+  `task-2-after-1024-zoom200-controls.png`.
+
+The desktop screenshots show the full fitted artwork, neutral palette,
+compact identity strip, and independently scrolling controls/export.
+Actual Chromium tab zoom used chrome.tabs.setZoom(2) in a disposable browser
+extension. getZoom returned 2; the 1280 x 800 viewport reported a 640 x 400
+CSS viewport and devicePixelRatio 2. At both desktop sizes with 200% zoom,
+keyboard Tab reached export, SVG downloads completed, and scrolling exposed
+artboard controls, fonts, and the fitted preview. Zoom reflow uses normal
+vertical scrolling. The extension and temporary profiles were deleted.
+
+An initial Playwright scrolled screenshot at browser zoom captured blank
+pixels despite successful interaction assertions. Those captures were not
+accepted as visual proof. Raw CDP capture replaced them; the final scrolled
+screenshots were opened and inspected. An early live probe also corrected
+its Tool locator before producing the successful baseline replay.
+
+### Boundaries
+
+Both live runs had zero page exceptions. Static hosting retains the existing
+optional `/snaps/ping` 404 behavior; bootstrap tests verify the expected
+console responses. No new console failure was attributed to this change.
+Independent review did not run under REVIEW_MODE=none.
+
+Preexisting edits to `tools/arrow-maze.html` and `tools/arrow-maze.embed.js`,
+untracked `.pi/` and `AGENTS.md`, and preview PID 47475 were preserved.
+All hosts and browsers started by this worker exited. No publication,
+delegation, saved-data migration, renderer change, or new dependency occurred.
+Changed user routes are opening Artboard for dimensions and Snapshots for
+snapshot actions; typefaces stay outside those disclosures.
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 5374ed73baccc3e52665d0b465dfaf6eac417e83, 1c3c1eae387281e53d6dd67ab438c0c258593355
+- Tests: npm run build, npx playwright test tests/workspace/controls.test.ts tests/workspace/storage.test.ts, npx playwright test tests/workspace/bootstrap.test.ts tests/workspace/exports.test.ts, npx playwright test tests/embeds/packages.test.ts --grep 'package progress, immutable design', node .flow/tmp/fn-6-work/task-2-live.mjs before, node .flow/tmp/fn-6-work/task-2-live.mjs after, git diff --check
 - PRs:
