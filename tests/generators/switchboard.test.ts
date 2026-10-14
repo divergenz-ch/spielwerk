@@ -133,6 +133,43 @@ test('switchboard: pixel saves migrate once and relative decoration scales with 
   await page.reload(); await expect(page.getByLabel('Stroke % of artboard width exact', { exact: true })).toHaveValue('0.4');
 });
 
+test('switchboard: high legacy decoration survives saves and snapshot loads at nondefault widths', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto(url + '#switchboard');
+  const legacy = { wpx: 600, hpx: 600, cols: 2, rows: 2, seed: 42, stroke: 24, radius: 60, shadow: 40, wirepx: 20, st: [1, 1, 1, 1], links: 12 };
+  await page.evaluate(params => localStorage.setItem('switchboard', JSON.stringify(params)), legacy);
+  await page.reload();
+  const scene = page.getByTestId('scene');
+  await expect(scene.locator('svg')).toHaveAttribute('viewBox', '0 0 600 600');
+  const geometry = () => scene.evaluate(el => {
+    const group = el.querySelector('[data-widget]')!; const rects = group.querySelectorAll('rect');
+    return { stroke: Number(el.querySelector('svg > g')!.getAttribute('stroke-width')), radius: Number(rects[0].getAttribute('rx')), shadow: Number(rects[0].getAttribute('x')) - Number(rects[1].getAttribute('x')), wire: Number(el.querySelector('svg > path')!.getAttribute('stroke-width')) };
+  });
+  const expected = { stroke: 24, radius: 60, shadow: 40, wire: 20 };
+  const migratedGeometry = await geometry();
+  for (const [key, value] of Object.entries(migratedGeometry)) expect(Math.abs(value - expected[key])).toBeLessThanOrEqual(0.031);
+  await expect(page.getByLabel('Corner % of artboard width exact', { exact: true })).toHaveValue('10');
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('switchboard')!));
+  expect(saved.rel).toBe(1); expect(saved.st).toEqual(legacy.st); expect(saved.radius).toBe(10);
+  await page.reload(); await expect(scene.locator('svg')).toHaveAttribute('viewBox', '0 0 600 600');
+  expect(await geometry()).toEqual(migratedGeometry);
+  const payload = { tool: 'switchboard', snaps: [{ name: 'legacy decoration', at: 1, params: legacy, font: null, accent: null }] };
+  await page.getByLabel('Import snapshots', { exact: true }).setInputFiles({ name: 'legacy.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(payload)) });
+  await page.getByLabel('Corner % of artboard width exact', { exact: true }).fill('1'); await page.getByLabel('Corner % of artboard width exact', { exact: true }).press('Tab');
+  await page.getByRole('button', { name: 'Load legacy decoration', exact: true }).click();
+  await expect(page.getByLabel('Corner % of artboard width exact', { exact: true })).toHaveValue('10');
+  await expect.poll(geometry).toEqual(migratedGeometry);
+  await page.getByRole('button', { name: 'Load legacy decoration', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('switchboard')!).radius)).toBe(10);
+  const bounds = await page.evaluate(async () => {
+    const { adapter, switchboard } = await import('/src/tools/switchboard.ts'); const { controlSettings } = await import('/src/workspace/view.ts');
+    return [100, 8000].map(wpx => controlSettings(adapter.controls, adapter.defaults, switchboard.prepareSettings!({ wpx, stroke: 24, radius: 60, shadow: 40, wirepx: 20 })));
+  });
+  for (const [i, width] of [100, 8000].entries()) for (const [key, pixels] of Object.entries({ stroke: 24, radius: 60, shadow: 40, wirepx: 20 })) expect(Math.abs(Number(bounds[i][key]) * width / 100 - pixels)).toBeLessThanOrEqual(width * 0.00005 + 0.00001);
+  await page.screenshot({ path: '.flow/tmp/switchboard-preview.png', fullPage: true });
+  expect(errors).toEqual([]);
+});
+
 test('switchboard: portable SMIL wire flow matches Rust baked instants', async ({ page }) => {
   await page.goto(url + '#switchboard');
   const errors = await page.evaluate(async () => {

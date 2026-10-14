@@ -1,14 +1,15 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import { browserPersistence, type Persistence, type SavedSettings } from './storage';
+  import { browserPersistence, type Persistence, type SavedSettings, type Parameters } from './storage';
   import { snapshots, type Snapshot } from './snapshots';
   import { activateTypeface, readTypeface, typefaces, type FontSlot, type Typeface } from './fonts';
 
   /** Mount keyed by tool slug; persist current design settings before saving a snapshot. */
-  let { slug, persistence = browserPersistence(), accent = false, onload = () => {}, onfontchange = () => {} }: {
+  let { slug, persistence = browserPersistence(), accent = false, prepareSettings, onload = () => {}, onfontchange = () => {} }: {
     slug: string;
     persistence?: Persistence;
     accent?: boolean;
+    prepareSettings?: (params: Parameters) => Parameters;
     onload?: (settings: SavedSettings) => void;
     onfontchange?: (slot: FontSlot, font: Typeface | null) => void;
   } = $props();
@@ -55,7 +56,8 @@
     entries = await library.list();
   }
   async function load(snap: Snapshot) {
-    const state = await library.load($state.snapshot(snap));
+    const snapshot = $state.snapshot(snap);
+    const state = await library.load({ ...snapshot, params: prepareSettings?.(snapshot.params) ?? snapshot.params });
     await restoreFonts();
     onload(state);
   }

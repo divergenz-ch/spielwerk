@@ -232,7 +232,7 @@
       {#if tool.artboard.ratioLock}<label>Lock ratio<input type="checkbox" checked={Boolean(params.lock)} onchange={event => setParam('lock', event.currentTarget.checked)} /></label>{/if}
     </fieldset>
     <ExportPanel adapter={tool.adapter} {handlers} {input} {destination} />
-    <SnapshotsPanel slug={tool.id} {persistence} accent={tool.accent} onfontchange={fontChange}
+    <SnapshotsPanel slug={tool.id} {persistence} accent={tool.accent} prepareSettings={tool.prepareSettings} onfontchange={fontChange}
       onload={saved => { params = settings(saved.params); persist(); }} />
   </aside>
   <section aria-label="Composition preview">
