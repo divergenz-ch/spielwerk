@@ -8,7 +8,7 @@ Implement these related primitive-based artwork consumers with separate tile and
 
 **Size:** M
 **Files:** `crates/spielwerk-engine/src/tools/mod.rs`, `crates/spielwerk-engine/src/tools/truchet_tiles.rs`, `crates/spielwerk-engine/src/tools/imprint.rs`, `src/tools/truchet-tiles.ts`, `src/tools/imprint.ts`, `tests/generators/truchet-tiles-imprint.test.ts`
-**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/truchet_tiles.rs, crates/spielwerk-engine/src/tools/imprint.rs, src/tools/truchet-tiles.ts, src/tools/imprint.ts, tests/generators/truchet-tiles-imprint.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock]
+**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/truchet_tiles.rs, crates/spielwerk-engine/src/tools/imprint.rs, src/tools/truchet-tiles.ts, src/tools/imprint.ts, tests/generators/truchet-tiles-imprint.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock, src/engine/client.ts, src/main.ts]
 
 ### Approach
 
@@ -53,3 +53,4 @@ TBD
 - Commits:
 - Tests:
 - PRs:
+
