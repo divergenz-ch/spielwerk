@@ -8,13 +8,15 @@ Complete the browser-side output facilities and the checked foundation receipt t
 
 **Size:** M
 **Files:** `src/workspace/exports.ts`, `src/workspace/ExportPanel.svelte`, `src/workspace/App.svelte`, `tests/workspace/exports.test.ts`
-**Touches:** [src/workspace/exports.ts, src/workspace/ExportPanel.svelte, src/workspace/App.svelte, tests/workspace/exports.test.ts]
+**Touches:** [src/workspace/exports.ts, src/workspace/ExportPanel.svelte, src/workspace/App.svelte, tests/workspace/exports.test.ts, src/workspace/Artboard.svelte]
 
 ### Approach
 
 - Consume the adapter's supported format list and selected fixed/responsive scene request. Reuse or adapt prototype download/folder/GIF helpers rather than duplicating existing behavior.
 - Pass preserved font bytes to sibling consumers and preserve embedded/baked appearance in supported output paths. Keep geometry and animation evaluation in Rust; browser file encoding/delivery remains behind the shared adapter.
 - Verify static build serving and the optional service's asset-serving path using the existing service. The final integration owner updates README/CLAUDE guidance once the actual sibling capabilities are delivered.
+
+- Connect the live design request owned by `Artboard.svelte` to export orchestration, preserving selected dimensions, settings, and original asset bytes. This bounded consumer connection must not reconstruct current design from potentially stale persistence or move ownership of artboard state.
 
 ### Investigation targets
 

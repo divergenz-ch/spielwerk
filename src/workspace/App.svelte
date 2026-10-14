@@ -4,9 +4,11 @@
   import { browserPersistence, type Persistence } from './storage';
   import { selectedTool, type CatalogEntry } from './view';
   import Artboard from './Artboard.svelte';
-  let { catalog = tools, persistence = browserPersistence() }: {
-    catalog?: readonly CatalogEntry[]; persistence?: Persistence;
+  import { exportDestination, type Exporters } from './exports';
+  let { catalog = tools, persistence = browserPersistence(), exporters = {} }: {
+    catalog?: readonly CatalogEntry[]; persistence?: Persistence; exporters?: Exporters;
   } = $props();
+  const destination = exportDestination();
   let hash = $state(location.hash);
   const selected = $derived(selectedTool(catalog, hash));
   onMount(() => {
@@ -31,7 +33,7 @@
     <h2>{selected.name}</h2>
     <p>{selected.description}</p>
     {#if selected.status === 'ready'}
-      {#key selected.id}<Artboard tool={selected} {persistence} />{/key}
+      {#key selected.id}<Artboard tool={selected} {persistence} handlers={exporters[selected.id] ?? {}} {destination} />{/key}
     {:else}
       <section aria-labelledby="workspace-heading">
         <h2 id="workspace-heading">Workspace foundation</h2>

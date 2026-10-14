@@ -7,7 +7,10 @@
   import SnapshotsPanel from './SnapshotsPanel.svelte';
   import { boundedSize, clamp, controlSettings, latestEvaluation, resize, type EditorTool, type Handle } from './view';
 
-  let { tool, persistence }: { tool: EditorTool; persistence: Persistence } = $props();
+  import ExportPanel from './ExportPanel.svelte';
+  import type { ExportDestination, ExportHandlers } from './exports';
+
+  let { tool, persistence, handlers, destination }: { tool: EditorTool; persistence: Persistence; handlers: ExportHandlers; destination: ExportDestination } = $props();
   const store = untrack(() => settingsStore(tool.id, persistence));
   const initial = untrack(() => store.load(tool.adapter.defaults));
   let params = $state<Parameters>(untrack(() => controlSettings(tool.adapter.controls, tool.adapter.defaults, initial.params)));
@@ -76,13 +79,16 @@
     },
     cause => { error = String(cause); busy = false; },
   ));
-  $effect(() => {
-    const input: EvaluationInput<Parameters> = {
+  const input: EvaluationInput<Parameters> = $derived.by(() => {
+    return {
       design: { toolId: tool.adapter.id, params: $state.snapshot(params), seed: Number(params.seed) >>> 0,
         artboard: { mode: responsive ? 'responsive' : 'fixed', dimensions: { ...dimensions } }, assets: $state.snapshot(assets) },
       timeSeconds: 0,
     };
-    untrack(() => { busy = true; error = ''; evaluator.request(input); });
+  });
+  $effect(() => {
+    const request = input;
+    untrack(() => { busy = true; error = ''; evaluator.request(request); });
   });
   onMount(() => {
     persist();
@@ -149,6 +155,7 @@
       {#if tool.artboard.swap}<button onclick={() => setSize({ width: dimensions.height, height: dimensions.width })}>Swap dimensions</button>{/if}
       {#if tool.artboard.ratioLock}<label>Lock ratio<input type="checkbox" checked={Boolean(params.lock)} onchange={event => setParam('lock', event.currentTarget.checked)} /></label>{/if}
     </fieldset>
+    <ExportPanel adapter={tool.adapter} {handlers} {input} {destination} />
     <SnapshotsPanel slug={tool.id} {persistence} accent={tool.accent} onfontchange={fontChange}
       onload={saved => { params = controlSettings(tool.adapter.controls, tool.adapter.defaults, saved.params); persist(); }} />
   </aside>
