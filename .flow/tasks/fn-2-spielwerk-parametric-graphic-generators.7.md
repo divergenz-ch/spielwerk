@@ -120,8 +120,31 @@ with zero findings. The earlier correctness result e96bb3c2 remains valid
 for unchanged code at d7729b8. No failed audit was counted as a pass.
 
 ## Done summary
+All eight real generator registrations now share a delivered catalog and actual artwork/embed exporters. The editor consumes src/tools/registry.ts without changing the independent runtime's computation-only imports. Final integration downloads and extracts actual fn-5 ZIPs, evaluates their local Rust/Wasm, verifies deterministic explicit-time output and genuine responsive relayout, distinguishes Truchet's still output from supported motion, and excludes visitor editing and editor dependencies.
 
+R1-R11 retain the completed task .1-.6 control, state, seeded geometry/time, font, persistence, responsive layout, and format-specific export coverage. The final catalog pins all eight delivered adapters, materialized export handlers, supported format sets, and fixed-artboard tool exclusions. R12 now consumes actual all-eight-tool fn-5 packages with local runtime/Wasm/fonts rather than declarations or normal SVG exports. fn-5 tasks .1-.3 report done with reachable evidence commits and 42 passing embed cases. This final receipt covers all fn-2 requirement IDs; no publication is implied.
+
+Measured verification:
+- Fresh resumed acceptance: npx playwright test tests/generators/catalog.test.ts tests/integration/generators.spec.ts passed 2 (.flow/tmp/fn2-resume-final-catalog.log).
+- npm run build passed (.flow/tmp/latest-local-build.log); current preview responds HTTP 200 at http://127.0.0.1:4173/.
+- Earlier final generator gate passed 35 and failed one obsolete exact Maze format expectation. It was corrected additively to retain SVG/PNG/GIF and include Website embed (ZIP); focused Maze rerun passed 4 (.flow/tmp/fn2-final-maze-fixed.log). No combined green generator-suite claim is made.
+- npm run test:workspace passed 19 (.flow/tmp/fn2-final-workspace.log).
+- cargo test --manifest-path crates/spielwerk-engine/Cargo.toml tools passed 24 (.flow/tmp/fn2-final-rust.log).
+- fn-5 final npm run test:embeds passed 42 (.flow/tmp/fn5-verified-embeds.log).
+- Fresh rustfmt check and git diff --check passed. No full-suite claim.
+
+Correctness audit e96bb3c2 completed with zero findings. Standards audit 0768b272 failed at the provider and was never counted as a pass; its blocker history remains preserved in the task. The authorized standards-only retry 0d162699 completed with zero findings on openai-codex/gpt-6.1-sol, confirmed by native terminal metadata. Both audits walked source and cited measured checks, not independently executed tests. No independent implementation-review SHIP receipt is claimed.
+
+Known boundaries remain: HTTP/static-host-compatible browser, output dimension limits 100-8000, static TTF/OTF rather than WOFF decoding or complex-script shaping, and no pixel-identical prototype or performance claim. Keep the exported module script immediately before its element for per-package inline-font resolution; external config assets resolve from that config URL. Optional shared fixture-server refactoring and profiled mask caching remain follow-ups, not observed remaining correctness defects.
+
+stage: impl-review - skipped(config: review.backend=none)
+stage: quality-audit-correctness - ran
+stage: quality-audit-standards - ran (retry recovered provider failure; model: openai-codex/gpt-6.1-sol)
+stage: plan-sync - skipped(config: planSync.enabled=false)
+Gates: focused (full suite not requested)
+
+The target remains fn-1-spielwerk-shared-design-workspace. User-owned prototype edits and untracked .pi/ and AGENTS.md are untouched. No PR, publication, or deployment occurred.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: d7729b8ce46003072bb055486f8de3a5bba630d5
+- Tests: npx playwright test tests/generators/catalog.test.ts tests/integration/generators.spec.ts (2 passed; .flow/tmp/fn2-resume-final-catalog.log), npm run build (passed; .flow/tmp/latest-local-build.log), npx playwright test tests/generators/arrow-maze.test.ts (4 passed; .flow/tmp/fn2-final-maze-fixed.log), npm run test:workspace (19 passed; .flow/tmp/fn2-final-workspace.log), cargo test --manifest-path crates/spielwerk-engine/Cargo.toml tools (24 passed; .flow/tmp/fn2-final-rust.log), npm run test:embeds (42 passed; .flow/tmp/fn5-verified-embeds.log), cargo fmt --manifest-path crates/spielwerk-engine/Cargo.toml -- --check; git diff --check (passed)
 - PRs:
