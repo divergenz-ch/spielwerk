@@ -47,6 +47,46 @@ as sufficient evidence for concurrent writers.
 - [ ] Simplification tests verify changed outline detail, preserved correspondence needed by later master output, and parameter-boundary behavior.
 - [ ] Browser source-loading/no-loaded-font paths and focused transform tests pass; no installable/master output is claimed yet.
 
+### Preserved foundation block history
+
+The original block is retained below before resetting runtime state.
+
+Blocked:
+# Workspace foundation prerequisite
+
+This font-transform entry task is blocked until
+fn-1-spielwerk-shared-design-workspace.2 through .6 have verified done
+receipts and their implementation commits are available here.
+Check fixed-board/control, compatible primary/accent font and snapshot
+state, Rust/browser, and shared output contracts, focused tests, applicable
+review outcomes, and limitations before authorized release. Preserve block
+history before reset. fn-1's final integration is downstream of this tool.
+
+No implementation receipts or release authorization exist at planning time.
+
+### Authorized foundation gate release
+
+The user requested: "Release the verified foundation gates and start
+fn-2-spielwerk-parametric-graphic-generators". Receipt check at
+2026-10-14T13:40:37.851Z, checkout `160bbc2446cbf073e51d47675df7d82f12086995`:
+
+- `fn-1-spielwerk-shared-design-workspace.2`: done; implementation commits `e8fca4d23dffb742c4282c48a0af3899f4a90dcb` are ancestors of HEAD. Focused tests are recorded in its done receipt.
+- `fn-1-spielwerk-shared-design-workspace.3`: done; implementation commits `2d4c208c21def6c9b8cdb8a0708f3b555a05378c` are ancestors of HEAD. Focused tests are recorded in its done receipt.
+- `fn-1-spielwerk-shared-design-workspace.4`: done; implementation commits `fc0196d284bd9f885e39379e9b4e8d27c8494c23` are ancestors of HEAD. Focused tests are recorded in its done receipt.
+- `fn-1-spielwerk-shared-design-workspace.5`: done; implementation commits `7994cad373c263b035f07ba828164b2daaaec62e`, `edc371352ed1388cf3ff15446b0ad2eaf497e85a`, `7a152a16c545c62818adc17a6b2de3002c8c85fc` are ancestors of HEAD. Focused tests are recorded in its done receipt.
+- `fn-1-spielwerk-shared-design-workspace.6`: done; implementation commits `1a5ac2e33b8e067ce4b6b858a85ad5d80a569854` are ancestors of HEAD. Focused tests are recorded in its done receipt.
+
+All five receipts explicitly record
+`stage: impl-review - skipped(config: REVIEW_MODE=none)`.
+Reviewed the task-2 through task-6 handoffs and task-6 final logs:
+19 Chromium workspace cases and 3 native workspace tests passed. These
+are existing measured receipts, not a new test run. Foundation fixtures
+prove interfaces, not named-tool computations or real artwork codecs.
+
+This releases only the foundation prerequisite. fn-3 and fn-4 become
+eligible, but no workers for those specs are authorized in this run.
+The fn-1 final owner, fn-2 final catalog, and fn-5 embed gates stay blocked.
+
 ## Done summary
 Blocked:
 # Workspace foundation prerequisite
