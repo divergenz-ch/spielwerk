@@ -78,12 +78,15 @@ for (const mode of ['development', 'static root', 'static subdirectory'] as cons
     await expect(page.getByRole('region', { name: 'Composition preview' })).toBeVisible();
     await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
     await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('arrow-poster');
-    await expect(page.getByRole('region', { name: 'Workspace foundation' })).toContainText('Design tools are not available yet.');
+    await expect(page.getByRole('heading', { name: 'Arrow Poster', exact: true })).toBeVisible();
+    await expect(page.getByTestId('scene').locator('[data-arrow] path').first()).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Workspace foundation' })).toHaveCount(0);
     await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('arrow-maze');
     await expect(page.getByTestId('scene').locator('svg')).toBeVisible();
     await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(233, 231, 226)');
     await page.waitForLoadState('networkidle');
-    expect(discovery).toHaveLength(2);
+    // Initial Maze, delivered Poster, then Maze each discover snapshot storage.
+    expect(discovery).toHaveLength(3);
     for (const response of discovery) {
       expect(response.status).toBe(mode === 'development' ? 200 : 404);
       expect(await response.body).not.toBe('"ok"');
@@ -111,6 +114,6 @@ for (const mode of ['development', 'static root', 'static subdirectory'] as cons
       if (mode === 'static subdirectory') expect(asset.url).toContain('/workspace/assets/');
     }
     expect(requests.every((request) => request.startsWith(url) || request === discoveryUrl)).toBe(true);
-    expect(requests.filter(request => new URL(request).pathname.startsWith('/snaps/'))).toEqual([discoveryUrl, discoveryUrl]);
+    expect(requests.filter(request => new URL(request).pathname.startsWith('/snaps/'))).toEqual([discoveryUrl, discoveryUrl, discoveryUrl]);
   });
 }
