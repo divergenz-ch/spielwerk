@@ -66,10 +66,41 @@ Chromium coverage does not certify other browsers or an OS screen reader. Indepe
 
 Implementation commit: `ba6a13023e2231be8b3a6d5c856626e2ebaab9e6`.
 Base: `96485869fb6c79be184569088a7b8759e21c9f17`.
-Preexisting `tools/arrow-maze.html`, `tools/arrow-maze.embed.js`, `.pi/`, and `AGENTS.md` remain untouched and unstaged. Preview PID 47475 remains running. No delegation or publication occurred.
+Preexisting `tools/arrow-maze.html`, `tools/arrow-maze.embed.js`, `.pi/`, and `AGENTS.md` remain untouched and unstaged. Preview PID 47475 remains running. No delegation or publication occurred in the implementation worker.
+
+### Post-implementation quality audit and fixes
+
+The conductor dispatched the two required read-only quality axes. Standards
+reported no findings. Correctness found two input-draft defects: partial color
+text was replaced while typing, and numeric arrow keys ignored an uncommitted
+value. Both were reproduced by browser regressions on the pre-fix artifact:
+color `#` became `#112233`; numeric draft 60 plus ArrowUp became 45, not 65.
+The task was reopened through flowctl while resolving them.
+
+Commit bd04a9f preserves incomplete color drafts, previews complete six-digit
+hex without blur, and leaves other supported formats to normal change/blur.
+Numeric stepping now normalizes the live draft, retaining last-valid fallback
+for blank/nonfinite text. No existing assertion was weakened. Two new regression
+tests pass, as do npm run build and all 22 focused controls/export/storage cases.
+Logs: audit-red-tests.log, audit-fix-tests.log, audit-final-build.log, and
+audit-final-tests.log. Earlier size/screenshot measurements above describe the
+initial integration build; the fixes change input behavior, not layout.
+
+The one fresh correctness follow-up found both findings resolved with no new
+issues in the fix scope. Its native terminal run is
+0efb0e77-f5e0-4dd5-b0b2-33b25619e4ee on openai-codex/gpt-6-astra. Audit output:
+/Users/baran/.pi/agent/sessions/--Users-baran-Repositories-spielwerk--/subagent-artifacts/outputs/0efb0e77-f5e0-4dd5-b0b2-33b25619e4ee/audits/fn7-fixes.md.
+These are quality audits, not a cross-family implementation/completion review;
+REVIEW_MODE remains none and no gated review receipt or verdict was invented.
+
+stage: quality-audit - ran (two axes; two reproduced findings fixed; one correctness follow-up clean) (model: openai-codex/gpt-6-astra)
+
+The conductor also hard-refreshed the live http://127.0.0.1:4173/#arrow-maze
+page and visually confirmed the real Tweakpane surface, 17 exact-value fields,
+and a current preview. Preexisting edits remain unchanged; no publication ran.
 
 stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: ba6a13023e2231be8b3a6d5c856626e2ebaab9e6, bd04a9f049e860b382117057224b2a28989af43b
+- Tests: npm run build, npx playwright test tests/workspace/controls.test.ts tests/workspace/exports.test.ts tests/workspace/storage.test.ts, npx playwright test tests/generators/arrow-poster-arrow-comb.test.ts --grep 'arrow-poster: legacy pixel settings', node .flow/tmp/fn-7-work/inspect-built.mjs, git diff --check, Post-audit: npx playwright test tests/workspace/controls.test.ts --grep 'numeric keyboard steps use|color typing preserves' (2 reproduced failures before fix, 2 passed after; audit-red-tests.log and audit-fix-tests.log), Post-audit: npm run build (exit 0; audit-final-build.log), Post-audit: npx playwright test tests/workspace/controls.test.ts tests/workspace/exports.test.ts tests/workspace/storage.test.ts (22 passed; audit-final-tests.log)
 - PRs:
