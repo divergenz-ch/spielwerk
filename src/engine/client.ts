@@ -25,13 +25,13 @@ export async function evaluateFixture(
   })));
 }
 
-export async function evaluateArrowMaze(input: EvaluationInput<any>, metrics: Record<string, number[]>) {
+export async function evaluateArrowMaze(input: EvaluationInput<any>, metrics: Record<string, number[]>, hostCell?: number) {
   await initialize();
   if (input.design.toolId !== 'arrow-maze') throw new Error('Not an Arrow Maze design');
   const font = (role: string) => input.design.assets.find(asset => asset.role === role)?.bytes ?? new Uint8Array();
   return JSON.parse(evaluate_arrow_maze(JSON.stringify({
     dimensions: input.design.artboard.dimensions, seed: input.design.seed,
-    params: input.design.params, timeSeconds: input.timeSeconds, metrics,
+    params: input.design.params, timeSeconds: input.timeSeconds, metrics, hostCell,
   }), font('typeface'), font('accent-typeface')));
 }
 

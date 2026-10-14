@@ -11,6 +11,8 @@ pub struct Input {
     pub params: Value,
     pub time_seconds: f64,
     #[serde(default)]
+    pub host_cell: Option<f64>,
+    #[serde(default)]
     pub metrics: BTreeMap<String, [f64; 4]>,
 }
 #[derive(Debug, Serialize, PartialEq)]
@@ -251,12 +253,45 @@ pub fn evaluate(input: Input, font: &[u8], accent: &[u8]) -> Result<Frame, &'sta
     };
     let p = &input.params;
     let density = number(p, "cols", 14.0, 2.0, 60.0);
-    let margin = number(p, "margin", 2.0, 0.0, 40.0) * (w * h).sqrt() / 100.0;
-    let margin = margin.min((w.min(h) - 50.0) / 2.0);
-    let gw = w - 2.0 * margin;
-    let gh = h - 2.0 * margin;
-    let cols = (density * (gw / gh).sqrt()).round().max(2.0) as usize;
-    let rows = (density * (gh / gw).sqrt()).round().max(2.0) as usize;
+    let margin_percent = number(p, "margin", 2.0, 0.0, 40.0);
+    let grid = |w: f64, h: f64, basis: f64, fixed: f64| {
+        let margin = (margin_percent * basis / 100.0).min((w.min(h) - 50.0) / 2.0);
+        let gw = w - 2.0 * margin;
+        let gh = h - 2.0 * margin;
+        let cols = (if fixed > 0.0 {
+            gw / fixed
+        } else {
+            density * (gw / gh).sqrt()
+        }).round().max(2.0) as usize;
+        let rows = (if fixed > 0.0 {
+            gh / fixed
+        } else {
+            density * (gh / gw).sqrt()
+        }).round().max(2.0) as usize;
+        (gw, gh, cols, rows)
+    };
+    let (basis, fixed) = if let Some(requested) = input.host_cell {
+        if !requested.is_finite() || requested < 0.0 {
+            return Err("Invalid Arrow Maze host cell");
+        }
+        let dw = number(p, "wpx", 600.0, 100.0, 8000.0);
+        let dh = number(p, "hpx", 800.0, 100.0, 8000.0);
+        let size = (dw * dh).sqrt();
+        let (gw, gh, cols, rows) = grid(dw, dh, size, 0.0);
+        let own = (gw / cols as f64).min(gh / rows as f64);
+        let configured = number(p, "ecell", 0.0, 0.0, 8000.0);
+        let cell = if requested > 0.0 {
+            requested
+        } else if configured > 0.0 {
+            configured
+        } else {
+            own
+        };
+        (size * cell / own, cell)
+    } else {
+        ((w * h).sqrt(), 0.0)
+    };
+    let (gw, gh, cols, rows) = grid(w, h, basis, fixed);
     let cell = (gw / cols as f64).min(gh / rows as f64);
     let ox = (w - cols as f64 * cell) / 2.0;
     let oy = (h - rows as f64 * cell) / 2.0;
@@ -762,6 +797,7 @@ mod tools {
             },
             seed: 42,
             time_seconds: 0.75,
+            host_cell: None,
             params: serde_json::json!({"fork":100,"words":"hello | extraordinarilylongunbreakablewordextraordinarilylongunbreakablewordextraordinarilylongunbreakablewordextraordinarilylongunbreakablewordextraordinarilylongunbreakablewordextraordinarilylongunbreakableword","style":"arc","motion":"draw loop"}),
             metrics: BTreeMap::new(),
         }
@@ -831,6 +867,29 @@ mod tools {
                 assert_ne!(f.scene.svg, f.scene.static_svg);
             }
         }
+    }
+    #[test]
+    fn host_cell_regenerates_with_design_basis_without_changing_density_default() {
+        let original = evaluate(input(), &[], &[]).unwrap();
+        let mut i = input();
+        i.params = serde_json::json!({"wpx":600,"hpx":400,"margin":0});
+        i.host_cell = Some(40.0);
+        let first = evaluate(i.clone(), &[], &[]).unwrap();
+        i.dimensions.width = 1000;
+        let wide = evaluate(i.clone(), &[], &[]).unwrap();
+        assert_eq!(first.scene.cell, 40.0);
+        assert_eq!(wide.scene.cell, 40.0);
+        assert_eq!((first.scene.columns, wide.scene.columns), (15, 25));
+        i.host_cell = Some(0.0);
+        let auto = evaluate(i.clone(), &[], &[]).unwrap();
+        i.params["ecell"] = 0.into();
+        assert_eq!(auto, evaluate(i.clone(), &[], &[]).unwrap());
+        i.params["ecell"] = 40.into();
+        assert_eq!(evaluate(i.clone(), &[], &[]).unwrap().scene.cell, 40.0);
+        assert_ne!(auto.scene.columns, wide.scene.columns);
+        assert_eq!(original, evaluate(input(), &[], &[]).unwrap());
+        i.host_cell = Some(-1.0);
+        assert_eq!(evaluate(i, &[], &[]).unwrap_err(), "Invalid Arrow Maze host cell");
     }
     #[test]
     fn dimensions_relayout_manual_word_layers_and_boundaries() {

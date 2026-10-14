@@ -129,6 +129,25 @@ test('Arrow Maze user surface: dragging, playback and decoded SVG PNG GIF downlo
   expect(errors).toEqual([]);
 });
 
+test('Maze optional host cell is Rust-owned and absent input preserves editor layout', async ({ page }) => {
+  await page.goto(url);
+  const result = await page.evaluate(async () => {
+    const { adapter, evaluateMaze } = await import('/src/tools/arrow-maze.ts');
+    const design = { toolId:adapter.id, params:{...adapter.defaults,margin:0,wpx:600,hpx:400}, seed:42, artboard:{mode:'responsive',dimensions:{width:600,height:400}}, assets:[] };
+    const input={design,timeSeconds:0.75};
+    const editor=await adapter.evaluate(input), unchanged=await evaluateMaze(input);
+    const fixed=await evaluateMaze(input,40);
+    const wide=await evaluateMaze({...input,design:{...design,artboard:{mode:'responsive',dimensions:{width:1000,height:400}}}},40);
+    const automatic=await evaluateMaze(input,0);
+    return {editor,unchanged,fixed,wide,automatic};
+  });
+  expect(result.editor).toEqual(result.unchanged);
+  expect(result.fixed.scene.cell).toBe(40);expect(result.wide.scene.cell).toBe(40);
+  expect([result.fixed.scene.columns,result.wide.scene.columns]).toEqual([15,25]);
+  expect(result.automatic.scene.columns).toBe(result.editor.scene.columns);
+  expect(result.automatic.scene.rows).toBe(result.editor.scene.rows);
+});
+
 test('Arrow Maze has no JavaScript calculation fallback when Wasm is unavailable', async ({ page }) => {
   await page.route('**/*.wasm', route => route.abort());
   await page.goto(url);

@@ -1,5 +1,5 @@
 import { evaluateArrowMaze } from '../engine/client';
-import type { Control, Frame, ToolAdapter } from '../engine/contracts';
+import type { Control, EvaluationInput, Frame, ToolAdapter } from '../engine/contracts';
 import type { EditorTool } from '../workspace/view';
 import { svgArtwork } from './svg-artwork';
 import type { Parameters } from '../workspace/storage';
@@ -30,19 +30,20 @@ export const adapter: ToolAdapter<Parameters, MazeScene> = {
     choice('motion', 'Motion', 'Motion', ['none', 'draw in', 'draw loop']), numeric('speed', 'Cycle seconds', 'Motion', 0.5, 20, 0.5), numeric('hold', 'Hold', 'Motion', 0, 90, 5), numeric('stagger', 'Stagger', 'Motion', 0, 100, 5), choice('timing', 'Timing', 'Motion', ['ease out', 'linear', 'snap']),
     numeric('fps', 'GIF fps', 'Output', 5, 30), numeric('gifpx', 'GIF pixels', 'Output', 200, 1000, 50),
   ],
-  async evaluate(input) {
-    const ctx = document.createElement('canvas').getContext('2d')!;
-    ctx.font = '700 100px Arial';
-    const metrics: Record<string, number[]> = {};
-    for (const entry of String(input.design.params.words ?? '').split('|')) {
-      for (const line of [entry.trim(), ...entry.split('/').map(s => s.trim()), ...entry.split(/\s+/)]) {
-        const m = ctx.measureText(line);
-        metrics[line] = [Math.max(m.width, m.actualBoundingBoxRight) + Math.max(0, m.actualBoundingBoxLeft), m.actualBoundingBoxAscent, m.actualBoundingBoxDescent, Math.max(0, m.actualBoundingBoxLeft)];
-      }
-    }
-    return evaluateArrowMaze(input, metrics);
-  },
+  evaluate: input => evaluateMaze(input),
 };
+export async function evaluateMaze(input: EvaluationInput<Parameters>, hostCell?: number): Promise<Frame<MazeScene>> {
+  const ctx = document.createElement('canvas').getContext('2d')!;
+  ctx.font = '700 100px Arial';
+  const metrics: Record<string, number[]> = {};
+  for (const entry of String(input.design.params.words ?? '').split('|')) {
+    for (const line of [entry.trim(), ...entry.split('/').map(s => s.trim()), ...entry.split(/\s+/)]) {
+      const m = ctx.measureText(line);
+      metrics[line] = [Math.max(m.width, m.actualBoundingBoxRight) + Math.max(0, m.actualBoundingBoxLeft), m.actualBoundingBoxAscent, m.actualBoundingBoxDescent, Math.max(0, m.actualBoundingBoxLeft)];
+    }
+  }
+  return evaluateArrowMaze(input, metrics, hostCell);
+}
 export const arrowMaze: EditorTool = {
   id: adapter.id, name: 'Arrow Maze', description: 'Branching arrows with text and draw-in motion.', status: 'ready', adapter,
   renderer: { render(frame: Frame<MazeScene>, target: HTMLElement) {
