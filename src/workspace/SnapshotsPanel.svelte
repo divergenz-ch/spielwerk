@@ -46,7 +46,7 @@
     void run(async () => { entries = await library.list(); await restoreFonts(); });
     return () => {
       disposed = true;
-      for (const face of Object.values(faces)) document.fonts.delete(face);
+      for (const face of Object.values(faces)) if (face) document.fonts.delete(face);
     };
   });
   async function save() {
