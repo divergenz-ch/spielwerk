@@ -1,4 +1,4 @@
-import type { Control, Dimensions, DimensionLimits, Renderer, ToolAdapter } from '../engine/contracts';
+import type { Control, Dimensions, DimensionLimits, Frame, Renderer, ToolAdapter } from '../engine/contracts';
 import type { PendingTool } from './registry';
 import type { Parameters } from './storage';
 
@@ -20,6 +20,11 @@ export type EditorTool = {
     handles: readonly Handle[];
   };
   accent: boolean;
+  playback?: boolean;
+  interaction?: {
+    hit(frame: Frame<any>, x: number, y: number): { key: string; center: number[] } | undefined;
+    drag(params: Parameters, key: string, x: number, y: number): Parameters;
+  };
 };
 export type CatalogEntry = PendingTool | EditorTool;
 export function selectedTool(catalog: readonly CatalogEntry[], hash: string) {

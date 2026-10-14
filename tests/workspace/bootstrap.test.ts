@@ -52,14 +52,18 @@ for (const mode of ['development', 'static root', 'static subdirectory'] as cons
       : staticUrl + (mode === 'static subdirectory' ? 'workspace/' : '');
     const errors: string[] = [];
     const assetResponses: { url: string; status: number; type: string }[] = [];
+    const discovery: { url: string; status: number; body: Promise<string> }[] = [];
+    const consoleErrors: { text: string; url: string }[] = [];
+    const discoveryUrl = new URL('/snaps/ping', url).href;
     const requests: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     page.on('console', (message) => {
-      if (message.type() === 'error') errors.push(message.text());
+      if (message.type() === 'error') consoleErrors.push({ text: message.text(), url: message.location().url });
     });
     page.on('requestfailed', (request) => errors.push(request.url()));
     page.on('request', (request) => requests.push(request.url()));
     page.on('response', (response) => {
+      if (response.url() === discoveryUrl) discovery.push({ url: response.url(), status: response.status(), body: response.text() });
       if (['script', 'stylesheet'].includes(response.request().resourceType())) {
         assetResponses.push({
           url: response.url(), status: response.status(),
@@ -71,12 +75,34 @@ for (const mode of ['development', 'static root', 'static subdirectory'] as cons
     const response = await page.goto(url);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading', { name: 'Spielwerk', exact: true })).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Workspace foundation' })).toContainText(
-      'Design tools are not available yet.',
-    );
+    await expect(page.getByRole('region', { name: 'Composition preview' })).toBeVisible();
+    await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
+    await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('arrow-poster');
+    await expect(page.getByRole('region', { name: 'Workspace foundation' })).toContainText('Design tools are not available yet.');
+    await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('arrow-maze');
+    await expect(page.getByTestId('scene').locator('svg')).toBeVisible();
     await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(233, 231, 226)');
     await page.waitForLoadState('networkidle');
-
+    expect(discovery).toHaveLength(2);
+    for (const response of discovery) {
+      expect(response.status).toBe(mode === 'development' ? 200 : 404);
+      expect(await response.body).not.toBe('"ok"');
+    }
+    await page.getByLabel('Snapshot name', { exact: true }).fill('local bootstrap');
+    await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Load local bootstrap', exact: true })).toBeVisible();
+    const local = await page.evaluate(() => new Promise<any[]>(resolve => {
+      const request = indexedDB.open('spielwerk', 1);
+      request.onsuccess = () => {
+        const db = request.result;
+        const read = db.transaction('kv').objectStore('kv').get('snaps:arrow-maze');
+        read.onsuccess = () => { resolve(read.result); db.close(); };
+      };
+    }));
+    expect(local.map(snapshot => snapshot.name)).toEqual(['local bootstrap']);
+    const allowedResourceError = 'Failed to load resource: the server responded with a status of 404 (File not found)';
+    const expectedConsoleErrors = mode === 'development' ? [] : discovery.map(() => ({ text: allowedResourceError, url: discoveryUrl }));
+    expect(consoleErrors).toEqual(expectedConsoleErrors);
     expect(errors).toEqual([]);
     expect(assetResponses.length).toBeGreaterThan(0);
     for (const asset of assetResponses) {
@@ -84,7 +110,7 @@ for (const mode of ['development', 'static root', 'static subdirectory'] as cons
       expect(asset.type, asset.url).toMatch(/javascript|css/);
       if (mode === 'static subdirectory') expect(asset.url).toContain('/workspace/assets/');
     }
-    expect(requests.every((request) => request.startsWith(url))).toBe(true);
-    expect(requests.some((request) => new URL(request).pathname.startsWith('/snaps/'))).toBe(false);
+    expect(requests.every((request) => request.startsWith(url) || request === discoveryUrl)).toBe(true);
+    expect(requests.filter(request => new URL(request).pathname.startsWith('/snaps/'))).toEqual([discoveryUrl, discoveryUrl]);
   });
 }

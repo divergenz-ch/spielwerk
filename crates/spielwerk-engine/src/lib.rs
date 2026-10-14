@@ -1,5 +1,18 @@
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
+pub mod tools;
+
+#[wasm_bindgen]
+pub fn evaluate_arrow_maze(
+    input_json: &str,
+    font: &[u8],
+    accent: &[u8],
+) -> Result<String, JsValue> {
+    let input =
+        serde_json::from_str(input_json).map_err(|error| JsValue::from_str(&error.to_string()))?;
+    let frame = tools::arrow_maze::evaluate(input, font, accent).map_err(JsValue::from_str)?;
+    serde_json::to_string(&frame).map_err(|error| JsValue::from_str(&error.to_string()))
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Dimensions {

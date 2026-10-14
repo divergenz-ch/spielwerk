@@ -103,7 +103,9 @@ for (const hosting of ['static', 'service']) {
     const base = hosting === 'static' ? staticUrl : serviceUrl;
     await page.goto(base + 'app/');
     await expect(page.getByRole('heading', { name: 'Spielwerk', exact: true })).toBeVisible();
-    await expect(page.getByText('Design tools are not available yet.', { exact: false })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Composition preview' })).toBeVisible();
+    await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
+    expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['svg', 'png', 'gif']);
     await start(page, false, base);
     await expect(page.getByRole('button', { name: 'Choose export folder' })).toHaveCount(0);
     expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['svg', 'png', 'gif']);

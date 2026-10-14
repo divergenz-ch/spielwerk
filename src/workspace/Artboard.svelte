@@ -24,6 +24,32 @@
   let stage: HTMLDivElement;
   let stageSize = $state({ width: 800, height: 600 });
   let space = $state(false);
+  let timeSeconds = $state(0);
+  let playing = $state(false);
+  let playbackHandle = 0;
+  let wordDrag: { id: number; key: string; x: number; y: number; center: number[]; original: Parameters } | undefined;
+  function scenePoint(event: PointerEvent) {
+    const rect = surface.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom };
+  }
+  function play() {
+    playing = !playing;
+    cancelAnimationFrame(playbackHandle);
+    if (!playing) return;
+    timeSeconds = 0;
+    const origin = performance.now();
+    const tick = (now: number) => {
+      timeSeconds = (now - origin) / 1000;
+      if (params.motion === 'draw in' && displayed && timeSeconds >= displayed.durationSeconds) playing = false;
+      if (playing) playbackHandle = requestAnimationFrame(tick);
+    };
+    playbackHandle = requestAnimationFrame(tick);
+  }
+  function finishPointer(cancel = false) {
+    if (cancel && wordDrag) params = wordDrag.original;
+    if (wordDrag) persist();
+    wordDrag = undefined; drag = undefined;
+  }
   let drag: { id: number; x: number; y: number; scale: number; size: Dimensions; pan: { x: number; y: number }; handle?: Handle } | undefined;
   const responsive = $derived(tool.adapter.capabilities.responsive && Boolean(params.responsive));
   const fixed = $derived(boundedSize({ width: Number(params.wpx) || tool.artboard.initial.width, height: Number(params.hpx) || tool.artboard.initial.height }, tool.adapter.dimensions));
@@ -83,7 +109,7 @@
     return {
       design: { toolId: tool.adapter.id, params: $state.snapshot(params), seed: Number(params.seed) >>> 0,
         artboard: { mode: responsive ? 'responsive' : 'fixed', dimensions: { ...dimensions } }, assets: $state.snapshot(assets) },
-      timeSeconds: 0,
+      timeSeconds,
     };
   });
   $effect(() => {
@@ -104,16 +130,34 @@
     });
     observer.observe(stage);
     observer.observe(container);
-    return () => { observer.disconnect(); evaluator.dispose(); };
+    return () => { observer.disconnect(); evaluator.dispose(); cancelAnimationFrame(playbackHandle); };
   });
   function start(event: PointerEvent, handle?: Handle) {
-    if (event.button !== 0 || (!handle && !space)) return;
+    if (event.button !== 0) return;
+    if (!handle && !space && displayed && tool.interaction) {
+      const point = scenePoint(event);
+      const hit = tool.interaction.hit(displayed, point.x, point.y);
+      if (hit) {
+        event.preventDefault(); event.stopPropagation();
+        wordDrag = { id: event.pointerId, key: hit.key, center: hit.center, x: point.x, y: point.y, original: $state.snapshot(params) };
+        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+      }
+      return;
+    }
+    if (!handle && !space) return;
     event.preventDefault(); event.stopPropagation();
     drag = { id: event.pointerId, x: event.clientX, y: event.clientY, scale: zoom, size: { ...dimensions }, pan: { ...pan }, handle };
     if (handle && (view.zoom === 'fit' || view.zoom === undefined)) setView({ zoom: zoom * 100 });
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   function move(event: PointerEvent) {
+    if (wordDrag && event.pointerId === wordDrag.id && tool.interaction) {
+      const point = scenePoint(event);
+      params = tool.interaction.drag(params, wordDrag.key,
+        clamp((wordDrag.center[0] + point.x - wordDrag.x) / dimensions.width, 0, 1),
+        clamp((wordDrag.center[1] + point.y - wordDrag.y) / dimensions.height, 0, 1));
+      return;
+    }
     if (!drag || event.pointerId !== drag.id) return;
     if (!drag.handle) { setView({ pan: { x: drag.pan.x + event.clientX - drag.x, y: drag.pan.y + event.clientY - drag.y } }); return; }
     const handle = drag.handle;
@@ -131,11 +175,12 @@
   function keydown(event: KeyboardEvent) {
     if (/^(INPUT|SELECT|TEXTAREA)$/.test((event.target as HTMLElement).tagName)) return;
     if (event.code === 'Space') { event.preventDefault(); space = true; }
+    if (event.key === 'Escape' && wordDrag) finishPointer(true);
     if (event.key === 'Escape' && drag) { if (drag.handle) setSize(drag.size); else setView({ pan: drag.pan }); drag = undefined; }
   }
 </script>
 
-<svelte:window onkeydown={keydown} onkeyup={event => { if (event.code === 'Space') space = false; }} onblur={() => { space = false; drag = undefined; }} />
+<svelte:window onkeydown={keydown} onkeyup={event => { if (event.code === 'Space') space = false; }} onblur={() => { space = false; finishPointer(true); }} />
 <div class="editor">
   <aside aria-label="Design controls">
     <Controls controls={tool.adapter.controls} defaults={tool.adapter.defaults} {params} {expandedGroups}
@@ -164,10 +209,11 @@
       <option value="fit">Fit</option>{#each [...new Set([25, 50, 100, 200, 400, ...(typeof view.zoom === 'number' ? [view.zoom] : [])])] as value}<option value={value}>{value}%</option>{/each}
     </select></label>
     <button onclick={() => setView({ pan: { x: 0, y: 0 } })}>Reset pan</button>
+    {#if tool.playback}<button onclick={play}>{playing ? 'Pause motion' : 'Play motion'}</button>{/if}
     <p role="status">{busy ? 'Updating full-detail preview…' : 'Full-detail preview'}{#if displayed} · {displayed.dimensions.width} × {displayed.dimensions.height}{/if}</p>
     {#if error}<p role="alert">{error}</p>{/if}
     <div class="stage" bind:this={stage} role="region" aria-label="Pan preview with Space and drag"
-      onpointerdown={event => start(event)} onpointermove={move} onpointerup={() => drag = undefined} onpointercancel={() => { if (drag?.handle) setSize(drag.size); drag = undefined; }}>
+      onpointerdown={event => start(event)} onpointermove={move} onpointerup={() => finishPointer()} onpointercancel={() => { if (drag?.handle) setSize(drag.size); finishPointer(true); }}>
       <div class="container" bind:this={container} data-testid="preview-container"
         style:width={`${dimensions.width}px`} style:height={`${dimensions.height}px`}
         style:min-width={`${tool.adapter.dimensions.width.min}px`} style:max-width={`${tool.adapter.dimensions.width.max}px`}

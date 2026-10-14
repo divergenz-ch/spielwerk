@@ -8,7 +8,7 @@ Port the maze layout/time calculations and font-aware placement through the shar
 
 **Size:** M
 **Files:** `crates/spielwerk-engine/src/tools/mod.rs`, `crates/spielwerk-engine/src/tools/arrow_maze.rs`, `src/tools/arrow-maze.ts`, `tests/generators/arrow-maze.test.ts`
-**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/arrow_maze.rs, src/tools/arrow-maze.ts, tests/generators/arrow-maze.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock, package.json, src/engine/client.ts, src/main.ts, src/workspace/view.ts, src/workspace/Artboard.svelte, tests/workspace/bootstrap.test.ts]
+**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/arrow_maze.rs, src/tools/arrow-maze.ts, tests/generators/arrow-maze.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock, package.json, src/engine/client.ts, src/main.ts, src/workspace/view.ts, src/workspace/Artboard.svelte, tests/workspace/bootstrap.test.ts, tests/workspace/exports.test.ts]
 
 ### Approach
 
@@ -183,6 +183,33 @@ The additional write paths are the necessary existing foundation consumer
 seams for the original Arrow Maze acceptance, not new product scope.
 The task remains a serial writer because it shares the Rust entry point.
 
+### Consumer compatibility decision during implementation
+
+The supervisor checked snapshots.ts and the consumer tests after the worker
+reported a green Arrow Maze gate and two stale root-only expectations.
+Automatic snapshot-service detection is existing foundation behavior and must
+remain enabled. Do not introduce local-only root persistence, host metadata,
+or an opt-in setting as part of this task.
+
+The ready root now mounts the snapshot panel; the previous pending shell did
+not. Bootstrap may recognize the same-origin /snaps/ping discovery request
+explicitly, while still asserting successful hosting-relative assets, no page
+errors or failed requests, and no unexpected snapshot API requests or writes.
+A static host's expected 404 may be excluded only for that exact discovery
+response and its matching resource-console message. Never ignore all 404s or
+all console errors. Development hosts may return non-service content instead;
+verify that service rejection and browser-local fallback work. Preserve the
+static subdirectory asset checks while recognizing the existing origin-root
+service endpoint. Existing service and local snapshot consumer tests remain
+required evidence, with disposable service HOME, not real saved data.
+
+tests/workspace/exports.test.ts is added to Touches solely for its two
+pending-shell root expectations: assert the delivered Arrow Maze preview and
+continued availability of SVG/PNG/GIF, then keep its internal-fixture output,
+font, error, folder, and service/local assertions intact. This is the narrow
+intentional root-content update required by the approved Arrow Maze delivery,
+not authorization to weaken export checks or change persistence policy.
+
 ## Done summary
 Blocked:
 # Workspace foundation prerequisite
@@ -239,3 +266,4 @@ stage: impl-review - skipped(config: review.backend=none; no implementation)
 - Commits:
 - Tests:
 - PRs:
+
