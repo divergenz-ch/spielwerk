@@ -4,3 +4,5 @@ pub mod arrow_maze;
 pub mod arrow_path;
 pub mod arrow_poster;
 pub mod switchboard;
+pub mod truchet_tiles;
+pub mod imprint;

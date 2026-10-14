@@ -1,4 +1,4 @@
-import init, { evaluate_fixture, evaluate_arrow_maze, evaluate_arrow_poster, evaluate_arrow_comb, evaluate_arrow_field, evaluate_switchboard, inspect_font } from './pkg/spielwerk_engine.js';
+import init, { evaluate_fixture, evaluate_arrow_maze, evaluate_arrow_poster, evaluate_arrow_comb, evaluate_arrow_field, evaluate_switchboard, evaluate_truchet_tiles, evaluate_imprint, inspect_font } from './pkg/spielwerk_engine.js';
 import wasmUrl from './pkg/spielwerk_engine_bg.wasm?url';
 import type { EvaluationInput, FixtureParams, FixtureScene, Frame } from './contracts';
 
@@ -67,6 +67,14 @@ export async function evaluateSwitchboard(input: EvaluationInput<any>, action?: 
     dimensions: input.design.artboard.dimensions, seed: input.design.seed,
     params: input.design.params, timeSeconds: input.timeSeconds, action,
   }), font));
+}
+
+export async function evaluatePrimitive(input: EvaluationInput<any>) {
+  await initialize();
+  const json = JSON.stringify({ dimensions: input.design.artboard.dimensions, seed: input.design.seed, params: input.design.params, timeSeconds: input.timeSeconds });
+  if (input.design.toolId === 'truchet-tiles') return JSON.parse(evaluate_truchet_tiles(json));
+  if (input.design.toolId === 'imprint') return JSON.parse(evaluate_imprint(json));
+  throw new Error('Not a primitive artwork design');
 }
 
 export async function inspectFont(bytes: Uint8Array): Promise<{
