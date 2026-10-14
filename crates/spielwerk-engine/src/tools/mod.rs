@@ -6,3 +6,4 @@ pub mod arrow_poster;
 pub mod switchboard;
 pub mod truchet_tiles;
 pub mod imprint;
+pub mod stripe_marquee;

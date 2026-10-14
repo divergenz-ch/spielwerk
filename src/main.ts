@@ -10,8 +10,9 @@ import { switchboard, artwork as switchboardArtwork } from './tools/switchboard'
 
 import { truchetTiles, artwork as truchetArtwork } from './tools/truchet-tiles';
 import { imprint, artwork as imprintArtwork } from './tools/imprint';
+import { stripeMarquee, artwork as stripeArtwork } from './tools/stripe-marquee';
 
 mount(App, { target: document.getElementById('app')!, props: {
-  catalog: tools.map(tool => [arrowMaze, arrowPoster, arrowComb, arrowField, switchboard, truchetTiles, imprint].find(ready => ready.id === tool.id) ?? tool),
-  exporters: { 'arrow-maze': artwork, 'arrow-poster': posterArtwork, 'arrow-comb': combArtwork, 'arrow-field': fieldArtwork, switchboard: switchboardArtwork, 'truchet-tiles': truchetArtwork, imprint: imprintArtwork },
+  catalog: tools.map(tool => [arrowMaze, arrowPoster, arrowComb, arrowField, switchboard, truchetTiles, imprint, stripeMarquee].find(ready => ready.id === tool.id) ?? tool),
+  exporters: { 'arrow-maze': artwork, 'arrow-poster': posterArtwork, 'arrow-comb': combArtwork, 'arrow-field': fieldArtwork, switchboard: switchboardArtwork, 'truchet-tiles': truchetArtwork, imprint: imprintArtwork, 'stripe-marquee': stripeArtwork },
 } });

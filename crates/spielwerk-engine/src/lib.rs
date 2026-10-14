@@ -56,6 +56,13 @@ pub fn evaluate_imprint(input_json: &str) -> Result<String, JsValue> {
     serde_json::to_string(&frame).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+#[wasm_bindgen]
+pub fn evaluate_stripe_marquee(input_json: &str, font: &[u8]) -> Result<String, JsValue> {
+    let input = serde_json::from_str(input_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let frame = tools::stripe_marquee::evaluate(input, font).map_err(JsValue::from_str)?;
+    serde_json::to_string(&frame).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Dimensions {
     pub width: u32,
