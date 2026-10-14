@@ -75,7 +75,7 @@ test('Arrow Maze user surface: dragging, playback and decoded SVG PNG GIF downlo
 
   await page.goto(url);
   await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
-  await expect(page.getByRole('combobox', { name: 'Output format' })).toHaveText('SVGPNGGIF');
+  await expect(page.getByRole('combobox', { name: 'Output format' }).locator('option')).toHaveText(['SVG', 'PNG', 'GIF', 'Website embed (ZIP)']);
   await page.getByLabel('Words', { exact: true }).fill('Maze');
   const word = page.getByTestId('scene').locator('[data-word]');
   await expect(word).toBeVisible();

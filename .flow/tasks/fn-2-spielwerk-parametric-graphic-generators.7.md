@@ -8,7 +8,7 @@ Verify the complete catalog only after the separate embed runtime delivers its a
 
 **Size:** M
 **Files:** `src/tools/registry.ts`, `tests/generators/catalog.test.ts`, `tests/integration/generators.spec.ts`
-**Touches:** [src/tools/registry.ts, tests/generators/catalog.test.ts, tests/integration/generators.spec.ts, src/main.ts]
+**Touches:** [src/tools/registry.ts, tests/generators/catalog.test.ts, tests/integration/generators.spec.ts, src/main.ts, tests/generators/arrow-maze.test.ts]
 
 ### Approach
 
