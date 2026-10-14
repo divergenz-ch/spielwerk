@@ -98,7 +98,7 @@ test('arrow-field: workspace pointer is transient; responsive SVG PNG GIF artwor
         const decoder = new (window as any).ImageDecoder({ data: Uint8Array.from(bytes), type: `image/${format}` }); await decoder.tracks.ready;
         const count = decoder.tracks.selectedTrack.frameCount; const first = (await decoder.decode({ frameIndex: 0 })).image;
         const canvas = Object.assign(document.createElement('canvas'), { width: first.displayWidth, height: first.displayHeight }); const ctx = canvas.getContext('2d')!; ctx.drawImage(first, 0, 0); const a = [...ctx.getImageData(0, 0, canvas.width, canvas.height).data]; first.close();
-        let different = false; if (count > 1) { const last = (await decoder.decode({ frameIndex: count - 1 })).image; ctx.drawImage(last, 0, 0); different = a.some((v, i) => v !== ctx.getImageData(0, 0, canvas.width, canvas.height).data[i]); last.close(); }
+        let different = false; if (count > 1) { const last = (await decoder.decode({ frameIndex: count - 1 })).image; ctx.drawImage(last, 0, 0); const b = ctx.getImageData(0, 0, canvas.width, canvas.height).data; different = a.some((v, i) => v !== b[i]); last.close(); }
         decoder.close(); return { count, width: canvas.width, height: canvas.height, different, colors: new Set(a).size };
       }, { bytes: [...bytes], format });
       expect(decoded.width).toBe(400); expect(decoded.height).toBe(300); expect(decoded.colors).toBeGreaterThan(2); expect(decoded.count).toBe(format === 'gif' ? 5 : 1); if (format === 'gif') expect(decoded.different).toBe(true);
