@@ -8,13 +8,15 @@ Implement the shared editor against the checked state/adapter contract, leaving 
 
 **Size:** M
 **Files:** `src/workspace/App.svelte`, `src/workspace/Controls.svelte`, `src/workspace/Artboard.svelte`, `src/workspace/view.ts`, `tests/workspace/controls.test.ts`
-**Touches:** [src/workspace/App.svelte, src/workspace/Controls.svelte, src/workspace/Artboard.svelte, src/workspace/view.ts, tests/workspace/controls.test.ts]
+**Touches:** [src/workspace/App.svelte, src/workspace/Controls.svelte, src/workspace/Artboard.svelte, src/workspace/view.ts, tests/workspace/controls.test.ts, src/workspace/SnapshotsPanel.svelte]
 
 ### Approach
 
 - Reuse prototype control metadata and navigation intent with tool-specific links/default fallback; build grouped Svelte controls, exact numeric input, resets, and range handling.
 - Keep dimension limits and exposed resize behavior tool-specific. Fixed/responsive mode passes real layout dimensions to the engine contract; zoom/pan affects only the view.
 - Schedule expensive evaluations without lowering detail. Keep latest requested design/dimensions consistent with the displayed full-fidelity scene; preserve existing settings and view preferences.
+
+- Correct the dependency's default-font cleanup in `SnapshotsPanel.svelte`: navigation must not pass an absent face to `document.fonts.delete`. This bounded correction was exposed by task .5's browser navigation tests; preserve regression coverage and avoid unrelated snapshot changes.
 
 ### Investigation targets
 
@@ -46,3 +48,4 @@ TBD
 - Commits:
 - Tests:
 - PRs:
+
