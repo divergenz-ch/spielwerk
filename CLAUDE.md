@@ -15,8 +15,9 @@ Final ten-tool verification and broader integration documentation belong to
 that gate or authorize publication.
 
 Svelte owns canonical parameters, assets, playback, and view preferences.
-`Controls.svelte` renders adapter-defined groups and native inputs; edits pass
-through `controlValue` in `src/workspace/view.ts`. Preserve minimum-relative
+`Controls.svelte` mounts adapter-defined Tweakpane folders and bindings through
+`src/workspace/tweakpane.ts`. The pane owns a disposable editing mirror; edits
+pass through `controlValue` in `src/workspace/view.ts`. Preserve minimum-relative
 step rounding, clamping, decimal precision, and last-valid-value recovery.
 Restoring settings or snapshots must update displayed controls without an
 edit/persistence loop. Remounting must not duplicate listeners or edits.
@@ -40,10 +41,33 @@ Website ZIP guidance must retain runtime, Wasm, and fonts together.
 
 ## Control-library decision
 
-Task `fn-6-spielwerk-minimal-creative-instrument.1` tested stock Tweakpane 4.0.5
-(MIT) against native controls in the same Chromium Svelte/App fixture with
-real Wasm. The selected implementation remains native; Tweakpane is not an
-installed dependency or a second UI option.
+Task `fn-7-spielwerk-tweakpane-controls.1` adopts pinned Tweakpane 4.0.5 (MIT)
+as the parameter editor. There is one editing surface. `@tweakpane/core` 2.0.5
+is a development dependency for Tweakpane's published type declarations; the
+integration imports its runtime only from `tweakpane`.
+
+Maintain the integration through public `Pane`, folder, binding, button,
+`element`, `refresh`, and `dispose` APIs. Numeric bindings use public bounds,
+key/pointer scales, and an exact format callback. `controlValue` alone applies
+minimum-relative steps, so a second library rounding pass cannot move the grid.
+Raw exact-entry and choice events recover the last valid value. Text input
+forwards changes while typing. Explicit `view: 'text'` prevents color inference.
+Color pickers expand inline to keep their fields in the control column.
+
+The helper names fields and picker channels through public element handles and
+standard DOM queries. It adds slider/spinbutton semantics, folder expansion
+state, keyboard steps, and per-number reset buttons. Local focus styles include
+the stock checkbox's visible label. It stops editing keys at the pane boundary.
+Refresh suppresses callbacks; teardown aborts DOM listeners, unsubscribes API
+handlers, and disposes the pane. Changes to this adapter require the focused
+browser contracts in `tests/workspace/controls.test.ts`. Do not use private
+controllers or CSS classes, forks, plugins, wrappers, or a native fallback.
+
+The earlier stock evaluation remains historical evidence. Task
+`fn-6-spielwerk-minimal-creative-instrument.1` compared stock Tweakpane 4.0.5
+against native controls in the same Chromium Svelte/App fixture with real Wasm.
+It selected native controls under the earlier unmodified-stock gate. The
+explicit Tweakpane request supersedes that selection.
 
 Both candidates edited numeric, choice, color, text, and toggle values.
 Tweakpane used only public `Pane`, `addFolder`, `addBinding`, `addButton`,
@@ -51,7 +75,7 @@ Tweakpane used only public `Pane`, `addFolder`, `addBinding`, `addButton`,
 values to Svelte. Text explicitly used `view: 'text'`. No fork, plugin,
 third-party Svelte wrapper, or private-DOM patch was used.
 
-Stock Tweakpane failed the parity gate:
+Stock Tweakpane failed that earlier parity gate:
 
 - Its six observed inputs had no accessible names; visible labels were
   unassociated. Native controls had six named inputs.
@@ -73,7 +97,9 @@ a candidate increase of 147,178 bytes (30,010 gzip). The selected native fixes
 measured 137,841 bytes (49,136 gzip). These are task .1 build measurements,
 not current bundle budgets or runtime speed claims. The task's recorded
 [decision and evidence](.flow/tasks/fn-6-spielwerk-minimal-creative-instrument.1.md)
-retain the comparison. No candidate lifecycle adapter remains to maintain.
+retain the comparison. The current helper addresses those observed name,
+precision, and focus gaps with browser-tested integration code. These tests
+still don't establish cross-browser or OS screen-reader certification.
 
 ## Legacy page skeleton
 

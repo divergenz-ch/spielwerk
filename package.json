@@ -36,11 +36,13 @@
     }
   },
   "dependencies": {
-    "svelte": "5.57.2"
+    "svelte": "5.57.2",
+    "tweakpane": "4.0.5"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@playwright/test": "1.64.1",
+    "@tweakpane/core": "2.0.5",
     "vite": "8.3.4"
   }
 }

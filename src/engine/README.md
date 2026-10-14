@@ -11,7 +11,8 @@ the probe's rectangles are a separate boundary fixture.
 
 See the [workspace workflow](../../README.md) for choosing, editing, previewing,
 and exporting, and the [control decision](../../CLAUDE.md#control-library-decision)
-for the tested native-control selection. Final ten-tool integration remains
+for the Tweakpane editing mirror, public-API maintenance boundary, and historical
+stock evaluation. Svelte retains canonical state. Final ten-tool integration remains
 with `fn-1-spielwerk-shared-design-workspace.1`.
 
 ## Build and inspect the proof

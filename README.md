@@ -43,8 +43,10 @@ this repository's source root alone does not build the Svelte app.
 The header contains one **Tool** selector, the tool name, and its short purpose.
 The preview sits beside a scrollable **Design controls** column.
 
-1. Select a delivered tool. Open its parameter groups and adjust a slider or
-   exact numeric field. **Reset** restores that parameter's default.
+1. Select a delivered tool. Open its Tweakpane parameter folders and adjust a
+   slider or exact numeric field. **Reset …** restores that parameter's default.
+   Arrow keys step numeric values; Tab reaches each reset button. Color pickers
+   expand inline, and text fields keep color-like text as text.
 2. Open **Artboard** for dimensions and, where supported, fixed or responsive
    layout. **Zoom** and **Reset pan** affect the view, not exported artwork.
 3. Read the preview status. Edits request full-detail updates during interaction.
@@ -92,7 +94,7 @@ npx playwright test tests/workspace/controls.test.ts tests/workspace/exports.tes
 ```
 
 See the [engine guide](src/engine/README.md) for the internal Rust/Wasm probe
-and the [authoring guide](CLAUDE.md) for the native-control decision and
+and the [authoring guide](CLAUDE.md) for the Tweakpane integration and
 ownership boundaries. These focused checks do not complete the separate
 final ten-tool integration gate.
 

@@ -23,11 +23,12 @@ test.beforeAll(async () => {
       let params = $state(untrack(() => ({ ...defaults })));
       let expandedGroups = $state(['Geometry', 'Appearance']);
       window.edits = [];
-      window.restoreControls = values => { params = { ...values }; };
+      window.restoreControls = (values, groups = expandedGroups) => { params = { ...values }; expandedGroups = groups; };
+      window.folds = [];
     </script>
     <Controls {controls} {params} {defaults} {expandedGroups}
       onchange={(key, value) => { window.edits.push({ key, value }); params = { ...params, [key]: value }; }}
-      onexpand={(group, open) => { expandedGroups = open ? [...new Set([...expandedGroups, group])] : expandedGroups.filter(g => g !== group); }} />
+      onexpand={(group, open) => { window.folds.push({ group, open }); expandedGroups = open ? [...new Set([...expandedGroups, group])] : expandedGroups.filter(g => g !== group); }} />
   `);
   await writeFile(entry, `
     import { mount, unmount } from ${JSON.stringify(resolve('node_modules/svelte/src/index-client.js'))};
@@ -139,21 +140,23 @@ test('catalog navigation and grouped controls use registered metadata, reset, ra
   await page.evaluate(() => { location.hash = 'internal-fixture'; return (window as any).start(); });
   await expect(scene(page).locator('rect')).toHaveCount(6);
   await edit(page, 'Cell size exact', '999');
-  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveValue('80');
+  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveAttribute('aria-valuenow', '80');
   await edit(page, 'Cell size exact', '-9');
-  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveValue('10');
+  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveAttribute('aria-valuenow', '10');
   await edit(page, 'Cell size exact', '43');
-  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveValue('45');
+  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveAttribute('aria-valuenow', '45');
   await page.getByRole('button', { name: 'Reset Cell size' }).click();
   await expect(scene(page).locator('rect')).toHaveCount(6);
   const slider = page.getByRole('slider', { name: 'Cell size', exact: true });
   await slider.press('ArrowRight');
-  await expect(slider).toHaveValue('45');
+  await expect(slider).toHaveAttribute('aria-valuenow', '45');
   await slider.dblclick();
-  await expect(slider).toHaveValue('40');
+  await expect(slider).toHaveAttribute('aria-valuenow', '40');
   await page.getByLabel('Style', { exact: true }).selectOption('outline');
   await page.getByLabel('Text', { exact: true }).fill('changed');
-  await page.getByLabel('Enabled', { exact: true }).uncheck();
+  await expect(page.getByLabel('Enabled', { exact: true })).toBeChecked();
+  await page.getByLabel('Enabled', { exact: true }).locator('..').click();
+  await expect(page.getByLabel('Enabled', { exact: true })).not.toBeChecked();
   await page.getByLabel('Ink', { exact: true }).fill('#abcdef');
   await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params)).toMatchObject({ cellSize: 40, style: 'outline', text: 'changed', enabled: false, ink: '#abcdef' });
   await page.getByLabel('Zoom', { exact: true }).selectOption('200');
@@ -167,7 +170,7 @@ test('catalog navigation and grouped controls use registered metadata, reset, ra
   await expect(page.getByRole('button', { name: /^Resize artboard/ })).toHaveCount(0);
   await page.evaluate(() => { location.hash = 'internal-fixture'; });
   await expect(page.getByLabel('Zoom', { exact: true })).toHaveValue('200');
-  await expect(page.locator('details').filter({ has: page.getByText('Appearance', { exact: true }) })).not.toHaveAttribute('open');
+  await expect(page.getByRole('button', { name: 'Appearance', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await page.getByText('Appearance', { exact: true }).click();
   await expect(page.getByLabel('Text', { exact: true })).toHaveValue('changed');
   await page.getByLabel('Text', { exact: true }).fill('later');
@@ -302,7 +305,7 @@ test('numeric boundaries retain valid values, minimum-relative precision and imm
   await page.evaluate(() => (window as any).start());
   await expect(scene(page).locator('rect')).toHaveCount(6);
   const fraction = page.getByRole('spinbutton', { name: 'Fraction exact', exact: true });
-  for (const [value, expected] of [['0.46', '0.55'], ['-1', '0.15'], ['9', '1.15'], ['0.35', '0.35'], ['', '0.35'], ['1e309', '0.35']]) {
+  for (const [value, expected] of [['0.46', '0.55'], ['-1', '0.15'], ['9', '1.15'], ['0.35', '0.35'], ['', '0.35'], ['1e309', '0.35'], ['NaN', '0.35'], ['Infinity', '0.35'], ['12px', '0.35']]) {
     await fraction.fill(value); await fraction.press('Tab');
     await expect(fraction).toHaveValue(expected);
     await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.fraction)).toBe(Number(expected));
@@ -311,7 +314,7 @@ test('numeric boundaries retain valid values, minimum-relative precision and imm
   await expect(fraction).toHaveValue('0.55');
   const slider = page.getByRole('slider', { name: 'Fraction', exact: true });
   await slider.press('ArrowRight');
-  await expect(slider).toHaveValue('0.75');
+  await expect(slider).toHaveAttribute('aria-valuenow', '0.75');
   await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.fraction)).toBe(0.75);
 });
 
@@ -326,7 +329,7 @@ test('Space activates reset and disclosures without panning while text editing k
   expect(await reset.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
   await reset.press('Space');
   await expect(page.getByRole('spinbutton', { name: 'Cell size exact', exact: true })).toHaveValue('40');
-  const summary = page.locator('summary').filter({ hasText: /^Appearance$/ });
+  const summary = page.getByRole('button', { name: 'Appearance', exact: true });
   await summary.press('Space');
   await expect(page.getByLabel('Text', { exact: true })).toBeHidden();
   await summary.press('Space');
@@ -335,7 +338,7 @@ test('Space activates reset and disclosures without panning while text editing k
   await expect(text).toHaveValue('#aabbcc ');
   const stage = page.getByRole('region', { name: 'Pan preview with Space and drag' });
   const box = (await stage.boundingBox())!;
-  for (const target of [reset, summary, text]) {
+  for (const target of [reset, summary, text, page.getByRole('slider', { name: 'Fraction', exact: true }), page.getByRole('button', { name: 'Choose Ink color', exact: true })]) {
     await target.focus(); await page.keyboard.down('Space');
     await page.mouse.move(box.x + 200, box.y + 200); await page.mouse.down();
     await page.mouse.move(box.x + 230, box.y + 220); await page.mouse.up(); await page.keyboard.up('Space');
@@ -343,9 +346,42 @@ test('Space activates reset and disclosures without panning while text editing k
   }
 });
 
+test('public-element labels and focus cover Tweakpane fields and color picker channels', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  for (const [role, name] of [['spinbutton', 'Fraction exact'], ['slider', 'Fraction'], ['combobox', 'Style'], ['textbox', 'Text'], ['button', 'Choose Ink color']] as const) {
+    const control = page.getByRole(role, { name, exact: true });
+    await control.focus();
+    await expect(control).toBeFocused();
+    expect(await control.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  }
+  const toggle = page.getByLabel('Enabled', { exact: true });
+  await toggle.focus();
+  expect(await toggle.locator('..').evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  await toggle.press('Space');
+  await expect(toggle).not.toBeChecked();
+  await page.getByRole('button', { name: 'Choose Ink color', exact: true }).click();
+  const red = page.getByLabel('Ink red', { exact: true });
+  await red.fill('128'); await red.press('Tab');
+  await expect(page.getByLabel('Ink', { exact: true })).toHaveValue('#802233');
+  await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.ink)).toBe('#802233');
+  for (const [format, channels] of [['hsl', ['hue', 'saturation', 'lightness']], ['hsv', ['hue', 'saturation', 'value']], ['hex', ['hex']], ['rgb', ['red', 'green', 'blue']]] as const) {
+    await page.getByLabel('Ink color format').selectOption(format);
+    for (const channel of channels) await expect(page.getByLabel(`Ink ${channel}`, { exact: true })).toBeVisible();
+  }
+  await page.getByRole('button', { name: 'Choose Ink color', exact: true }).click();
+});
+
 test('restores and repeated mounts do not emit edits; invalid values keep canonical controls', async ({ page }) => {
   for (let mount = 0; mount < 3; mount++) {
-    await page.evaluate(() => (window as any).start('controls'));
+    await page.evaluate(() => {
+      (window as any).detachedInput = document.querySelector('input[aria-label="Text"]');
+      return (window as any).start('controls');
+    });
+    await page.evaluate(() => {
+      const old = (window as any).detachedInput;
+      if (old) { old.value = 'disposed edit'; old.dispatchEvent(new Event('input', { bubbles: true })); old.dispatchEvent(new Event('change', { bubbles: true })); }
+    });
+    await expect(page.getByRole('group', { name: 'Tool parameters', exact: true })).toHaveCount(1);
     await expect(page.getByLabel('Text', { exact: true })).toHaveValue('proof');
     await page.getByText('Appearance', { exact: true }).click();
     await page.evaluate(() => (window as any).restoreControls({ cellSize: 45, fraction: 0.75, text: '#aabbcc', ink: '#abcdef', enabled: false, style: 'outline' }));
@@ -362,8 +398,15 @@ test('restores and repeated mounts do not emit edits; invalid values keep canoni
     await edit(page, 'Cell size exact', '');
     await edit(page, 'Cell size exact', '1e309');
     expect(await page.evaluate(() => (window as any).edits)).toEqual([]);
+    expect(await page.evaluate(() => (window as any).folds)).toEqual([{ group: 'Appearance', open: false }, { group: 'Appearance', open: true }]);
+    await page.evaluate(() => (window as any).restoreControls({ cellSize: 45, fraction: 0.75, text: '#aabbcc', ink: '#abcdef', enabled: false, style: 'outline' }, ['Geometry']));
+    await expect(page.getByRole('button', { name: 'Appearance', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    expect(await page.evaluate(() => (window as any).folds)).toHaveLength(2);
+    await page.getByRole('button', { name: 'Appearance', exact: true }).click();
     await page.getByLabel('Text', { exact: true }).fill('one edit');
     expect(await page.evaluate(() => (window as any).edits)).toEqual([{ key: 'text', value: 'one edit' }]);
+    await page.getByRole('slider', { name: 'Fraction', exact: true }).press('ArrowRight');
+    expect(await page.evaluate(() => (window as any).edits)).toEqual([{ key: 'text', value: 'one edit' }, { key: 'fraction', value: 0.95 }]);
   }
 });
 
@@ -400,8 +443,8 @@ test('delayed full-detail evaluations coalesce and never publish stale controls 
   const box = (await slider.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width - 8, box.y + box.height / 2);
-  await expect(slider).toHaveValue('80');
+  await page.mouse.move(box.x + box.width, box.y + box.height / 2);
+  await expect(slider).toHaveAttribute('aria-valuenow', '80');
   await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.cellSize)).toBe(80);
   await expect(scene(page).locator('rect')).toHaveCount(2);
   await page.mouse.up();
