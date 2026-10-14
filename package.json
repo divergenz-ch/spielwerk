@@ -1,0 +1,35 @@
+{
+  "name": "spielwerk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.12.0 || >=24.0.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test:bootstrap": "npm run build && playwright test tests/workspace/bootstrap.test.ts",
+    "test:workspace": "npm run build && playwright test tests/workspace",
+    "test:integration": "playwright test tests/integration"
+  },
+  "spielwerk": {
+    "setup": "npm ci && npx playwright install chromium",
+    "development": "npm run dev; open the printed local URL.",
+    "staticHosting": "npm run build; serve or publish dist/ using any static HTTP host, including a subdirectory. npm run preview serves dist/ locally. No backend or file:// support is required.",
+    "testContracts": {
+      "test:bootstrap": "Build and run Chromium mount/asset smoke tests against Vite development and plain static HTTP hosting (Python 3 required).",
+      "test:workspace": "Build and run tests/workspace; later foundation tasks add focused tests here.",
+      "test:integration": "Reserved for tests/integration, supplied by final integration. Fails with no tests until that task lands; not a bootstrap acceptance gate."
+    }
+  },
+  "dependencies": {
+    "svelte": "5.57.2"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@playwright/test": "1.64.1",
+    "vite": "8.3.4"
+  }
+}

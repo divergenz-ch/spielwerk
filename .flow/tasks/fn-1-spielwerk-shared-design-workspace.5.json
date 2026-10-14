@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-13T12:55:01.430448Z",
+  "depends_on": [
+    "fn-1-spielwerk-shared-design-workspace.4"
+  ],
+  "id": "fn-1-spielwerk-shared-design-workspace.5",
+  "priority": null,
+  "spec": "fn-1-spielwerk-shared-design-workspace",
+  "spec_path": ".flow/tasks/fn-1-spielwerk-shared-design-workspace.5.md",
+  "status": "todo",
+  "title": "Build grouped controls and fixed/responsive artboard views",
+  "updated_at": "2026-10-13T12:55:01.430448Z"
+}

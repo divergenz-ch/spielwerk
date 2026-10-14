@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-13T12:55:01.798932Z",
+  "depends_on": [
+    "fn-2-spielwerk-parametric-graphic-generators.1"
+  ],
+  "id": "fn-2-spielwerk-parametric-graphic-generators.6",
+  "priority": null,
+  "spec": "fn-2-spielwerk-parametric-graphic-generators",
+  "spec_path": ".flow/tasks/fn-2-spielwerk-parametric-graphic-generators.6.md",
+  "status": "todo",
+  "title": "Deliver Stripe Marquee Rust stripe/text geometry and timing",
+  "updated_at": "2026-10-13T12:55:01.798932Z"
+}

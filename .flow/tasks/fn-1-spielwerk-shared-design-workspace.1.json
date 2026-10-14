@@ -1,0 +1,17 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-13T09:15:26.734901Z",
+  "depends_on": [
+    "fn-1-spielwerk-shared-design-workspace.6"
+  ],
+  "id": "fn-1-spielwerk-shared-design-workspace.1",
+  "implicit_owner": true,
+  "priority": null,
+  "spec": "fn-1-spielwerk-shared-design-workspace",
+  "spec_path": ".flow/tasks/fn-1-spielwerk-shared-design-workspace.1.md",
+  "status": "todo",
+  "title": "Implement Spielwerk shared design workspace",
+  "updated_at": "2026-10-13T13:10:46.601809Z"
+}

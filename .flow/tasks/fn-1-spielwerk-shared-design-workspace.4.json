@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-13T12:55:01.430427Z",
+  "depends_on": [
+    "fn-1-spielwerk-shared-design-workspace.3"
+  ],
+  "id": "fn-1-spielwerk-shared-design-workspace.4",
+  "priority": null,
+  "spec": "fn-1-spielwerk-shared-design-workspace",
+  "spec_path": ".flow/tasks/fn-1-spielwerk-shared-design-workspace.4.md",
+  "status": "todo",
+  "title": "Preserve compatible settings, snapshots, and uploaded typefaces",
+  "updated_at": "2026-10-13T12:55:01.430427Z"
+}
