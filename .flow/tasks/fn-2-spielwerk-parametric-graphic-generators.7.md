@@ -73,7 +73,7 @@ warnings. Generator tasks .1-.6 are done. This releases final catalog
 verification only; it does not itself accept R12 or mark either spec complete.
 The original blocker remains above. No publication/deployment is authorized.
 
-## Done summary
+## Preserved audit failure history
 Blocked:
 # Standards audit provider failure
 
@@ -113,6 +113,14 @@ Gates: focused (full suite not requested)
 
 User-owned tools/arrow-maze.html and tools/arrow-maze.embed.js, untracked
 .pi/ and AGENTS.md remain untouched. No publication or deployment occurred.
+## Audit recovery
+
+Standards retry 0d162699 completed successfully on openai-codex/gpt-6.1-sol
+with zero findings. The earlier correctness result e96bb3c2 remains valid
+for unchanged code at d7729b8. No failed audit was counted as a pass.
+
+## Done summary
+
 ## Evidence
 - Commits:
 - Tests:
