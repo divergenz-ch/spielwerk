@@ -168,7 +168,12 @@ pub fn evaluate(input: Input, font: &[u8]) -> Result<Frame, &'static str> {
             let thick = scale * number(p, "thick", 40.0, 5.0, 100.0) / 100.0;
             let swing = number(p, "swing", 100.0, 0.0, 170.0).to_radians();
             for i in 0..n {
-                let q = (i as f64 + 0.5 + off) / n as f64;
+                // A half-spacing nesting offset cannot displace a band's only anchor.
+                let q = if n == 1 {
+                    0.5
+                } else {
+                    (i as f64 + 0.5 + off) / n as f64
+                };
                 if q >= 1.0 {
                     continue;
                 }
@@ -324,6 +329,31 @@ mod tests {
             first.scene.arrows[0].points,
             evaluate(changed, &[]).unwrap().scene.arrows[0].points
         );
+    }
+    #[test]
+    fn narrow_single_arrow_bands_keep_an_interior_anchor() {
+        for direction in ["left", "right", "up", "down"] {
+            let mut value = input();
+            value.dimensions = if ["left", "right"].contains(&direction) {
+                crate::Dimensions {
+                    width: 8000,
+                    height: 100,
+                }
+            } else {
+                crate::Dimensions {
+                    width: 100,
+                    height: 8000,
+                }
+            };
+            value.params["count"] = serde_json::json!(4);
+            value.params["dirs"] = serde_json::json!([direction]);
+            let frame = evaluate(value, &[]).unwrap();
+            assert!(
+                !frame.scene.arrows.is_empty(),
+                "{direction} bands must retain arrows"
+            );
+            assert!(frame.scene.svg.contains("data-arrow="));
+        }
     }
     #[test]
     fn font_rows_are_baked_and_boundaries_hold() {

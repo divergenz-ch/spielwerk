@@ -30,6 +30,21 @@ for (const tool of ['arrow-poster', 'arrow-comb']) {
     if (tool === 'arrow-comb') expect(new Set(result.profiles.map(p => JSON.stringify(p))).size).toBe(3);
   });
 
+  if (tool === 'arrow-comb') test('arrow-comb: wide short left-only responsive bands still produce visible artwork', async ({ page }) => {
+    await page.goto(url + '#' + tool);
+    const result = await page.evaluate(async () => {
+      const { adapter, artwork } = await import('/src/tools/arrow-comb.ts');
+      const frame = await adapter.evaluate({ design: { toolId: adapter.id, params: { ...adapter.defaults, count: 4, nest: 0, dir_up: false, dir_down: false, dir_left: true, dir_right: false, textTop: '', textMid: '', textBot: '', motion: 'none' }, seed: 42, artboard: { mode: 'responsive', dimensions: { width: 8000, height: 100 } }, assets: [] }, timeSeconds: 0 });
+      const png = await artwork.png!({ frame } as any);
+      const image = await createImageBitmap(png.blob);
+      const canvas = Object.assign(document.createElement('canvas'), { width: image.width, height: image.height });
+      const ctx = canvas.getContext('2d')!; ctx.drawImage(image, 0, 0); image.close();
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      return { arrows: frame.scene.arrows.length, width: canvas.width, height: canvas.height, ink: pixels.some((v, i) => i % 4 !== 3 && v < 100) };
+    });
+    expect(result.arrows).toBe(4); expect(result.width).toBe(8000); expect(result.height).toBe(100); expect(result.ink).toBe(true);
+  });
+
   test(`${tool}: exported SVG motion matches explicit-time Wasm frames`, async ({ page }) => {
     await page.goto(url + '#' + tool);
     const errors = await page.evaluate(async tool => {

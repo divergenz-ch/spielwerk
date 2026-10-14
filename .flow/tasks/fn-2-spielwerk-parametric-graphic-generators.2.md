@@ -75,6 +75,6 @@ stage: completion-review - skipped(policy: other spec tasks remain unfinished)
 
 stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits: 5598cb15a1a99a329698fe481fd9ac571c21909b
-- Tests: cargo +1.98.0 test --locked --manifest-path crates/spielwerk-engine/Cargo.toml tools (8 passed), npm run test:generators (13 passed; builds actual Wasm), npx playwright test tests/workspace/controls.test.ts (4 passed), rustfmt +stable --check --edition 2021 --config skip_children=true crates/spielwerk-engine/src/lib.rs crates/spielwerk-engine/src/tools/mod.rs crates/spielwerk-engine/src/tools/arrow_path.rs crates/spielwerk-engine/src/tools/arrow_poster.rs crates/spielwerk-engine/src/tools/arrow_comb.rs (passed), git diff --check (passed)
+- Commits:
+- Tests:
 - PRs:
