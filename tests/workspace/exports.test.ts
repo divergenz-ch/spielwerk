@@ -63,7 +63,13 @@ test.beforeAll(async () => {
         } };
       } : undefined });
       mount(App, { target: document.body, props: { exporters: { 'internal-export-fixture': handlers }, catalog: [{
-        id: 'internal-export-fixture', name: 'Internal export fixture', description: 'Contract files, not delivered SVG/PNG/GIF encoders', status: 'ready', accent: true, adapter,
+        id: 'internal-export-fixture', name: 'Internal export fixture', description: 'Contract files, not delivered SVG/PNG/GIF encoders', status: 'ready', accent: true, adapter, playback: true,
+        async preview(input) {
+          window.previewInput = input;
+          const frame = await adapter.evaluate(input);
+          if (window.holdPreview === input.design.params.cellSize) await new Promise(resolve => window.releasePreview = resolve);
+          return frame;
+        },
         artboard: { initial: { width: 120, height: 80 }, dimensions: true, presets: [], swap: false, ratioLock: false, handles: [] },
         renderer: { render(frame, target) { target.textContent = frame.scene.rectangles.length + ' full-detail rectangles'; } }
       }] } });
@@ -125,7 +131,7 @@ for (const hosting of ['static', 'service']) {
       const file = await downloaded;
       expect(file.suggestedFilename()).toBe('internal-' + format + '-contract.json');
       records.push(JSON.parse(await readFile((await file.path())!, 'utf8')));
-      await expect(page.getByRole('status', { name: 'Export progress' })).toContainText('browser downloads');
+      await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText(`Download started: internal-${format}-contract.json (browser downloads).`);
     }
     for (const record of records) {
       expect(record.input).toEqual(preview);
@@ -148,7 +154,7 @@ for (const hosting of ['static', 'service']) {
   });
 }
 
-test('progress, visible encoder failure, original typeface bytes, and immutable in-flight fixed request', async ({ page }) => {
+test('pending preview export captures activation-time settings, assets, dimensions and time; failure can retry', async ({ page }) => {
   await start(page);
   let font: Buffer | undefined;
   for (const path of ['/System/Library/Fonts/Supplemental/Arial.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'C:/Windows/Fonts/arial.ttf']) {
@@ -157,15 +163,41 @@ test('progress, visible encoder failure, original typeface bytes, and immutable 
   expect(font, 'A real browser-loadable font is required').toBeDefined();
   for (const slot of ['Primary', 'Accent']) await page.getByLabel(`${slot} typeface`, { exact: true }).setInputFiles({ name: `${slot}.ttf`, mimeType: 'font/ttf', buffer: font! });
   await expect.poll(() => page.evaluate(() => (window as any).inputs.at(-1).design.assets.length)).toBe(2);
-  await page.evaluate(() => { (window as any).hold = true; });
+  await page.getByRole('button', { name: 'Play motion' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).previewInput.timeSeconds)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Pause motion' }).click();
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  await page.evaluate(() => { (window as any).hold = true; (window as any).holdPreview = 20; });
+  await edit(page, 'Cell size exact', '20');
+  await page.waitForFunction(() => (window as any).releasePreview);
+  await expect(page.getByTestId('scene')).toHaveText('6 full-detail rectangles');
+  await expect(page.getByText('Preview is updating. Export captures current settings, dimensions, typefaces and time at activation, not the previous artwork.', { exact: true })).toBeVisible();
+  const activated = await page.evaluate(() => (window as any).previewInput);
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Fixture encoding 1/2');
   await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Output format')).toBeDisabled();
+  await page.getByRole('button', { name: 'Export artwork', exact: true }).evaluate((button: HTMLButtonElement) => button.click());
   await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await edit(page, 'Width', '200');
+  await edit(page, 'Cell size exact', '10');
+  await page.getByRole('button', { name: 'Clear primary typeface' }).click();
+  await page.getByRole('button', { name: 'Play motion' }).click();
   const downloaded = page.waitForEvent('download');
   await page.evaluate(() => (window as any).release());
   const record = JSON.parse(await readFile((await (await downloaded).path())!, 'utf8'));
+  await page.getByRole('button', { name: 'Pause motion' }).click();
+  expect(record.input.design.params).toEqual(activated.design.params);
+  expect(record.input.design.params.cellSize).toBe(20);
+  expect(record.input.timeSeconds).toBe(activated.timeSeconds);
+  expect(record.input.timeSeconds).toBeGreaterThan(0);
+  expect(record.frame.scene.rectangles).toHaveLength(24);
+  expect(await page.evaluate(() => (window as any).encoded.length)).toBe(1);
+  await expect(page.getByTestId('scene')).toHaveText('6 full-detail rectangles');
+  await page.evaluate(() => (window as any).releasePreview());
+  await expect(page.getByTestId('scene')).toHaveText('160 full-detail rectangles');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  await expect(page.getByText('Preview is updating.', { exact: false })).toHaveCount(0);
   expect(record.input.design.artboard).toEqual({ mode: 'fixed', dimensions: { width: 120, height: 80 } });
   expect(record.later.dimensions).toEqual({ width: 120, height: 80 });
   expect(record.input.design.assets.map((a: any) => a.role)).toEqual(['typeface', 'accent-typeface']);
@@ -174,6 +206,14 @@ test('progress, visible encoder failure, original typeface bytes, and immutable 
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveText('Export failed: Error: fixture encoder failure');
   await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeEnabled();
+  await page.evaluate(() => { (window as any).fail = false; });
+  const retry = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
+  const retried = JSON.parse(await readFile((await (await retry).path())!, 'utf8'));
+  expect(retried.input.design.params.cellSize).toBe(10);
+  expect(retried.frame.dimensions).toEqual({ width: 200, height: 80 });
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Download started: internal-svg-contract.json (browser downloads).');
 });
 
 test('folder cancellation retains destination; picker/write permissions fall back to downloads', async ({ page }) => {
@@ -195,7 +235,7 @@ test('folder cancellation retains destination; picker/write permissions fall bac
   await pick.click();
   await expect(page.getByText('Destination: Disposable fixture folder', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
-  await expect(page.getByRole('status', { name: 'Export progress' })).toContainText('Disposable fixture folder');
+  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Saved internal-svg-contract.json to Disposable fixture folder.');
   expect(await page.evaluate(() => (window as any).writeClosed)).toBe(true);
   const writes = await page.evaluate(() => (window as any).writes);
   expect(writes).toHaveLength(1); expect(JSON.parse(writes[0].text).frame.scene.rectangles).toHaveLength(6);
@@ -205,5 +245,6 @@ test('folder cancellation retains destination; picker/write permissions fall bac
   await downloaded;
   await expect(page.getByRole('alert')).toContainText('Folder output failed:');
   await expect(page.getByRole('alert')).toContainText('Used browser download instead.');
+  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Download started: internal-svg-contract.json (browser downloads).');
   await expect(page.getByText('Destination: Disposable fixture folder', { exact: true })).toBeVisible();
 });

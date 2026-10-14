@@ -38,7 +38,7 @@ test.beforeAll(async () => {
     window.catalog = tools;
     window.calls = [];
     const fixture = {
-      id: 'internal-fixture', name: 'Internal engine fixture', description: 'Not a named design tool', status: 'ready', accent: true,
+      id: 'internal-fixture', name: 'Internal engine fixture', description: 'Not a named design tool', status: 'ready', accent: true, playback: true,
       adapter: {
         id: '__fixture__', defaults: { cellSize: 40, fraction: 0.35, ink: '#112233', text: 'proof', enabled: true, style: 'solid' },
         controls: [
@@ -55,11 +55,15 @@ test.beforeAll(async () => {
           window.calls.push(input);
           const frame = await evaluateFixture(input);
           if (window.hold === input.design.params.cellSize) await new Promise(resolve => window.release = resolve);
+          window.finished = (window.finished ?? 0) + 1;
+          if (window.failEvaluation) throw Error('fixture evaluation failure');
           return frame;
         },
       },
       artboard: { initial: { width: 120, height: 80 }, dimensions: true, presets: ['1:1', '2:3'], swap: true, ratioLock: true, handles: ['n','ne','e','se','s','sw','w','nw'] },
       renderer: { render(frame, target) {
+        if (window.failRender) throw Error('fixture renderer failure');
+        window.rendered = (window.rendered ?? 0) + 1;
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('width', frame.dimensions.width); svg.setAttribute('height', frame.dimensions.height);
         svg.setAttribute('viewBox', '0 0 ' + frame.dimensions.width + ' ' + frame.dimensions.height);
@@ -370,6 +374,7 @@ test('delayed full-detail evaluations coalesce and never publish stale controls 
   await page.evaluate(() => { (window as any).hold = 20; });
   await edit(page, 'Cell size exact', '20');
   await page.waitForFunction(() => (window as any).release);
+  await expect(page.getByTestId('preview-status')).toContainText('Updating full-detail preview — showing previous artwork');
   await edit(page, 'Cell size exact', '10');
   await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await edit(page, 'Width', '200');
@@ -383,10 +388,74 @@ test('delayed full-detail evaluations coalesce and never publish stale controls 
   });
   await expect(scene(page).locator('rect')).toHaveCount(10);
   await expect(page.getByRole('status')).toContainText('200 × 80');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  await expect(page.getByTestId('preview-status')).not.toContainText('previous');
   expect(await page.evaluate(() => (window as any).counts)).toEqual([10]);
   const calls = await page.evaluate(() => (window as any).calls);
   expect(calls.slice(-2).map((call: any) => call.design.params.cellSize)).toEqual([20, 40]);
   expect(calls.at(-1).design.params.cellSize).toBe(40);
   expect(calls.at(-1).design.artboard.dimensions).toEqual({ width: 200, height: 80 });
   expect(calls.every((call: any) => !('zoom' in call.design.params) && !('pan' in call.design.params) && call.timeSeconds === 0)).toBe(true);
+  const slider = page.getByRole('slider', { name: 'Cell size', exact: true });
+  const box = (await slider.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 8, box.y + box.height / 2);
+  await expect(slider).toHaveValue('80');
+  await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.cellSize)).toBe(80);
+  await expect(scene(page).locator('rect')).toHaveCount(3);
+  await page.mouse.up();
+});
+
+for (const failure of ['failEvaluation', 'failRender']) {
+  test(`${failure} retains artwork until a successful current render and navigation disposes pending work`, async ({ page }) => {
+    await page.evaluate(() => (window as any).start());
+    await expect(scene(page).locator('rect')).toHaveCount(6);
+    const original = await scene(page).innerHTML();
+    await page.evaluate(failure => { (window as any)[failure] = true; }, failure);
+    await edit(page, 'Cell size exact', '20');
+    await expect(page.getByRole('alert')).toContainText(failure === 'failEvaluation' ? 'fixture evaluation failure' : 'fixture renderer failure');
+    await expect(page.getByTestId('preview-status')).toContainText('Preview failed — showing previous artwork');
+    expect(await scene(page).innerHTML()).toBe(original);
+    await page.evaluate(failure => { (window as any)[failure] = false; (window as any).hold = 10; }, failure);
+    await edit(page, 'Cell size exact', '10');
+    await page.waitForFunction(() => (window as any).release);
+    await expect(page.getByTestId('preview-status')).toContainText('Updating full-detail preview — showing previous artwork');
+    await expect(page.getByRole('alert')).toBeVisible();
+    expect(await scene(page).innerHTML()).toBe(original);
+    await page.evaluate(() => (window as any).release());
+    await expect(scene(page).locator('rect')).toHaveCount(96);
+    await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.evaluate(() => { (window as any).hold = 20; (window as any).release = undefined; });
+    await edit(page, 'Cell size exact', '20');
+    await page.waitForFunction(() => (window as any).release);
+    await page.getByLabel('Tool', { exact: true }).selectOption('internal-fixed-fixture');
+    await expect(scene(page).locator('rect')).toHaveCount(6);
+    const rendered = await page.evaluate(() => (window as any).rendered);
+    const finished = await page.evaluate(() => (window as any).finished);
+    await page.evaluate(() => (window as any).release());
+    await expect.poll(() => page.evaluate(() => (window as any).finished)).toBe(finished + 1);
+    expect(await page.evaluate(() => (window as any).rendered)).toBe(rendered);
+    await expect(scene(page).locator('rect')).toHaveCount(6);
+    await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  });
+}
+
+test('playback renders full detail without frame-by-frame live announcements', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  await expect(scene(page).locator('rect')).toHaveCount(6);
+  await page.getByRole('button', { name: 'Play motion' }).click();
+  await expect(page.getByRole('status', { name: 'Preview status' })).toHaveText('Motion playing. Full-detail preview updates continuously.');
+  const rendered = await page.evaluate(() => {
+    (window as any).announcements = [];
+    const live = document.querySelector('[role=status][aria-label="Preview status"]')!;
+    new MutationObserver(() => (window as any).announcements.push(live.textContent)).observe(live, { childList: true, characterData: true, subtree: true });
+    return (window as any).rendered;
+  });
+  await expect.poll(() => page.evaluate(() => (window as any).rendered)).toBeGreaterThan(rendered + 10);
+  expect(await page.evaluate(() => (window as any).announcements)).toEqual([]);
+  await page.getByRole('button', { name: 'Pause motion' }).click();
+  await expect(page.getByRole('status', { name: 'Preview status' })).toContainText('Preview current');
+  await expect(scene(page).locator('rect')).toHaveCount(6);
 });
