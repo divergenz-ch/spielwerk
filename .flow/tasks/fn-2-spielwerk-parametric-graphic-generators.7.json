@@ -1,7 +1,4 @@
 {
-  "assignee": null,
-  "claim_note": "",
-  "claimed_at": null,
   "created_at": "2026-10-13T12:55:01.798951Z",
   "depends_on": [
     "fn-2-spielwerk-parametric-graphic-generators.1",
@@ -17,5 +14,5 @@
   "spec_path": ".flow/tasks/fn-2-spielwerk-parametric-graphic-generators.7.md",
   "status": "todo",
   "title": "Verify the complete generator catalog with delivered website embeds",
-  "updated_at": "2026-10-13T12:55:01.798951Z"
+  "updated_at": "2026-10-14T19:07:35.905595Z"
 }

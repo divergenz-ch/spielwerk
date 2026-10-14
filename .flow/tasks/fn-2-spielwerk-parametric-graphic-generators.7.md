@@ -8,7 +8,7 @@ Verify the complete catalog only after the separate embed runtime delivers its a
 
 **Size:** M
 **Files:** `src/tools/registry.ts`, `tests/generators/catalog.test.ts`, `tests/integration/generators.spec.ts`
-**Touches:** [src/tools/registry.ts, tests/generators/catalog.test.ts, tests/integration/generators.spec.ts]
+**Touches:** [src/tools/registry.ts, tests/generators/catalog.test.ts, tests/integration/generators.spec.ts, src/main.ts]
 
 ### Approach
 
@@ -44,7 +44,7 @@ an authorized reset; no cross-spec automatic release is implied.
 - [ ] Each applicable SVG/PNG/GIF export matches selected preview dimensions/layout and retains supported typefaces/motion; unsupported formats stay unavailable and export failures are visible.
 - [ ] A verified final receipt covers every fn-2 R-ID, including actual R12 delivery; fixture interfaces or module declarations alone are not acceptance.
 
-## Done summary
+## Preserved block history
 Blocked:
 # Actual website embed delivery prerequisite
 
@@ -60,6 +60,21 @@ and limitations before authorized release; preserve this block history before
 reset. No interfaces, placeholders, or planned gates count as actual embeds.
 
 Planning grants no implementation/release/completion authority.
+## Release verification
+
+The user delegated milestone release decisions. All fn-5 tasks .1-.3 now
+report done with real independent-host ZIP/runtime/Wasm/font evidence;
+every evidence commit is reachable in this checkout. Final measured embed
+verification passed 42 cases (.flow/tmp/fn5-verified-embeds.log). Both quality
+audit correctness findings are fixed with regression tests. One optional
+fixture refactor is deferred. Completion review is explicitly skipped by
+configured backend none, not an independent SHIP. fn-5 validates without
+warnings. Generator tasks .1-.6 are done. This releases final catalog
+verification only; it does not itself accept R12 or mark either spec complete.
+The original blocker remains above. No publication/deployment is authorized.
+
+## Done summary
+
 ## Evidence
 - Commits:
 - Tests:
