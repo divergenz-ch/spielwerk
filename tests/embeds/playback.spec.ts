@@ -83,6 +83,29 @@ for (const id of tools) test(`${id}: package-element modes, host clock and brows
   expect(errors).toEqual([]);
 });
 
+for (const id of ['arrow-poster', 'arrow-comb', 'imprint']) test(`${id}: playback overrides normalize draw/grow geometry, not only the clock`, async ({ page, packages }) => {
+  const prefix = id === 'imprint' ? 'grow' : 'draw';
+  await openPackage(page, packages.origins[0], id, { playback: 'loop' });
+  const configure = async (motion: string) => page.evaluate(async motion => {
+    const el = document.querySelector('spielwerk-artwork') as any;
+    const config = JSON.parse(el.querySelector('script').textContent);
+    config.params.motion = motion;
+    config.assets = await Promise.all(config.assets.map(async ({ url, ...asset }: any) => ({ ...asset, bytes: new Uint8Array(await (await fetch(url)).arrayBuffer()) })));
+    await el.setConfig(config); await el.pause();
+  }, motion);
+  await configure(`${prefix} in`);
+  const early = await seek(page, 0.125);
+  const repeated = await seek(page, early.durationSeconds + 0.125);
+  expect(repeated.svg === early.svg, 'Loop override must repeat an originally one-shot design').toBe(true);
+  await openPackage(page, packages.origins[0], id, { playback: 'once' });
+  await configure(`${prefix} in`);
+  const duration = (await state(page)).durationSeconds;
+  const complete = await seek(page, duration);
+  await configure(`${prefix} loop`);
+  const overridden = await seek(page, duration);
+  expect(overridden.svg === complete.svg, 'Once override must finish the same geometry as draw/grow in').toBe(true);
+});
+
 test('Maze package in-view restarts on re-entry, but explicit pause survives visibility and media transitions', async ({ page, packages }) => {
   await openPackage(page, packages.origins[0], 'arrow-maze', { playback: 'in-view' });
   await command(page, 'pause');

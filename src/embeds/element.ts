@@ -15,7 +15,12 @@ export class SpielwerkArtwork extends HTMLElement {
   disconnectedCallback() { ++this.revision; this.runtime?.destroy(); this.runtime = undefined; }
   private async load(revision: number) {
     const source = this.getAttribute('config-src');
-    const base = source ? new URL(source, document.baseURI).href : import.meta.url;
+    // Each reusable snippet keeps its module immediately before its artwork.
+    // Custom-element registration is shared across packages, but font bases aren't.
+    const script = this.previousElementSibling;
+    const runtimeUrl = script instanceof HTMLScriptElement && script.type === 'module' && script.src
+      ? script.src : import.meta.url;
+    const base = source ? new URL(source, document.baseURI).href : runtimeUrl;
     const config: Configuration = source
       ? await (await fetch(base)).json()
       : JSON.parse(this.querySelector('script[type="application/json"]')!.textContent!);

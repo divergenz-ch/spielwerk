@@ -63,7 +63,11 @@ export class EmbedRuntime {
   private input(timeSeconds: number) {
     const params = { ...this.design.params };
     if (this.clock.static) params.motion = 'none';
-    else if (this.design.toolId === maze.id) params.motion = this.clock.mode === 'loop' ? 'draw loop' : 'draw in';
+    else if (this.design.toolId === maze.id || (['arrow-poster', 'arrow-comb'].includes(this.design.toolId) && params.motion !== 'none')) {
+      params.motion = this.clock.mode === 'loop' ? 'draw loop' : 'draw in';
+    } else if (this.design.toolId === 'imprint' && ['grow in', 'grow loop'].includes(String(params.motion))) {
+      params.motion = this.clock.mode === 'loop' ? 'grow loop' : 'grow in';
+    }
     if (this.design.toolId === maze.id) {
       params.wpx = this.design.artboard.dimensions.width;
       params.hpx = this.design.artboard.dimensions.height;
@@ -89,7 +93,11 @@ export class EmbedRuntime {
     svg.querySelectorAll('animate, animateTransform, animateMotion, set').forEach(node => node.remove());
     fitSvg(svg, this.fit, frame.dimensions);
     this.host.dispatchEvent(new CustomEvent('spielwerk:frame', { detail: frame }));
-    if (this.clock.active) this.raf = requestAnimationFrame(() => { void this.redraw(); });
+    // Evaluation may cross the once-mode deadline while an earlier frame is
+    // being computed. Publish the completed frame before stopping the RAF loop.
+    const needsFinalFrame = ['once', 'in-view'].includes(this.clock.mode) && !this.clock.static
+      && frame.timeSeconds < frame.durationSeconds && this.clock.frameTime() >= frame.durationSeconds;
+    if (this.clock.active || needsFinalFrame) this.raf = requestAnimationFrame(() => { void this.redraw(); });
     return frame;
   }
   play() { this.clock.play(); return this.redraw(); }

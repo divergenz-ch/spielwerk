@@ -8,7 +8,7 @@ Establish the real independent-host delivery receipt that releases generator fin
 
 **Size:** M
 **Files:** `tests/embeds/hosts.spec.ts`, `tests/embeds/playback.spec.ts`, `src/embeds/packages.ts`
-**Touches:** [tests/embeds/hosts.spec.ts, tests/embeds/playback.spec.ts, tests/embeds/package-fixture.ts, tests/embeds/packages.test.ts, src/embeds/packages.ts]
+**Touches:** [tests/embeds/hosts.spec.ts, tests/embeds/playback.spec.ts, tests/embeds/package-fixture.ts, tests/embeds/packages.test.ts, src/embeds/**]
 
 ### Approach
 

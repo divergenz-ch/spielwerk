@@ -154,6 +154,41 @@ for (const id of tools) test(`${id}: actual workspace ZIP, local fonts, inert in
   expect(errors).toEqual([]);
 });
 
+test('two independently fonted packages share a page without sharing their font base', async ({ page }) => {
+  const first = await readFile('tests/generators/fixtures/outline.ttf');
+  let second: Buffer | undefined;
+  for (const candidate of ['/System/Library/Fonts/Supplemental/Arial.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'C:/Windows/Fonts/arial.ttf']) {
+    try { second = await readFile(candidate); break; } catch { /* next platform */ }
+  }
+  expect(second, 'Distinct font required for package isolation').toBeDefined();
+  const snippets: string[] = [], expected: string[] = [];
+  for (const [index, font] of [first, second!].entries()) {
+    await open(page, 'stripe-marquee');
+    await page.getByLabel('Text', { exact: true }).fill('A');
+    await page.getByLabel('Primary typeface', { exact: true }).setInputFiles({ name: `face-${index}.ttf`, mimeType: 'font/ttf', buffer: font });
+    await expect(page.getByText(`face-${index}.ttf`, { exact: true })).toBeVisible();
+    // Export captures and evaluates the same immutable input at time zero.
+    const exported = await download(page);
+    const folder = `mixed-${index}`;
+    extract(exported.bytes, join(directory, 'packages', folder));
+    const snippet = await readFile(join(directory, 'packages', folder, 'snippet.html'), 'utf8');
+    snippets.push(snippet.replace('src="./runtime.js"', `src="./${folder}/runtime.js"`));
+    await page.goto(packageUrl + `${folder}/index.html`);
+    await page.waitForFunction(() => (document.querySelector('spielwerk-artwork') as any)?.frame);
+    await page.evaluate(() => { const el = document.querySelector('spielwerk-artwork') as HTMLElement; el.style.width = '600px'; el.style.height = '800px'; });
+    await expect(page.locator('spielwerk-artwork svg')).toHaveAttribute('viewBox', '0 0 600 800');
+    expected.push(await page.evaluate(async () => { const el = document.querySelector('spielwerk-artwork') as any; await el.pause(); return (await el.seek(0)).scene.svg; }));
+  }
+  expect(expected[0] === expected[1], 'Distinct outlines must produce distinct geometry').toBe(false);
+  await writeFile(join(directory, 'packages', 'mixed.html'), `<!doctype html><meta charset="utf-8">${snippets.join('\n')}`);
+  await page.goto(packageUrl + 'mixed.html');
+  await page.waitForFunction(() => [...document.querySelectorAll('spielwerk-artwork')].every((el: any) => el.frame));
+  await page.evaluate(() => document.querySelectorAll('spielwerk-artwork').forEach((el: HTMLElement) => { el.style.width = '600px'; el.style.height = '800px'; }));
+  for (const svg of await page.locator('spielwerk-artwork svg').all()) await expect(svg).toHaveAttribute('viewBox', '0 0 600 800');
+  const actual = await page.evaluate(async () => Promise.all([...document.querySelectorAll('spielwerk-artwork')].map(async (el: any) => { await el.pause(); return (await el.seek(0)).scene.svg; })));
+  expect(actual.map((svg, index) => svg === expected[index]), 'Each element must retain its own exported font geometry').toEqual([true, true]);
+});
+
 test('package progress, immutable design, runtime fetch failure and recovery through workspace downloads', async ({ page }) => {
   await open(page, 'arrow-maze');
   let release!: () => void;

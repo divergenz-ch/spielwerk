@@ -21,7 +21,9 @@ export function templates(design: DesignState<Parameters>, assets: { id: string;
 <body>${snippet}</body></html>`;
   const instructions = `Serve this extracted folder over HTTP (not file://). Open index.html for the demo.
 Copy snippet.html into your website. Point its module script src to the runtime.js
-in this folder; keep assets/ and fonts/ beside runtime.js. No editor, backend,
+in this folder; keep the module script immediately before its artwork element,
+and keep assets/ and fonts/ beside runtime.js. This preserves separate font bases
+when multiple exported packages share a page. No editor, backend,
 CDN, or build tool is needed on your website. Your host CSS controls the artwork
 box; without a height it keeps the exported artboard proportions.
 
