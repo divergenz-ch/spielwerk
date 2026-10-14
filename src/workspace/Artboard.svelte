@@ -18,8 +18,15 @@
   let view = $state<Parameters>(initial.view);
   let assets = $state<Asset[]>([]);
   let displayed = $state<Frame<unknown>>();
-  let busy = $state(false);
+  let busy = $state(true);
   let error = $state('');
+  const previewStatus = $derived(busy ? 'updating' : error ? 'failed' : 'current');
+  const previewMessage = $derived((busy
+    ? `Updating full-detail preview — ${displayed ? 'showing previous artwork' : 'no artwork yet'}.`
+    : error
+      ? `Preview failed — ${displayed ? 'showing previous artwork' : 'no artwork available'}.`
+      : 'Preview current — full detail.')
+    + (displayed ? ` · ${displayed.dimensions.width} × ${displayed.dimensions.height}` : ''));
   let surface: HTMLDivElement;
   let container: HTMLDivElement;
   let stage: HTMLDivElement;
@@ -119,6 +126,7 @@
         tool.renderer.render(frame, target);
         surface.replaceChildren(target);
         displayed = frame;
+        error = '';
         busy = false;
       } catch (cause) { error = String(cause); busy = false; }
     },
@@ -133,7 +141,7 @@
   });
   $effect(() => {
     const request = { input, pointer };
-    untrack(() => { busy = true; error = ''; evaluator.request(request); });
+    untrack(() => { busy = true; evaluator.request(request); });
   });
   onMount(() => {
     persist();
@@ -218,7 +226,7 @@
   <aside aria-label="Design controls">
     <Controls controls={tool.adapter.controls} defaults={tool.adapter.defaults} {params} {expandedGroups}
       onchange={setParam} onexpand={(group, open) => { if (expandedGroups.includes(group) !== open) setView({ expandedGroups: open ? [...expandedGroups, group] : expandedGroups.filter(g => g !== group) }); }} />
-    <ExportPanel adapter={tool.adapter} {handlers} {input} {destination} />
+    <ExportPanel adapter={tool.adapter} {handlers} {input} {destination} {previewStatus} />
     <details class="artboard-options">
       <summary>Artboard</summary>
       <div class="artboard-fields">
@@ -247,8 +255,9 @@
       <button onclick={() => setView({ pan: { x: 0, y: 0 } })}>Reset pan</button>
       {#if tool.playback}<button onclick={play}>{playing ? 'Pause motion' : 'Play motion'}</button>{/if}
     </div>
-    <p role="status">{busy ? 'Updating full-detail preview…' : 'Full-detail preview'}{#if displayed} · {displayed.dimensions.width} × {displayed.dimensions.height}{/if}</p>
-    {#if error}<p role="alert">{error}</p>{/if}
+    <p data-testid="preview-status">{previewMessage}</p>
+    <p class="announcement" role="status" aria-label="Preview status">{playing ? (error ? 'Preview failed. Previous artwork may be retained.' : 'Motion playing. Full-detail preview updates continuously.') : previewMessage}</p>
+    {#if error}<p role="alert">Last preview error: {error}</p>{/if}
     <div class="stage" bind:this={stage} role="region" aria-label="Pan preview with Space and drag"
       onpointerleave={() => pointer = undefined} onpointerdown={event => { pointer = undefined; start(event); }} onpointermove={move} onpointerup={releasePointer} onpointercancel={() => { if (drag?.handle) setSize(drag.size); finishPointer(true); }}>
       <div class="container" bind:this={container} data-testid="preview-container"
@@ -281,6 +290,7 @@
   section { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
   .view-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
   section p { margin: .5rem 0; font-size: .875rem; }
+  .announcement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .stage { flex: 1; min-height: 0; overflow: auto; background: #d6d4cf; padding: 24px; }
   @media (max-width: 48rem) {
     .editor { grid-template-columns: minmax(0, 1fr); }

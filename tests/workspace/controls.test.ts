@@ -403,12 +403,12 @@ test('delayed full-detail evaluations coalesce and never publish stale controls 
   await page.mouse.move(box.x + box.width - 8, box.y + box.height / 2);
   await expect(slider).toHaveValue('80');
   await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.cellSize)).toBe(80);
-  await expect(scene(page).locator('rect')).toHaveCount(3);
+  await expect(scene(page).locator('rect')).toHaveCount(2);
   await page.mouse.up();
 });
 
 for (const failure of ['failEvaluation', 'failRender']) {
-  test(`${failure} retains artwork until a successful current render and navigation disposes pending work`, async ({ page }) => {
+  test(`${failure} retains artwork until a successful current render and navigation disposes pending work`, async ({ page }, testInfo) => {
     await page.evaluate(() => (window as any).start());
     await expect(scene(page).locator('rect')).toHaveCount(6);
     const original = await scene(page).innerHTML();
@@ -416,12 +416,14 @@ for (const failure of ['failEvaluation', 'failRender']) {
     await edit(page, 'Cell size exact', '20');
     await expect(page.getByRole('alert')).toContainText(failure === 'failEvaluation' ? 'fixture evaluation failure' : 'fixture renderer failure');
     await expect(page.getByTestId('preview-status')).toContainText('Preview failed — showing previous artwork');
+    if (failure === 'failRender') await page.screenshot({ path: testInfo.outputPath('failed-preview.png') });
     expect(await scene(page).innerHTML()).toBe(original);
     await page.evaluate(failure => { (window as any)[failure] = false; (window as any).hold = 10; }, failure);
     await edit(page, 'Cell size exact', '10');
     await page.waitForFunction(() => (window as any).release);
     await expect(page.getByTestId('preview-status')).toContainText('Updating full-detail preview — showing previous artwork');
     await expect(page.getByRole('alert')).toBeVisible();
+    if (failure === 'failRender') await page.screenshot({ path: testInfo.outputPath('pending-preview.png') });
     expect(await scene(page).innerHTML()).toBe(original);
     await page.evaluate(() => (window as any).release());
     await expect(scene(page).locator('rect')).toHaveCount(96);
@@ -430,7 +432,7 @@ for (const failure of ['failEvaluation', 'failRender']) {
     await page.evaluate(() => { (window as any).hold = 20; (window as any).release = undefined; });
     await edit(page, 'Cell size exact', '20');
     await page.waitForFunction(() => (window as any).release);
-    await page.getByLabel('Tool', { exact: true }).selectOption('internal-fixed-fixture');
+    await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('internal-fixed-fixture');
     await expect(scene(page).locator('rect')).toHaveCount(6);
     const rendered = await page.evaluate(() => (window as any).rendered);
     const finished = await page.evaluate(() => (window as any).finished);

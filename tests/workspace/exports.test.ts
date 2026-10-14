@@ -67,6 +67,7 @@ test.beforeAll(async () => {
         async preview(input) {
           window.previewInput = input;
           const frame = await adapter.evaluate(input);
+          if (window.failPreview) throw Error('fixture preview failure');
           if (window.holdPreview === input.design.params.cellSize) await new Promise(resolve => window.releasePreview = resolve);
           return frame;
         },
@@ -154,6 +155,47 @@ for (const hosting of ['static', 'service']) {
   });
 }
 
+test('built app edit, restore and actual SVG download retain deterministic artwork and embed guidance', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(staticUrl + 'app/#arrow-maze');
+  await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
+  await edit(page, 'Seed exact', '84');
+  await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
+  await edit(page, 'Width', '640');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  const artwork = await page.getByTestId('scene').innerHTML();
+  await page.locator('summary').filter({ hasText: /^Snapshots$/ }).click();
+  await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Load snapshot 1', exact: true })).toBeEnabled();
+  await edit(page, 'Seed exact', '126');
+  await page.getByRole('button', { name: 'Load snapshot 1', exact: true }).click();
+  await expect(page.getByLabel('Seed exact', { exact: true })).toHaveValue('84');
+  await expect(page.getByTestId('scene')).toHaveJSProperty('innerHTML', artwork);
+  await expect(page.getByLabel('Output format')).toHaveValue('svg');
+  const downloaded = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
+  const file = await downloaded;
+  expect(file.suggestedFilename()).toMatch(/\.svg$/);
+  await file.saveAs(testInfo.outputPath('arrow-maze.svg'));
+  const text = await readFile((await file.path())!, 'utf8');
+  const comparison = await page.evaluate(text => {
+    const exported = new DOMParser().parseFromString(text, 'image/svg+xml');
+    const preview = document.querySelector('[data-testid=scene] svg')!;
+    const geometry = (root: ParentNode) => Array.from(root.querySelectorAll('path, rect, text')).map(node => new XMLSerializer().serializeToString(node));
+    return { error: Boolean(exported.querySelector('parsererror')), width: exported.documentElement.getAttribute('width'),
+      exported: geometry(exported), preview: geometry(preview) };
+  }, text);
+  expect(comparison.error).toBe(false);
+  expect(comparison.width).toBe('640');
+  expect(comparison.exported.length).toBeGreaterThan(0);
+  expect(comparison.exported).toEqual(comparison.preview);
+  await expect(page.getByRole('status', { name: 'Export progress' })).toContainText('Download started:');
+  await expect(page.getByRole('status', { name: 'Export progress' })).not.toContainText('Saved');
+  await page.screenshot({ path: testInfo.outputPath('built-export.png') });
+  await page.getByLabel('Output format').selectOption('embed');
+  await expect(page.getByText('Extract the ZIP and serve its demo or copy its website snippet. Keep the included runtime, Wasm, and fonts together.', { exact: true })).toBeVisible();
+});
+
 test('pending preview export captures activation-time settings, assets, dimensions and time; failure can retry', async ({ page }) => {
   await start(page);
   let font: Buffer | undefined;
@@ -214,6 +256,15 @@ test('pending preview export captures activation-time settings, assets, dimensio
   expect(retried.frame.dimensions).toEqual({ width: 200, height: 80 });
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Download started: internal-svg-contract.json (browser downloads).');
+  await page.evaluate(() => { (window as any).failPreview = true; });
+  await edit(page, 'Cell size exact', '15');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview failed — showing previous artwork');
+  await expect(page.getByText('Preview failed. Export captures current settings, dimensions, typefaces and time at activation, not the previous artwork.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeEnabled();
+  await page.evaluate(() => { (window as any).failPreview = false; });
+  await edit(page, 'Cell size exact', '10');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  await expect(page.getByText('Preview failed. Export captures', { exact: false })).toHaveCount(0);
 });
 
 test('folder cancellation retains destination; picker/write permissions fall back to downloads', async ({ page }) => {
