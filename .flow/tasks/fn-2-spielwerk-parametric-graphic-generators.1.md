@@ -8,7 +8,7 @@ Port the maze layout/time calculations and font-aware placement through the shar
 
 **Size:** M
 **Files:** `crates/spielwerk-engine/src/tools/mod.rs`, `crates/spielwerk-engine/src/tools/arrow_maze.rs`, `src/tools/arrow-maze.ts`, `tests/generators/arrow-maze.test.ts`
-**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/arrow_maze.rs, src/tools/arrow-maze.ts, tests/generators/arrow-maze.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock]
+**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/arrow_maze.rs, src/tools/arrow-maze.ts, tests/generators/arrow-maze.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock, package.json, src/engine/client.ts, src/main.ts, src/workspace/view.ts, src/workspace/Artboard.svelte, tests/workspace/bootstrap.test.ts]
 
 ### Approach
 
@@ -88,6 +88,100 @@ prove interfaces, not named-tool computations or real artwork codecs.
 This releases only the foundation prerequisite. fn-3 and fn-4 become
 eligible, but no workers for those specs are authorized in this run.
 The fn-1 final owner, fn-2 final catalog, and fn-5 embed gates stay blocked.
+
+### Preserved startup block history
+
+The startup observations are retained below before the authorized reset.
+
+Blocked:
+# Workspace foundation prerequisite
+
+This generator entry task is blocked until
+fn-1-spielwerk-shared-design-workspace.2 through .6 have actual verified done
+receipts for static Svelte serving, real Rust/Wasm boundary, compatible
+saved-work/font state, grouped controls/artboards, and output orchestration.
+
+Verify done statuses, relevant implementation commit ranges present here,
+focused test results, applicable review receipts/configuration skips, and
+limitations before an authorized release. Preserve this block history before
+reset. Final fn-1.1 is not a prerequisite; foundation is an intermediate
+handoff and does not complete the workspace.
+
+No implementation evidence exists and no release is authorized by planning.
+
+Blocked:
+# Generator startup gate unavailable
+
+BLOCKED: TOOLING_FAILURE
+Task: fn-2-spielwerk-parametric-graphic-generators.1
+Summary: Foundation release passed, but the planned focused generator gates
+are not established in the delivered foundation checkout.
+Impact: No fn-2 writer was dispatched; generator implementation has not begun.
+Suggested resolution: Authorize a bounded generator-harness bootstrap with
+package.json in the declared write surface, establish real browser and Rust
+generator checks, then resume the Arrow Maze proof point.
+
+Measured before any application edit at HEAD
+`160bbc2446cbf073e51d47675df7d82f12086995`:
+
+- `npm run test:generators` exited 1: missing script `test:generators`.
+  Full log: `.flow/tmp/release-20261014/generator-gate-baseline.log`.
+- `cargo test --manifest-path crates/spielwerk-engine/Cargo.toml tools`
+  exited 0 but collected 0 tests, with 3 workspace cases filtered out.
+  This is inconclusive, not a passing generator gate.
+  Full log: `.flow/tmp/release-20261014/rust-tools-baseline.log`.
+- `flowctl ready --spec fn-2-spielwerk-parametric-graphic-generators --json`
+  showed .1 ready after the receipt-checked foundation release.
+- `flowctl spec chain` reported eligible with no open dependency.
+
+The historical foundation blocker and verified release evidence remain in
+this task's preserved-history and authorized-release sections. This new
+block is startup tooling, not a reversal of the foundation receipt check.
+fn-3.1 and fn-4.1 remain eligible without implementation dispatch. fn-1.1,
+fn-2.7, and fn-5.1 remain blocked on their original final-delivery gates.
+No generator work, review verdict, completion, publication, or deployment
+is claimed. The existing Arrow Maze edits are untouched.
+
+stage: work - failed(TOOLING_FAILURE: focused generator harness unavailable)
+stage: impl-review - skipped(config: review.backend=none; no implementation)
+
+### Approved harness bootstrap and implementation bindings
+
+The user replied "Ok i approve" to the request to approve generator-harness
+bootstrap, including package.json in this task's write scope, then resume
+Arrow Maze. This releases the startup tooling block, not downstream gates.
+
+- Add the real focused generator command in package.json. Its gate must build
+  the actual Wasm and collect generator browser cases. Zero-case collection
+  is not a pass. Keep the missing-command and zero-Rust-test baseline
+  observations as unavailable/inconclusive; do not relabel them green.
+- Establish this tooling in a distinct bootstrap change, before the feature
+  implementation. Red tests of the requested Arrow Maze behavior are valid
+  pre-fix evidence, not permission to weaken tests or claim a green baseline.
+- Use real tools-filtered Rust cases and the browser user surface to prove
+  Arrow Maze, not the existing internal fixture as a substitute.
+- src/engine/client.ts may expose the actual Arrow Maze Wasm call while
+  preserving fixture behavior. src/main.ts may supply its ready registration
+  and artwork handlers through App's existing catalog/exporter props; leave
+  all other named tools pending. Final eight-tool registry integration remains
+  with .7. Avoid changing App or the pending registry when existing props fit.
+- src/workspace/view.ts and Artboard.svelte may provide the minimal optional
+  interaction/playback binding needed for tool-owned word dragging and preview
+  draw-in motion. The artboard still owns saved parameters, fonts, dimensions,
+  and view state. Rust still owns calculations and explicit-time evaluation;
+  do not maintain a second hidden design in the renderer. Existing adapters
+  without these bindings must keep their behavior.
+- tests/workspace/bootstrap.test.ts may update the deliberate root-content
+  expectation from pending-only shell to actual Arrow Maze. Preserve hosting,
+  asset, console, storage-exclusion, and unavailable-tool assertions by testing
+  the delivered root behavior, not deleting the checks for convenience.
+- Keep font-aware text and actual supported SVG/PNG/GIF outputs within this
+  tool handoff. Do not declare an encoder ready from a request fixture alone.
+  No fn-5 website package or fn-2 R12 delivery is claimed here.
+
+The additional write paths are the necessary existing foundation consumer
+seams for the original Arrow Maze acceptance, not new product scope.
+The task remains a serial writer because it shares the Rust entry point.
 
 ## Done summary
 Blocked:
