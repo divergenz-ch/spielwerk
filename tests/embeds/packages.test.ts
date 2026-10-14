@@ -72,7 +72,7 @@ for (const id of tools) test(`${id}: actual workspace ZIP, local fonts, inert in
     const fontless = await page.getByTestId('scene').locator('svg').evaluate(svg => svg.outerHTML);
     await page.getByLabel('Primary typeface', { exact: true }).setInputFiles({ name: 'face </script> & " Ω.ttf', mimeType: 'font/ttf', buffer: font });
     await expect(page.getByText('face </script> & " Ω.ttf', { exact: true })).toBeVisible();
-    await expect.poll(() => page.getByTestId('scene').locator('svg').evaluate(svg => svg.outerHTML)).not.toBe(fontless);
+    await expect.poll(async () => (await page.getByTestId('scene').locator('svg').evaluate(svg => svg.outerHTML)) !== fontless, { message: 'Uploaded primary font must change actual SVG geometry' }).toBe(true);
     if (id === 'arrow-maze') {
       for (const candidate of ['/System/Library/Fonts/Supplemental/Arial.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'C:/Windows/Fonts/arial.ttf']) {
         try { accent = await readFile(candidate); break; } catch { /* next platform */ }
@@ -80,7 +80,7 @@ for (const id of tools) test(`${id}: actual workspace ZIP, local fonts, inert in
       expect(accent, 'A distinct browser-loadable accent font is required').toBeDefined();
       const primaryOnly = await page.getByTestId('scene').locator('svg').evaluate(svg => svg.outerHTML);
       await page.getByLabel('Accent typeface', { exact: true }).setInputFiles({ name: 'accent & Ω.ttf', mimeType: 'font/ttf', buffer: accent! });
-      await expect.poll(() => page.getByTestId('scene').locator('svg').evaluate(svg => svg.outerHTML)).not.toBe(primaryOnly);
+      await expect.poll(async () => (await page.getByTestId('scene').locator('svg').evaluate(svg => svg.outerHTML)) !== primaryOnly, { message: 'Uploaded accent font must change actual SVG geometry' }).toBe(true);
     }
   }
   await expect(page.getByTestId('scene').locator('svg')).toHaveAttribute('viewBox', '0 0 600 800');
