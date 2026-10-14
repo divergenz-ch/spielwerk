@@ -47,9 +47,34 @@ as sufficient evidence for concurrent writers.
 - [ ] The handoff identifies delivered responsive/time/font capabilities and remaining website-runtime work. It does not mark fn-2 R12 delivered before fn-5.
 
 ## Done summary
-TBD
+Delivered Arrow Poster and Arrow Comb as registered Rust/Wasm calculations
+with Svelte controls and explicit-time playback. Poster has seeded grid
+placement, five shapes, stacked contours, and workspace-only raise-on-arrow
+ordering. Comb has fan/wave/swirl bands, nesting/directions, tapered tails,
+and optional uploaded-font rows baked into paths.
 
+Both tools adapt to fixed/responsive artboards within 100–8000 px limits and
+export animated SVG, selected-time still PNG, and cycle GIF. Shared raster
+encoders preserve Arrow Maze outputs. Legacy pixel settings migrate once to
+width-relative values; shape/direction selections and unknown saved fields
+remain intact. Website runtime/embed delivery and R12 remain fn-5/.7 work.
+
+Measured: native tool tests 8/8; build-backed generator browser tests 13/13;
+workspace control tests 4/4. Real SVG playback matched baked Wasm frames
+across draw-in/loop, linear/ease-out/snap, and zero/default hold. Browser
+checks decoded SVG/PNG/GIF downloads, exercised click/outside-target behavior,
+verified font paths, saved-settings migration, no Wasm fallback, screenshots,
+and clean browser consoles.
+
+Formatting used the installed stable rustfmt; rustfmt is absent from the
+pinned 1.98.0 toolchain. Stable rustfmt check and git diff --check passed.
+No separate JavaScript lint/format command is configured.
+
+stage: impl-review - skipped(config: review.backend=none)
+stage: completion-review - skipped(policy: other spec tasks remain unfinished)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 5598cb15a1a99a329698fe481fd9ac571c21909b
+- Tests: cargo +1.98.0 test --locked --manifest-path crates/spielwerk-engine/Cargo.toml tools (8 passed), npm run test:generators (13 passed; builds actual Wasm), npx playwright test tests/workspace/controls.test.ts (4 passed), rustfmt +stable --check --edition 2021 --config skip_children=true crates/spielwerk-engine/src/lib.rs crates/spielwerk-engine/src/tools/mod.rs crates/spielwerk-engine/src/tools/arrow_path.rs crates/spielwerk-engine/src/tools/arrow_poster.rs crates/spielwerk-engine/src/tools/arrow_comb.rs (passed), git diff --check (passed)
 - PRs:
