@@ -1,19 +1,94 @@
-# spielwerk — building a new tool
+# Spielwerk authoring boundaries
 
-Each tool is ONE self-contained page in `tools/<slug>.html`. Copy the closest
-existing tool as the starting point (`stripe-marquee.html` is the reference for
-panel structure, `arrow-field.html` for a SMIL + GIF generator) and keep every
-convention below. Shortest diff against the house pattern wins.
+The current workspace uses Svelte for UI and Rust/Wasm for geometry and timing.
+Start with the [current-app workflow](README.md) and
+[engine contract](src/engine/README.md). The single-file conventions below
+apply only to retained legacy pages in `tools/`.
 
-## Page skeleton
+## Current workspace
+
+`src/main.ts` merges delivered registrations from `src/tools/registry.ts` with
+pending metadata in `src/workspace/registry.ts`. Eight generators and their
+website packages are delivered. Logo Extruder and Font Remixer remain pending.
+Final ten-tool verification and broader integration documentation belong to
+`fn-1-spielwerk-shared-design-workspace.1`; this UI refinement doesn't release
+that gate or authorize publication.
+
+Svelte owns canonical parameters, assets, playback, and view preferences.
+`Controls.svelte` renders adapter-defined groups and native inputs; edits pass
+through `controlValue` in `src/workspace/view.ts`. Preserve minimum-relative
+step rounding, clamping, decimal precision, and last-valid-value recovery.
+Restoring settings or snapshots must update displayed controls without an
+edit/persistence loop. Remounting must not duplicate listeners or edits.
+Keep reset keyboard-reachable and focus visible; editing keys must not trigger
+workspace panning.
+
+Rust owns computation. `latestEvaluation` publishes only the latest full-detail
+result; retain its disposal boundary on navigation. Artboard reports updating,
+current, or failed preview state, including retained artwork. Avoid per-frame
+live announcements during playback. Zoom, pan, and disclosure state remain
+view preferences, separate from design export.
+
+Keep parameters and **Artwork export** directly reachable in the control
+column. Dimensions live under **Artboard**, snapshot actions under
+**Snapshots**, and typeface inputs outside snapshot management. Export uses
+`exportArtwork`'s immutable activation-time input, even during preview lag or
+failure. Offer only formats with both adapter support and a handler. Keep
+folder selection secondary, preserve download fallback warnings, and report
+browser download initiation separately from a completed folder write.
+Website ZIP guidance must retain runtime, Wasm, and fonts together.
+
+## Control-library decision
+
+Task `fn-6-spielwerk-minimal-creative-instrument.1` tested stock Tweakpane 4.0.5
+(MIT) against native controls in the same Chromium Svelte/App fixture with
+real Wasm. The selected implementation remains native; Tweakpane is not an
+installed dependency or a second UI option.
+
+Both candidates edited numeric, choice, color, text, and toggle values.
+Tweakpane used only public `Pane`, `addFolder`, `addBinding`, `addButton`,
+`refresh`, and `dispose` APIs, with an editing mirror forwarding normalized
+values to Svelte. Text explicitly used `view: 'text'`. No fork, plugin,
+third-party Svelte wrapper, or private-DOM patch was used.
+
+Stock Tweakpane failed the parity gate:
+
+- Its six observed inputs had no accessible names; visible labels were
+  unassociated. Native controls had six named inputs.
+- With minimum 0.15 and step 0.2, canonical 0.55 displayed as 0.6; an ArrowUp
+  edit reached canonical 0.75 but displayed 0.8. Native displayed both exactly.
+- Stock inputs were focusable, but the observed input outline and shadow were
+  absent. The selected native path retained visible focus.
+
+The candidate did restore snapshots through mirror refresh and survived three
+unmount/remount cycles without duplicate widgets or duplicate edit callbacks.
+Selected native tests additionally verified zero edit callbacks on direct restores,
+blank/non-finite recovery, rejected choices, hex-like text, and keyboard reset.
+These are Chromium observations, not a cross-browser accessibility
+certification or an OS screen-reader listening test.
+
+With identical production entrypoints and base sources, native JavaScript
+measured 137,635 bytes (49,074 gzip) versus 284,813 (79,084 gzip) for Tweakpane,
+a candidate increase of 147,178 bytes (30,010 gzip). The selected native fixes
+measured 137,841 bytes (49,136 gzip). These are task .1 build measurements,
+not current bundle budgets or runtime speed claims. The task's recorded
+[decision and evidence](.flow/tasks/fn-6-spielwerk-minimal-creative-instrument.1.md)
+retain the comparison. No candidate lifecycle adapter remains to maintain.
+
+## Legacy page skeleton
+
+Each legacy tool is one page in `tools/<slug>.html`. Copy the closest existing
+tool when maintaining that surface (`stripe-marquee.html` for panel structure,
+`arrow-field.html` for a SMIL + GIF generator). The remaining sections describe
+that legacy surface only, including its storage, rendering, and filenames.
 
 - Single HTML file: inline `<style>`, `#panel` (left, sliders) + `#stage`
   (right, live SVG) + `#viewbox` zoom select, then the shared scripts —
   `export.js`, `zoom.js`, `mobile.js`, `sliders.js`, `snapshots.js`, and
   `fontpick.js` (after snapshots.js) when the tool renders text — and `mobile.css`.
   Never duplicate what those helpers already do.
-- Register the tool in the `tools` manifest array in `index.html`
-  (file, name, one-paragraph desc).
+- Link directly to the legacy page. The root `index.html` now mounts the
+  Svelte workspace and has no legacy `tools` manifest.
 
 ## Parameters
 
