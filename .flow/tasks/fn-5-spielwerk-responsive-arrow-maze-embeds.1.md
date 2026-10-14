@@ -84,10 +84,33 @@ No publication or deployment is authorized. The original blocker remains
 above. fn-2 final task .7 waits for actual fn-5 package delivery.
 
 ## Done summary
+Independent website hosts can render and resize all eight delivered generators through `EmbedRuntime`, with host play, pause, restart, and explicit seek. Rust evaluates layout, fonts, and time; browser observers and the runtime clock manage offscreen, reduced-motion, once, in-view, loop, and static playback.
 
+Tier: session (jev-unavailable(no_key)) (model: openai-codex/gpt-6.1-sol)
+stage: impl-review - skipped(config: review.backend=none)
+stage: wave-join - ran (cherry-picked 0574739 as 8fbc2b3; formatting fix bf801ff)
+stage: plan-sync - skipped(config: planSync.enabled=false)
+Gates: focused (full suite not requested)
+
+Integrated target checks passed: npm run test:embeds (10), native tools tests (24), and tests/generators/arrow-maze.test.ts (4). Logs: .flow/tmp/fn5-task1-integrated-{embeds,rust,maze}.log. System cargo fmt fixed the host-cell formatting and its check passed. No independent audit or SHIP receipt is claimed; spec-wide quality follows packaging and host verification.
+
+Measured verification:
+- Baseline native tools gate passed 23 tests before edits. The planned `test:embeds` command and directory did not exist at entry; no pre-existing embed suite was available. This task adds that declared command.
+- `npm run test:embeds` passed 10 Chromium cases. Eight real-adapter fixtures compare identical explicit seek frames, resize from 400x300 to 800x300, exercise offscreen/reduced-motion/once lifecycle, and test visitor input isolation. Four applicable text tools receive actual primary/accent font bytes. Truchet remains still. Runtime requests include Wasm and exclude workspace/Svelte modules.
+- Maze-specific cases cover regenerate/contain/cover/fixed mapping, explicit cell override, absent host height, config replacement, in-view restart, reduced-motion restoration/override, offscreen override, and host controls.
+- `cargo +1.98.0 test --manifest-path crates/spielwerk-engine/Cargo.toml tools` passed 24 native tests.
+- `npx playwright test tests/generators/arrow-maze.test.ts` passed all 4 cases, including existing editor dragging, playback, downloaded artwork, and Wasm failure checks.
+- `git diff --check` passed. Gate classification is FULL. No repository lint/format gate is configured. An optional `rustfmt +1.98.0` attempt failed because that component is not installed; it changed no files.
+- Screenshots for all eight independent hosts were captured and inspected. All eight fixture consoles had no errors. Playwright closes browsers and the Vite fixture closes its server.
+
+Logs and screenshots are in `/Users/baran/Repositories/spielwerk-fn5-task1/.flow/tmp/`: `baseline-rust.log`, `verify-embeds-final2.log`, `verify-rust-final.log`, `verify-maze-final.log`, and `embed-<tool-id>.png`. Initial local test failures exposed fixture middleware ordering and inactive Switchboard source widgets; both were corrected before the recorded green runs.
+
+The supervisor authorized additional touches in the Maze Rust engine, client, adapter, and generator test because the prerequisite handoff lacked host-cell sizing. Optional `hostCell` is Rust-owned; omission preserves existing editor density calculations. Zero chooses saved `ecell` or the original artboard's cell. Like the prototype, a requested cell chooses rounded grid counts, and the actual cell fits the remaining box. Runtime uses foundation artboard dimensions as the original basis. Native tests also cover saved zero-cell fallback and negative-cell rejection. No prototype `tools/` files were changed.
+
+Downstream package integration can import `EmbedRuntime` and `adapters` from `src/embeds/runtime.ts`. Runtime takes a foundation `DesignState` with asset bytes and optional `{fit, cell, playback, pauseOffscreen, reducedMotion}`. Fit/cell apply only to Maze. Methods are `play`, `pause`, `restart`, `seek`, `redraw`, `setConfig`, and `destroy`; `frame` and `spielwerk:frame` expose evaluated output. Shadow-root artwork isolates SVG identifiers and host CSS. No visitor-editing handlers or editor UI cross this boundary. Configuration fetching and package/snippet assets remain task .2's responsibility.
+
+Existing adapter bounds remain 100-8000 output dimensions, static TTF/OTF fonts, and no complex-script shaping or WOFF decoding. No pixel-identical prototype or full-suite claim is made. The only remaining untracked entry is the inherited `node_modules` workspace dependency link; no files are staged. This adds an unmapped independent-host API surface and leaves existing workspace routes unchanged.
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 8fbc2b33ea929d3dfdea6b703b6c190a8adfcf1a, bf801ff1554d31cc2c42e29f1ad25de77d26752d
+- Tests: npm run test:embeds (10 passed; .flow/tmp/fn5-task1-integrated-embeds.log), cargo test --manifest-path crates/spielwerk-engine/Cargo.toml tools (24 passed; .flow/tmp/fn5-task1-integrated-rust.log), npx playwright test tests/generators/arrow-maze.test.ts (4 passed; .flow/tmp/fn5-task1-integrated-maze.log), cargo fmt --manifest-path crates/spielwerk-engine/Cargo.toml -- --check (passed)
 - PRs:
-
-
