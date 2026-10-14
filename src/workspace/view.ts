@@ -1,4 +1,4 @@
-import type { Control, Dimensions, DimensionLimits, Frame, Renderer, ToolAdapter } from '../engine/contracts';
+import type { Control, Dimensions, DimensionLimits, EvaluationInput, Frame, Renderer, ToolAdapter } from '../engine/contracts';
 import type { PendingTool } from './registry';
 import type { Parameters } from './storage';
 
@@ -22,6 +22,7 @@ export type EditorTool = {
   accent: boolean;
   prepareSettings?(saved: Parameters): Parameters;
   playback?: boolean;
+  preview?(input: EvaluationInput<Parameters>, pointer?: { x: number; y: number }): Promise<Frame<any>>;
   interaction?: {
     hit(frame: Frame<any>, x: number, y: number, target?: EventTarget | null): { key: string; center: number[] } | undefined;
     drag?(params: Parameters, key: string, x: number, y: number): Parameters;

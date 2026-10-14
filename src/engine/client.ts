@@ -1,4 +1,4 @@
-import init, { evaluate_fixture, evaluate_arrow_maze, evaluate_arrow_poster, evaluate_arrow_comb, inspect_font } from './pkg/spielwerk_engine.js';
+import init, { evaluate_fixture, evaluate_arrow_maze, evaluate_arrow_poster, evaluate_arrow_comb, evaluate_arrow_field, inspect_font } from './pkg/spielwerk_engine.js';
 import wasmUrl from './pkg/spielwerk_engine_bg.wasm?url';
 import type { EvaluationInput, FixtureParams, FixtureScene, Frame } from './contracts';
 
@@ -47,6 +47,16 @@ export async function evaluateArrowPath(input: EvaluationInput<any>) {
     return JSON.parse(evaluate_arrow_comb(json, font));
   }
   throw new Error('Not an arrow-path design');
+}
+
+export async function evaluateArrowField(input: EvaluationInput<any>, pointer?: { x: number; y: number }) {
+  await initialize();
+  if (input.design.toolId !== 'arrow-field') throw new Error('Not an Arrow Field design');
+  return JSON.parse(evaluate_arrow_field(JSON.stringify({
+    dimensions: input.design.artboard.dimensions, seed: input.design.seed,
+    params: input.design.params, timeSeconds: input.timeSeconds,
+    pointer: pointer ? [pointer.x, pointer.y] : null,
+  })));
 }
 
 export async function inspectFont(bytes: Uint8Array): Promise<{

@@ -15,6 +15,13 @@ pub fn evaluate_arrow_maze(
 }
 
 #[wasm_bindgen]
+pub fn evaluate_arrow_field(input_json: &str) -> Result<String, JsValue> {
+    let input = serde_json::from_str(input_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let frame = tools::arrow_field::evaluate(input).map_err(JsValue::from_str)?;
+    serde_json::to_string(&frame).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+#[wasm_bindgen]
 pub fn evaluate_arrow_poster(input_json: &str) -> Result<String, JsValue> {
     let input = serde_json::from_str(input_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
     let frame = tools::arrow_poster::evaluate(input).map_err(JsValue::from_str)?;

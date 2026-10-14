@@ -25,6 +25,7 @@
   let stage: HTMLDivElement;
   let stageSize = $state({ width: 800, height: 600 });
   let space = $state(false);
+  let pointer = $state<{ x: number; y: number }>();
   let timeSeconds = $state(0);
   let playing = $state(false);
   let playbackHandle = 0;
@@ -50,6 +51,7 @@
     if (cancel && wordDrag) params = wordDrag.original;
     if (wordDrag) persist();
     wordDrag = undefined; drag = undefined;
+    if (cancel) pointer = undefined;
   }
   let drag: { id: number; x: number; y: number; scale: number; size: Dimensions; pan: { x: number; y: number }; handle?: Handle } | undefined;
   const responsive = $derived(tool.adapter.capabilities.responsive && Boolean(params.responsive));
@@ -93,8 +95,8 @@
     }
     assets = remaining;
   }
-  const evaluator = untrack(() => latestEvaluation<EvaluationInput<Parameters>, Frame<unknown>>(
-    input => tool.adapter.evaluate(input),
+  const evaluator = untrack(() => latestEvaluation<{ input: EvaluationInput<Parameters>; pointer?: { x: number; y: number } }, Frame<unknown>>(
+    request => tool.preview ? tool.preview(request.input, request.pointer) : tool.adapter.evaluate(request.input),
     frame => {
       try {
         const target = document.createElement('div');
@@ -114,7 +116,7 @@
     };
   });
   $effect(() => {
-    const request = input;
+    const request = { input, pointer };
     untrack(() => { busy = true; error = ''; evaluator.request(request); });
   });
   onMount(() => {
@@ -155,6 +157,10 @@
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   function move(event: PointerEvent) {
+    if (tool.preview) {
+      const point = scenePoint(event);
+      pointer = !space && !drag && point.x >= 0 && point.y >= 0 && point.x <= dimensions.width && point.y <= dimensions.height ? point : undefined;
+    }
     if (wordDrag && event.pointerId === wordDrag.id && tool.interaction?.drag) {
       const point = scenePoint(event);
       params = tool.interaction.drag(params, wordDrag.key,
@@ -217,7 +223,7 @@
     <p role="status">{busy ? 'Updating full-detail preview…' : 'Full-detail preview'}{#if displayed} · {displayed.dimensions.width} × {displayed.dimensions.height}{/if}</p>
     {#if error}<p role="alert">{error}</p>{/if}
     <div class="stage" bind:this={stage} role="region" aria-label="Pan preview with Space and drag"
-      onpointerdown={event => start(event)} onpointermove={move} onpointerup={() => finishPointer()} onpointercancel={() => { if (drag?.handle) setSize(drag.size); finishPointer(true); }}>
+      onpointerleave={() => pointer = undefined} onpointerdown={event => { pointer = undefined; start(event); }} onpointermove={move} onpointerup={() => finishPointer()} onpointercancel={() => { if (drag?.handle) setSize(drag.size); finishPointer(true); }}>
       <div class="container" bind:this={container} data-testid="preview-container"
         style:width={`${dimensions.width}px`} style:height={`${dimensions.height}px`}
         style:min-width={`${tool.adapter.dimensions.width.min}px`} style:max-width={`${tool.adapter.dimensions.width.max}px`}
