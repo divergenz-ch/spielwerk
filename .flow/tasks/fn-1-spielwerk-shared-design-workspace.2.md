@@ -44,9 +44,29 @@ ignore rules; their presence is not a source change to stage.
 - [ ] Build and bootstrap gates pass after introduction. No absent-manifest baseline or unavailable named tool is reported as a passing application requirement.
 
 ## Done summary
-TBD
+The Spielwerk root now mounts a Svelte browser workspace from static assets. The shell explicitly says design tools are unavailable; engine, storage, controls, exports, and final catalog integration remain with their owning tasks.
 
+Measured validation:
+- baseline: unavailable (no package.json, application build, or focused harness existed before editing). No planned application gate was counted as passing at baseline.
+- `npm install` and `npx playwright install chromium` exited 0.
+- `npm run test:bootstrap` exited 0, including production build and 3 Chromium smoke cases.
+- `npm ci` exited 0 from the committed lockfile, with 0 vulnerabilities. npm reported an optional fsevents install-script approval warning; the following build and browser gate passed without approving it.
+- `npm run test:workspace` exited 0 after the clean install, including production build and 3 Chromium smoke cases. Log: `.flow/tmp/work-20261014-fn1/task-2-workspace.log`.
+- Tests navigate the real browser entry via Vite development, Python static HTTP at root, and Python static HTTP at `/workspace/`. They assert mounted headings, compiled styling, successful JavaScript/CSS MIME responses, no browser errors, and local asset requests without snapshot-service requests.
+- `flowctl gate classify` returned 1 (FULL), selecting focused executable checks. No lint/format gate is configured.
+- `git diff --check` passed. Pre-existing Arrow Maze hashes match the dispatch hashes; those files remain unstaged.
+
+Script contracts and install/build/serve instructions live in `package.json` under `spielwerk`. `test:integration` reserves `tests/integration` and deliberately fails until final integration provides tests. Integration and Cargo gates were not run and are not claimed as passing. No sibling test scripts were introduced.
+
+Changed source paths: `.gitignore`, `package.json`, `package-lock.json`, `index.html`, `vite.config.ts`, `src/main.ts`, `src/workspace/App.svelte`, `tests/workspace/bootstrap.test.ts`. The required pre-existing `.flow/` planning state was included in the implementation commit. `.pi/` and `AGENTS.md` remain untracked.
+
+Route change: `/` now opens the foundation shell instead of the prototype iframe catalog. No feature map exists. README.md and CLAUDE.md still describe the prototype; their updates are outside this task's Touches. Built hosting serves `dist/`, not raw source HTML. Tests require Python 3 and Playwright Chromium; mobile and other browser engines were not checked.
+
+stage: impl-review - skipped(config: REVIEW_MODE=none)
+Tier: session (jev-unavailable(no_key)) (model: gpt-6-astra, evidenced by PI_MODEL)
+
+stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: e8fca4d23dffb742c4282c48a0af3899f4a90dcb
+- Tests: baseline: unavailable (application manifest and harness absent pre-edit), npm ci (exit 0), npm run test:bootstrap (exit 0; build and 3 browser cases), npm run test:workspace (exit 0; build and 3 browser cases after npm ci), git diff --check (exit 0)
 - PRs:
