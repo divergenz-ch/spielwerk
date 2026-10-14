@@ -528,19 +528,19 @@ pub fn evaluate(input: Input, font: &[u8]) -> Result<Frame, &'static str> {
     let accent = color(p, "accent", "#ff4d2e");
     // Cap absolute decoration at the current cell size so extreme responsive boards stay valid.
     let unit = cw.min(ch);
-    let stroke = number(p, "stroke", 6.0, 1.0, 24.0).min(unit * 0.08);
+    let stroke = (w * number(p, "stroke", 0.4, 0.01, 1.6) / 100.0).min(unit * 0.08);
     let paint = Paint {
         ink: &ink,
         paper: &paper,
         on: &on,
-        radius: number(p, "radius", 8.0, 0.0, 60.0).min(unit * 0.2),
-        shadow: number(p, "shadow", 10.0, 0.0, 40.0).min(unit * 0.1),
+        radius: (w * number(p, "radius", 0.53, 0.0, 4.0) / 100.0).min(unit * 0.2),
+        shadow: (w * number(p, "shadow", 0.67, 0.0, 2.67) / 100.0).min(unit * 0.1),
         stroke,
         face: face.as_ref(),
     };
     let secs = number(p, "secs", 4.0, 1.0, 20.0);
     let moving = text(p, "motion", "flow") == "flow";
-    let wirepx = number(p, "wirepx", 4.0, 1.0, 20.0).min(unit * 0.1);
+    let wirepx = (w * number(p, "wirepx", 0.27, 0.01, 1.33) / 100.0).min(unit * 0.1);
     let period = wirepx * 6.0;
     let wires = |animated: bool| {
         let mut s = String::new();

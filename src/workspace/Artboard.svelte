@@ -29,7 +29,7 @@
   let timeSeconds = $state(0);
   let playing = $state(false);
   let playbackHandle = 0;
-  let wordDrag: { id: number; key: string; x: number; y: number; center: number[]; original: Parameters } | undefined;
+  let wordDrag: { id: number; key: string; x: number; y: number; center: number[]; original: Parameters; moved: boolean } | undefined;
   function scenePoint(event: PointerEvent) {
     const rect = surface.getBoundingClientRect();
     return { x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom };
@@ -58,7 +58,7 @@
     if (gesture && event.pointerId === gesture.id && tool.interaction?.release) {
       const point = scenePoint(event);
       const current = input;
-      const moved = Math.hypot(point.x - gesture.x, point.y - gesture.y) >= dimensions.width * 0.005;
+      const moved = gesture.moved || Math.hypot(point.x - gesture.x, point.y - gesture.y) >= dimensions.width * 0.005;
       finishPointer();
       try {
         const patch = await tool.interaction.release(current, gesture.key, point.x, point.y, moved);
@@ -160,7 +160,7 @@
         event.preventDefault(); event.stopPropagation();
         if (tool.interaction.click) { params = tool.interaction.click(params, hit.key); persist(); }
         if (tool.interaction.drag || tool.interaction.release) {
-          wordDrag = { id: event.pointerId, key: hit.key, center: hit.center, x: point.x, y: point.y, original: $state.snapshot(params) };
+          wordDrag = { id: event.pointerId, key: hit.key, center: hit.center, x: point.x, y: point.y, original: $state.snapshot(params), moved: false };
           (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
         }
       }
@@ -176,6 +176,11 @@
     if (tool.preview) {
       const point = scenePoint(event);
       pointer = !space && !drag && point.x >= 0 && point.y >= 0 && point.x <= dimensions.width && point.y <= dimensions.height ? point : undefined;
+    }
+    if (wordDrag && event.pointerId === wordDrag.id && tool.interaction?.release) {
+      const point = scenePoint(event);
+      wordDrag.moved ||= Math.hypot(point.x - wordDrag.x, point.y - wordDrag.y) >= dimensions.width * 0.005;
+      return;
     }
     if (wordDrag && event.pointerId === wordDrag.id && tool.interaction?.drag) {
       const point = scenePoint(event);

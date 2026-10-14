@@ -12,16 +12,16 @@ export type SwitchboardScene = {
 export const act = (input: EvaluationInput<Parameters>, action: { kind: 'click' | 'swap'; id: number; x?: number; y?: number }): Promise<Frame<SwitchboardScene>> => evaluateSwitchboard(input, action);
 export const adapter: ToolAdapter<Parameters, SwitchboardScene> = {
   id: 'switchboard',
-  defaults: { seed: 42, cols: 5, rows: 7, gap: 24, jitter: 0, buttons: true, dials: true, lights: true, form: true, labels: 'ON,OFF,SEND,OK,RUN,A,B,MUTE,ARM,SYNC', stroke: 6, radius: 8, shadow: 10, paper: '#f4f1ea', ink: '#111111', on: '#ffd400', accent: '#ff4d2e', links: 12, effect: 'colour + size', strength: 70, propagate: 'copy', wires: true, wire: 'curve', wirepx: 4, motion: 'flow', secs: 4, fps: 20, gifpx: 600, wpx: 1500, hpx: 2000, st: [], order: [] },
+  defaults: { seed: 42, cols: 5, rows: 7, gap: 24, jitter: 0, buttons: true, dials: true, lights: true, form: true, labels: 'ON,OFF,SEND,OK,RUN,A,B,MUTE,ARM,SYNC', rel: 1, stroke: 0.4, radius: 0.53, shadow: 0.67, paper: '#f4f1ea', ink: '#111111', on: '#ffd400', accent: '#ff4d2e', links: 12, effect: 'colour + size', strength: 70, propagate: 'copy', wires: true, wire: 'curve', wirepx: 0.27, motion: 'flow', secs: 4, fps: 20, gifpx: 600, wpx: 1500, hpx: 2000, st: [], order: [] },
   dimensions, capabilities: { responsive: true, motion: true, formats: ['svg', 'png', 'gif'] },
   controls: [
     numeric('seed', 'Seed', 'Grid', 1, 9999), numeric('cols', 'Columns', 'Grid', 2, 12), numeric('rows', 'Rows', 'Grid', 2, 16), numeric('gap', 'Gap %', 'Grid', 0, 60, 2), numeric('jitter', 'Size jitter %', 'Grid', 0, 100, 5),
     ...['buttons', 'dials', 'lights', 'form'].map(key => ({ key, label: key, group: 'Grid', type: 'toggle' as const })),
     { key: 'labels', label: 'Labels', group: 'Grid', type: 'text' },
-    numeric('stroke', 'Stroke px', 'Look', 1, 24), numeric('radius', 'Corner px', 'Look', 0, 60, 2), numeric('shadow', 'Shadow px', 'Look', 0, 40),
+    numeric('stroke', 'Stroke % of artboard width', 'Look', 0.01, 1.6, 0.01), numeric('radius', 'Corner % of artboard width', 'Look', 0, 4, 0.01), numeric('shadow', 'Shadow % of artboard width', 'Look', 0, 2.67, 0.01),
     ...['paper', 'ink', 'on', 'accent'].map(key => ({ key, label: key, group: 'Look', type: 'color' as const })),
     numeric('links', 'Links', 'Links', 0, 60), choice('effect', 'Link effect', 'Links', ['colour', 'size', 'colour + size']), numeric('strength', 'Strength %', 'Links', 0, 100, 5), choice('propagate', 'Propagate state', 'Links', ['none', 'copy', 'invert']),
-    { key: 'wires', label: 'Draw wires', group: 'Links', type: 'toggle' }, choice('wire', 'Wire style', 'Links', ['straight', 'elbow', 'curve']), numeric('wirepx', 'Wire px', 'Links', 1, 20),
+    { key: 'wires', label: 'Draw wires', group: 'Links', type: 'toggle' }, choice('wire', 'Wire style', 'Links', ['straight', 'elbow', 'curve']), numeric('wirepx', 'Wire % of artboard width', 'Links', 0.01, 1.33, 0.01),
     choice('motion', 'Motion', 'Motion', ['none', 'flow']), numeric('secs', 'Cycle seconds', 'Motion', 1, 20), numeric('fps', 'GIF fps', 'Output', 5, 30), numeric('gifpx', 'GIF pixels', 'Output', 200, 1000, 50),
   ],
   evaluate: input => evaluateSwitchboard(input),
@@ -30,6 +30,17 @@ export const switchboard: EditorTool = {
   id: adapter.id, name: 'Switchboard', description: 'Linked widgets, cell swaps and deterministic wire flow.', status: 'ready', adapter,
   renderer: { render(frame, target) { target.innerHTML = frame.scene.svg; } },
   artboard: { ...artboard, initial: { width: 1500, height: 2000 } }, accent: false, playback: true,
+  prepareSettings(saved) {
+    const params = { ...saved };
+    if (params.rel !== 1) {
+      const basis = Math.max(100, Math.min(8000, Number(params.wpx) || 1500));
+      for (const key of ['stroke', 'radius', 'shadow', 'wirepx']) {
+        if (typeof params[key] === 'number') params[key] = params[key] / basis * 100;
+      }
+    }
+    params.rel = 1;
+    return params;
+  },
   interaction: {
     hit(frame: Frame<SwitchboardScene>, _x, _y, target) {
       const group = target instanceof Element ? target.closest('[data-widget]') : null;
