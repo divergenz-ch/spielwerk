@@ -74,7 +74,45 @@ verification only; it does not itself accept R12 or mark either spec complete.
 The original blocker remains above. No publication/deployment is authorized.
 
 ## Done summary
+Blocked:
+# Standards audit provider failure
 
+Implementation is committed at d7729b8, based on 443aad2. All eight delivered
+registrations and export handlers are bound through src/tools/registry.ts.
+Final integration consumes actual downloaded fn-5 ZIPs outside the editor.
+fn-5 tasks .1-.3 have verified done receipts and all evidence commits are
+reachable. fn-5 final embed verification passed 42 tests.
+
+Measured final checks: npm run build passed (.flow/tmp/fn2-final-build.log);
+catalog and independent-package integration passed 2
+(.flow/tmp/fn2-final-catalog.log); generator suite passed 35 and failed one
+obsolete Maze format assertion; the additive format correction retains
+SVG/PNG/GIF and adds the delivered embed, focused Maze rerun passed 4
+(.flow/tmp/fn2-final-maze-fixed.log). npm run test:workspace passed 19
+(.flow/tmp/fn2-final-workspace.log), native tools passed 24
+(.flow/tmp/fn2-final-rust.log), rustfmt and git diff checks passed.
+No combined green generator-suite or full-suite result is claimed.
+
+Correctness audit e96bb3c2 completed with no findings. Standards audit
+0768b272 failed before any report with a provider processing error. Workflow
+590d66e1 is terminal; no live workers or pending requests remain. This is an
+infrastructure failure, not a standards pass. Do not mark the task done or
+fabricate a verdict. Retain the clean committed implementation and prior
+logs. Recovery requires the failed standards audit, not another correctness
+audit or reimplementation. Review the preserved report/artifacts before
+resuming. Once the missing gate succeeds, record flowctl done with exact
+range/tests, verify done, commit its receipt, and invoke completion review
+with configured backend none (explicit skip, not independent SHIP).
+
+stage: impl-review - skipped(config: review.backend=none)
+stage: quality-audit-correctness - ran
+stage: quality-audit-standards - failed(provider: processing error before report)
+stage: completion-review - skipped(policy: final task not done)
+stage: plan-sync - skipped(config: planSync.enabled=false)
+Gates: focused (full suite not requested)
+
+User-owned tools/arrow-maze.html and tools/arrow-maze.embed.js, untracked
+.pi/ and AGENTS.md remain untouched. No publication or deployment occurred.
 ## Evidence
 - Commits:
 - Tests:
