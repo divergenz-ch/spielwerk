@@ -46,7 +46,11 @@ test('Stripe: uploaded outlines carry lettering, column/shear/direction controls
     const invalid=[];
     for (const size of [99,8001]) {try {await adapter.evaluate({...input,design:{...input.design,artboard:{mode:'fixed',dimensions:{width:size,height:300}}}});invalid.push(false);} catch {invalid.push(true);} }
     const migrated=stripeMarquee.prepareSettings!({wpx:1500,fontsize:300,minw:4,seed:77,retained:'sentinel'});
-    return { first,repeat,changed,directions,loop,wide,doubled,invalid,migrated,twice:stripeMarquee.prepareSettings!(migrated) };
+    const lettering=await adapter.evaluate({...input,design:{...input.design,params:{...input.design.params,fontsize:25,rows:110,depth:6,jitter:0,minw:0.01,skew:0,motion:'none',ink0:0,ink1:100,contrast:100},artboard:{mode:'fixed',dimensions:{width:400,height:440}}}});
+    const polygons=new DOMParser().parseFromString(lettering.scene.svg,'image/svg+xml').querySelectorAll('polygon');
+    const cellWidth=(row:number,col:number)=>{const points=polygons[row*64+col].getAttribute('points')!.split(' ').map(p=>p.split(',').map(Number));return points[1][0]-points[0][0];};
+    const silhouette={stem:cellWidth(17,3),counter:cellWidth(17,4),paper:cellWidth(17,12)};
+    return { first,repeat,changed,directions,loop,wide,doubled,invalid,migrated,silhouette,twice:stripeMarquee.prepareSettings!(migrated) };
   }, [...font]);
   expect(result.first).toEqual(result.repeat); expect(result.first.scene.svg).toBe(result.loop.scene.svg);
   for (const changed of result.changed) expect(changed).not.toBe(result.first.scene.svg);
@@ -58,6 +62,7 @@ test('Stripe: uploaded outlines carry lettering, column/shear/direction controls
   expect(result.first.scene.svg).not.toMatch(/<text|<clipPath|<image|font-family/);
   const widths=[...result.first.scene.svg.matchAll(/points="([\d.-]+),[\d.-]+ ([\d.-]+),/g)].map(m=>+m[2]-+m[1]);
   expect(Math.max(...widths)).toBeGreaterThan(Math.min(...widths)*1.2);
+  expect(result.silhouette.stem).toBeGreaterThan(5); expect(result.silhouette.counter).toBeLessThan(3); expect(result.silhouette.paper).toBe(0);
 });
 
 test('Stripe: real UI font upload, legacy snapshot migration, playback and decoded SVG/PNG/GIF exports', async ({ page }) => {
