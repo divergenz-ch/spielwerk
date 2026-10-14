@@ -8,7 +8,7 @@ Implement font-derived stripe geometry, column/shear and direction/scroll calcul
 
 **Size:** M
 **Files:** `crates/spielwerk-engine/src/tools/mod.rs`, `crates/spielwerk-engine/src/tools/stripe_marquee.rs`, `src/tools/stripe-marquee.ts`, `tests/generators/stripe-marquee.test.ts`
-**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/stripe_marquee.rs, src/tools/stripe-marquee.ts, tests/generators/stripe-marquee.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock]
+**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/stripe_marquee.rs, src/tools/stripe-marquee.ts, tests/generators/stripe-marquee.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock, src/engine/client.ts, src/main.ts]
 
 ### Approach
 
@@ -53,3 +53,4 @@ TBD
 - Commits:
 - Tests:
 - PRs:
+
