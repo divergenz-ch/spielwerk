@@ -8,7 +8,7 @@ Implement widget layout/state propagation, cell swaps and wire-flow evaluation i
 
 **Size:** M
 **Files:** `crates/spielwerk-engine/src/tools/mod.rs`, `crates/spielwerk-engine/src/tools/switchboard.rs`, `src/tools/switchboard.ts`, `tests/generators/switchboard.test.ts`
-**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/switchboard.rs, src/tools/switchboard.ts, tests/generators/switchboard.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock]
+**Touches:** [crates/spielwerk-engine/src/tools/mod.rs, crates/spielwerk-engine/src/tools/switchboard.rs, src/tools/switchboard.ts, tests/generators/switchboard.test.ts, crates/spielwerk-engine/src/lib.rs, crates/spielwerk-engine/Cargo.toml, crates/spielwerk-engine/Cargo.lock, src/engine/client.ts, src/main.ts, src/workspace/view.ts, src/workspace/Artboard.svelte]
 
 ### Approach
 
@@ -53,3 +53,4 @@ TBD
 - Commits:
 - Tests:
 - PRs:
+

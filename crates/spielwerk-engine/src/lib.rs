@@ -35,6 +35,13 @@ pub fn evaluate_arrow_comb(input_json: &str, font: &[u8]) -> Result<String, JsVa
     serde_json::to_string(&frame).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+#[wasm_bindgen]
+pub fn evaluate_switchboard(input_json: &str, font: &[u8]) -> Result<String, JsValue> {
+    let input = serde_json::from_str(input_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let frame = tools::switchboard::evaluate(input, font).map_err(JsValue::from_str)?;
+    serde_json::to_string(&frame).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct Dimensions {
     pub width: u32,

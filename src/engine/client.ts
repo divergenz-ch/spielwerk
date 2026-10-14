@@ -1,4 +1,4 @@
-import init, { evaluate_fixture, evaluate_arrow_maze, evaluate_arrow_poster, evaluate_arrow_comb, evaluate_arrow_field, inspect_font } from './pkg/spielwerk_engine.js';
+import init, { evaluate_fixture, evaluate_arrow_maze, evaluate_arrow_poster, evaluate_arrow_comb, evaluate_arrow_field, evaluate_switchboard, inspect_font } from './pkg/spielwerk_engine.js';
 import wasmUrl from './pkg/spielwerk_engine_bg.wasm?url';
 import type { EvaluationInput, FixtureParams, FixtureScene, Frame } from './contracts';
 
@@ -57,6 +57,16 @@ export async function evaluateArrowField(input: EvaluationInput<any>, pointer?: 
     params: input.design.params, timeSeconds: input.timeSeconds,
     pointer: pointer ? [pointer.x, pointer.y] : null,
   })));
+}
+
+export async function evaluateSwitchboard(input: EvaluationInput<any>, action?: { kind: 'click' | 'swap'; id: number; x?: number; y?: number }) {
+  await initialize();
+  if (input.design.toolId !== 'switchboard') throw new Error('Not a Switchboard design');
+  const font = input.design.assets.find(asset => asset.role === 'typeface')?.bytes ?? new Uint8Array();
+  return JSON.parse(evaluate_switchboard(JSON.stringify({
+    dimensions: input.design.artboard.dimensions, seed: input.design.seed,
+    params: input.design.params, timeSeconds: input.timeSeconds, action,
+  }), font));
 }
 
 export async function inspectFont(bytes: Uint8Array): Promise<{

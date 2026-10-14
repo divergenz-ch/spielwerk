@@ -27,6 +27,7 @@ export type EditorTool = {
     hit(frame: Frame<any>, x: number, y: number, target?: EventTarget | null): { key: string; center: number[] } | undefined;
     drag?(params: Parameters, key: string, x: number, y: number): Parameters;
     click?(params: Parameters, key: string): Parameters;
+    release?(input: EvaluationInput<Parameters>, key: string, x: number, y: number, moved: boolean): Promise<Parameters>;
   };
 };
 export type CatalogEntry = PendingTool | EditorTool;

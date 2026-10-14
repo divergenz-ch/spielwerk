@@ -53,6 +53,22 @@
     wordDrag = undefined; drag = undefined;
     if (cancel) pointer = undefined;
   }
+  async function releasePointer(event: PointerEvent) {
+    const gesture = wordDrag;
+    if (gesture && event.pointerId === gesture.id && tool.interaction?.release) {
+      const point = scenePoint(event);
+      const current = input;
+      const moved = Math.hypot(point.x - gesture.x, point.y - gesture.y) >= dimensions.width * 0.005;
+      finishPointer();
+      try {
+        const patch = await tool.interaction.release(current, gesture.key, point.x, point.y, moved);
+        // Do not apply a delayed gesture over a changed design or restored snapshot.
+        if (JSON.stringify(input.design) === JSON.stringify(current.design)) { params = { ...params, ...patch }; persist(); }
+      } catch (cause) { error = String(cause); }
+      return;
+    }
+    finishPointer();
+  }
   let drag: { id: number; x: number; y: number; scale: number; size: Dimensions; pan: { x: number; y: number }; handle?: Handle } | undefined;
   const responsive = $derived(tool.adapter.capabilities.responsive && Boolean(params.responsive));
   const fixed = $derived(boundedSize({ width: Number(params.wpx) || tool.artboard.initial.width, height: Number(params.hpx) || tool.artboard.initial.height }, tool.adapter.dimensions));
@@ -143,7 +159,7 @@
       if (hit) {
         event.preventDefault(); event.stopPropagation();
         if (tool.interaction.click) { params = tool.interaction.click(params, hit.key); persist(); }
-        if (tool.interaction.drag) {
+        if (tool.interaction.drag || tool.interaction.release) {
           wordDrag = { id: event.pointerId, key: hit.key, center: hit.center, x: point.x, y: point.y, original: $state.snapshot(params) };
           (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
         }
@@ -223,7 +239,7 @@
     <p role="status">{busy ? 'Updating full-detail preview…' : 'Full-detail preview'}{#if displayed} · {displayed.dimensions.width} × {displayed.dimensions.height}{/if}</p>
     {#if error}<p role="alert">{error}</p>{/if}
     <div class="stage" bind:this={stage} role="region" aria-label="Pan preview with Space and drag"
-      onpointerleave={() => pointer = undefined} onpointerdown={event => { pointer = undefined; start(event); }} onpointermove={move} onpointerup={() => finishPointer()} onpointercancel={() => { if (drag?.handle) setSize(drag.size); finishPointer(true); }}>
+      onpointerleave={() => pointer = undefined} onpointerdown={event => { pointer = undefined; start(event); }} onpointermove={move} onpointerup={releasePointer} onpointercancel={() => { if (drag?.handle) setSize(drag.size); finishPointer(true); }}>
       <div class="container" bind:this={container} data-testid="preview-container"
         style:width={`${dimensions.width}px`} style:height={`${dimensions.height}px`}
         style:min-width={`${tool.adapter.dimensions.width.min}px`} style:max-width={`${tool.adapter.dimensions.width.max}px`}
