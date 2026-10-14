@@ -110,6 +110,7 @@ for (const hosting of ['static', 'service']) {
     await expect(page.getByRole('button', { name: 'Choose export folder' })).toHaveCount(0);
     expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['svg', 'png', 'gif']);
     await expect(page.evaluate(() => (window as any).rejectUnsupported())).rejects.toThrow('This output format is not available');
+    await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
     await page.getByLabel('Layout', { exact: true }).selectOption('responsive');
     await edit(page, 'Container width', '200'); await edit(page, 'Container height', '120');
     await edit(page, 'Cell size exact', '20');
@@ -135,6 +136,7 @@ for (const hosting of ['static', 'service']) {
       expect(record.input.design.params).not.toHaveProperty('zoom');
       expect(record.frame).toEqual(records[0].frame); expect(record.later).toEqual(records[0].later);
     }
+    await page.locator('summary').filter({ hasText: /^Snapshots$/ }).click();
     await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Load snapshot 1', exact: true })).toBeVisible();
     if (hosting === 'service') {
@@ -159,6 +161,7 @@ test('progress, visible encoder failure, original typeface bytes, and immutable 
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Fixture encoding 1/2');
   await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeDisabled();
+  await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await edit(page, 'Width', '200');
   const downloaded = page.waitForEvent('download');
   await page.evaluate(() => (window as any).release());
