@@ -17,9 +17,10 @@ test.beforeAll(async () => {
   const harness = join(directory, 'ControlsHarness.svelte');
   await writeFile(harness, `
     <script>
+      import { untrack } from ${JSON.stringify(resolve('node_modules/svelte/src/index-client.js'))};
       import Controls from ${JSON.stringify(resolve('src/workspace/Controls.svelte'))};
       let { controls, defaults } = $props();
-      let params = $state({ ...defaults });
+      let params = $state(untrack(() => ({ ...defaults })));
       let expandedGroups = $state(['Geometry', 'Appearance']);
       window.edits = [];
       window.restoreControls = values => { params = { ...values }; };
@@ -200,7 +201,7 @@ test('artboard dimensions, presets, ratio, handles and observed responsive relay
   await page.getByLabel('Zoom', { exact: true }).selectOption('200');
   const stage = page.getByRole('region', { name: 'Pan preview with Space and drag' });
   const stageBox = (await stage.boundingBox())!;
-  await stage.click({ position: { x: 20, y: 20 } });
+  await stage.click({ position: { x: 8, y: 8 } });
   await page.keyboard.down('Space');
   await page.mouse.move(stageBox.x + 200, stageBox.y + 200); await page.mouse.down(); await page.mouse.move(stageBox.x + 230, stageBox.y + 220); await page.mouse.up(); await page.keyboard.up('Space');
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('internal-fixture')!).pan)).toEqual({ x: 30, y: 20 });

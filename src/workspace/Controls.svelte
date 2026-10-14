@@ -11,9 +11,11 @@
   function change(control: Control, event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const value = control.type === 'toggle' ? input.checked : input.value;
-    const next = controlValue(control, value, params[control.key]);
-    onchange(control.key, next);
-    if (control.type === 'number') input.value = String(next);
+    const previous = params[control.key];
+    const next = control.type === 'number' && input.value.trim() === ''
+      ? previous : controlValue(control, value, previous);
+    if (next !== previous) onchange(control.key, next);
+    if (control.type === 'number' || control.type === 'choice') input.value = String(next);
   }
 </script>
 

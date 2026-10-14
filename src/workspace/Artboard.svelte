@@ -204,7 +204,8 @@
     setSize(resize(dimensions, dimensions.width + (handle.includes('e') ? x : handle.includes('w') ? -x : 0), dimensions.height + (handle.includes('s') ? y : handle.includes('n') ? -y : 0), tool.adapter.dimensions, Boolean(params.lock), /[ew]/.test(handle) ? 'width' : 'height'));
   }
   function keydown(event: KeyboardEvent) {
-    if (/^(INPUT|SELECT|TEXTAREA)$/.test((event.target as HTMLElement).tagName)) return;
+    const target = event.target;
+    if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, select, textarea, button, summary, a[href]'))) return;
     if (event.code === 'Space') { event.preventDefault(); space = true; }
     if (event.key === 'Escape' && wordDrag) finishPointer(true);
     if (event.key === 'Escape' && drag) { if (drag.handle) setSize(drag.size); else setView({ pan: drag.pan }); drag = undefined; }
