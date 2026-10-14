@@ -21,17 +21,20 @@
 <main>
   <header>
     <h1>Spielwerk</h1>
-    <p>Design workspace</p>
+    {#if selected}
+      <div class="identity">
+        <h2>{selected.name}</h2>
+        <p>{selected.description}</p>
+      </div>
+    {/if}
+    <nav aria-label="Tools">
+      <label>Tool<select value={selected?.id} onchange={event => { location.hash = event.currentTarget.value; hash = location.hash; }}>
+        {#each catalog as tool}<option value={tool.id}>{tool.name}</option>{/each}
+      </select></label>
+      {#if selected}<a href={`#${selected.id}`}>Link to {selected.name}</a>{/if}
+    </nav>
   </header>
-  <nav aria-label="Tools">
-    <label>Tool<select value={selected?.id} onchange={event => { location.hash = event.currentTarget.value; hash = location.hash; }}>
-      {#each catalog as tool}<option value={tool.id}>{tool.name}</option>{/each}
-    </select></label>
-    {#if selected}<a href={`#${selected.id}`}>Link to {selected.name}</a>{/if}
-  </nav>
   {#if selected}
-    <h2>{selected.name}</h2>
-    <p>{selected.description}</p>
     {#if selected.status === 'ready'}
       {#key selected.id}<Artboard tool={selected} {persistence} handlers={exporters[selected.id] ?? {}} {destination} />{/key}
     {:else}
@@ -51,22 +54,21 @@
     font: 16px/1.5 system-ui, sans-serif;
   }
 
-  main { padding: 2rem; }
-  nav { display: flex; gap: 1rem; margin-bottom: 1rem; }
-  select { margin-left: .5rem; }
+  main { box-sizing: border-box; height: 100dvh; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; }
+  header { display: flex; align-items: center; gap: 1.5rem; }
+  h1 { font-size: 1rem; }
+  h2 { font-size: 1.25rem; }
+  h1, h2, p { margin: 0; }
+  .identity { flex: 1; min-width: 0; }
+  .identity p, nav { font-size: .875rem; }
+  nav { display: grid; gap: .25rem; }
+  select { margin-left: .5rem; max-width: 100%; }
+  section { padding: 1rem 0; }
 
-  h1,
-  h2 {
-    margin: 0;
-  }
-
-  header {
-    margin-bottom: 2rem;
-  }
-
-  section {
-    background: #fff;
-    padding: 2rem;
-    border-radius: 0.5rem;
+  @media (max-width: 48rem) {
+    main { height: auto; min-height: 100dvh; }
+    header { flex-wrap: wrap; gap: .75rem; }
+    .identity { flex-basis: calc(100% - 8rem); }
+    nav { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
   }
 </style>

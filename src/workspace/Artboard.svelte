@@ -218,31 +218,35 @@
   <aside aria-label="Design controls">
     <Controls controls={tool.adapter.controls} defaults={tool.adapter.defaults} {params} {expandedGroups}
       onchange={setParam} onexpand={(group, open) => { if (expandedGroups.includes(group) !== open) setView({ expandedGroups: open ? [...expandedGroups, group] : expandedGroups.filter(g => g !== group) }); }} />
-    <fieldset>
-      <legend>Artboard</legend>
-      {#if tool.adapter.capabilities.responsive}
-        <label>Layout<select aria-label="Layout" value={responsive ? 'responsive' : 'fixed'} onchange={event => setParam('responsive', event.currentTarget.value === 'responsive')}><option value="fixed">Fixed</option><option value="responsive">Responsive</option></select></label>
-      {/if}
-      {#if tool.artboard.dimensions || responsive}
-        <label>{responsive ? 'Container width' : 'Width'}<input type="number" min={tool.adapter.dimensions.width.min} max={tool.adapter.dimensions.width.max} value={dimensions.width} onchange={event => dimensionEdit('width', event)} /></label>
-        <label>{responsive ? 'Container height' : 'Height'}<input type="number" min={tool.adapter.dimensions.height.min} max={tool.adapter.dimensions.height.max} value={dimensions.height} onchange={event => dimensionEdit('height', event)} /></label>
-      {/if}
-      {#if tool.artboard.presets.length}
-        <label>Aspect<select aria-label="Aspect" value={aspect} onchange={preset}><option value="">Custom</option>{#each tool.artboard.presets as ratio}<option>{ratio}</option>{/each}</select></label>
-      {/if}
-      {#if tool.artboard.swap}<button onclick={() => setSize({ width: dimensions.height, height: dimensions.width })}>Swap dimensions</button>{/if}
-      {#if tool.artboard.ratioLock}<label>Lock ratio<input type="checkbox" checked={Boolean(params.lock)} onchange={event => setParam('lock', event.currentTarget.checked)} /></label>{/if}
-    </fieldset>
     <ExportPanel adapter={tool.adapter} {handlers} {input} {destination} />
+    <details class="artboard-options">
+      <summary>Artboard</summary>
+      <div class="artboard-fields">
+        {#if tool.adapter.capabilities.responsive}
+          <label>Layout<select aria-label="Layout" value={responsive ? 'responsive' : 'fixed'} onchange={event => setParam('responsive', event.currentTarget.value === 'responsive')}><option value="fixed">Fixed</option><option value="responsive">Responsive</option></select></label>
+        {/if}
+        {#if tool.artboard.dimensions || responsive}
+          <label>{responsive ? 'Container width' : 'Width'}<input type="number" min={tool.adapter.dimensions.width.min} max={tool.adapter.dimensions.width.max} value={dimensions.width} onchange={event => dimensionEdit('width', event)} /></label>
+          <label>{responsive ? 'Container height' : 'Height'}<input type="number" min={tool.adapter.dimensions.height.min} max={tool.adapter.dimensions.height.max} value={dimensions.height} onchange={event => dimensionEdit('height', event)} /></label>
+        {/if}
+        {#if tool.artboard.presets.length}
+          <label>Aspect<select aria-label="Aspect" value={aspect} onchange={preset}><option value="">Custom</option>{#each tool.artboard.presets as ratio}<option>{ratio}</option>{/each}</select></label>
+        {/if}
+        {#if tool.artboard.swap}<button onclick={() => setSize({ width: dimensions.height, height: dimensions.width })}>Swap dimensions</button>{/if}
+        {#if tool.artboard.ratioLock}<label>Lock ratio<input type="checkbox" checked={Boolean(params.lock)} onchange={event => setParam('lock', event.currentTarget.checked)} /></label>{/if}
+      </div>
+    </details>
     <SnapshotsPanel slug={tool.id} {persistence} accent={tool.accent} prepareSettings={tool.prepareSettings} onfontchange={fontChange}
       onload={saved => { params = settings(saved.params); persist(); }} />
   </aside>
   <section aria-label="Composition preview">
-    <label>Zoom<select aria-label="Zoom" value={view.zoom ?? 'fit'} onchange={event => setView({ zoom: event.currentTarget.value === 'fit' ? 'fit' : Number(event.currentTarget.value) })}>
-      <option value="fit">Fit</option>{#each [...new Set([25, 50, 100, 200, 400, ...(typeof view.zoom === 'number' ? [view.zoom] : [])])] as value}<option value={value}>{value}%</option>{/each}
-    </select></label>
-    <button onclick={() => setView({ pan: { x: 0, y: 0 } })}>Reset pan</button>
-    {#if tool.playback}<button onclick={play}>{playing ? 'Pause motion' : 'Play motion'}</button>{/if}
+    <div class="view-controls">
+      <label>Zoom<select aria-label="Zoom" value={view.zoom ?? 'fit'} onchange={event => setView({ zoom: event.currentTarget.value === 'fit' ? 'fit' : Number(event.currentTarget.value) })}>
+        <option value="fit">Fit</option>{#each [...new Set([25, 50, 100, 200, 400, ...(typeof view.zoom === 'number' ? [view.zoom] : [])])] as value}<option value={value}>{value}%</option>{/each}
+      </select></label>
+      <button onclick={() => setView({ pan: { x: 0, y: 0 } })}>Reset pan</button>
+      {#if tool.playback}<button onclick={play}>{playing ? 'Pause motion' : 'Play motion'}</button>{/if}
+    </div>
     <p role="status">{busy ? 'Updating full-detail preview…' : 'Full-detail preview'}{#if displayed} · {displayed.dimensions.width} × {displayed.dimensions.height}{/if}</p>
     {#if error}<p role="alert">{error}</p>{/if}
     <div class="stage" bind:this={stage} role="region" aria-label="Pan preview with Space and drag"
@@ -263,12 +267,26 @@
 </div>
 
 <style>
-  .editor { display: grid; grid-template-columns: 24rem minmax(0, 1fr); gap: 1.5rem; }
-  aside { max-height: 85vh; overflow: auto; }
-  fieldset { display: grid; gap: .5rem; margin: 1rem 0; }
+  .editor { display: grid; grid-template-columns: 20rem minmax(0, 1fr); gap: 1rem; flex: 1; min-height: 0; }
+  aside { min-width: 0; overflow: auto; padding-right: .75rem; }
+  aside :global(fieldset) { min-width: 0; margin: .75rem 0; padding: 0; border: 0; }
+  aside :global(legend), summary { font-weight: 600; }
+  aside :global(input), aside :global(select) { box-sizing: border-box; min-width: 0; max-width: 100%; }
+  aside :global(label) { max-width: 100%; flex-wrap: wrap; }
+  .artboard-options { border-top: 1px solid #ccc; padding: .5rem 0; }
+  summary { cursor: pointer; }
+  .artboard-fields { display: grid; gap: .5rem; padding-top: .5rem; }
   label { display: flex; gap: .5rem; align-items: center; }
   input[type=number] { width: 6rem; }
-  .stage { height: 65vh; min-height: 300px; overflow: auto; background: #d6d4cf; padding: 24px; }
+  section { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .view-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  section p { margin: .5rem 0; font-size: .875rem; }
+  .stage { flex: 1; min-height: 0; overflow: auto; background: #d6d4cf; padding: 24px; }
+  @media (max-width: 48rem) {
+    .editor { grid-template-columns: minmax(0, 1fr); }
+    aside { overflow: visible; padding-right: 0; }
+    .stage { flex: none; height: 60vh; min-height: 240px; }
+  }
   .container { position: relative; transform-origin: top left; }
   .surface { background: white; }
   .handle { position: absolute; width: 12px; height: 12px; padding: 0; border: 1px solid #2463cf; background: white; transform: translate(-50%, -50%); touch-action: none; }

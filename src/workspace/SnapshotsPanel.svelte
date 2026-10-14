@@ -91,21 +91,26 @@
 </script>
 
 <section aria-label="Snapshots and typefaces">
+  <details>
+    <summary>Snapshots</summary>
+    <fieldset disabled={busy} aria-label="Snapshot management">
+      <form onsubmit={event => { event.preventDefault(); void run(save); }}>
+        <label>Snapshot name <input bind:value={name} placeholder="name" /></label>
+        <button type="submit">Save snapshot</button>
+      </form>
+      {#each entries as snap (snap.name)}
+        <div>
+          <span>{snap.name}</span>
+          <button type="button" aria-label={`Load ${snap.name}`} onclick={() => run(() => load(snap))}>Load</button>
+          <button type="button" aria-label={`Delete ${snap.name}`} onclick={() => run(async () => { await library.remove(snap.name); entries = await library.list(); })}>Delete</button>
+        </div>
+      {:else}<p>Nothing saved yet</p>{/each}
+      <button type="button" onclick={() => run(exportFile)}>Export snapshots</button>
+      <label>Import snapshots <input type="file" accept=".json,application/json" onchange={importFile} /></label>
+    </fieldset>
+  </details>
   <fieldset disabled={busy}>
-    <legend>Snapshots</legend>
-    <form onsubmit={event => { event.preventDefault(); void run(save); }}>
-      <label>Snapshot name <input bind:value={name} placeholder="name" /></label>
-      <button type="submit">Save snapshot</button>
-    </form>
-    {#each entries as snap (snap.name)}
-      <div>
-        <span>{snap.name}</span>
-        <button type="button" aria-label={`Load ${snap.name}`} onclick={() => run(() => load(snap))}>Load</button>
-        <button type="button" aria-label={`Delete ${snap.name}`} onclick={() => run(async () => { await library.remove(snap.name); entries = await library.list(); })}>Delete</button>
-      </div>
-    {:else}<p>Nothing saved yet</p>{/each}
-    <button type="button" onclick={() => run(exportFile)}>Export snapshots</button>
-    <label>Import snapshots <input type="file" accept=".json,application/json" onchange={importFile} /></label>
+    <legend>Typefaces</legend>
     {#each (accent ? ['primary', 'accent'] : ['primary']) as slot}
       <label>{slot === 'primary' ? 'Primary typeface' : 'Accent typeface'}
         <input type="file" accept=".ttf,.otf,.woff,.woff2" onchange={event => upload(slot as FontSlot, event)} />
@@ -118,7 +123,11 @@
 </section>
 
 <style>
-  fieldset { display: grid; gap: 0.5rem; }
-  form, label { display: flex; gap: 0.5rem; align-items: center; }
-  input { min-width: 0; }
+  details { border-top: 1px solid #ccc; padding: .5rem 0; }
+  summary, legend { font-weight: 600; }
+  summary { cursor: pointer; }
+  fieldset { display: grid; gap: .5rem; min-width: 0; margin: .5rem 0; padding: 0; border: 0; }
+  form, label { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+  input { min-width: 0; max-width: 100%; }
+  span { overflow-wrap: anywhere; }
 </style>

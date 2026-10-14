@@ -154,6 +154,7 @@ test('catalog navigation and grouped controls use registered metadata, reset, ra
   await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params)).toMatchObject({ cellSize: 40, style: 'outline', text: 'changed', enabled: false, ink: '#abcdef' });
   await page.getByLabel('Zoom', { exact: true }).selectOption('200');
   await page.getByText('Appearance', { exact: true }).click();
+  await page.locator('summary').filter({ hasText: /^Snapshots$/ }).click();
   await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Load snapshot 1', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('internal-fixed-fixture');
@@ -166,6 +167,7 @@ test('catalog navigation and grouped controls use registered metadata, reset, ra
   await page.getByText('Appearance', { exact: true }).click();
   await expect(page.getByLabel('Text', { exact: true })).toHaveValue('changed');
   await page.getByLabel('Text', { exact: true }).fill('later');
+  await page.locator('summary').filter({ hasText: /^Snapshots$/ }).click();
   await page.getByRole('button', { name: 'Load snapshot 1', exact: true }).click();
   await expect(page.getByLabel('Text', { exact: true })).toHaveValue('changed');
   await expect(page.getByLabel('Zoom', { exact: true })).toHaveValue('200');
@@ -174,6 +176,7 @@ test('catalog navigation and grouped controls use registered metadata, reset, ra
 test('artboard dimensions, presets, ratio, handles and observed responsive relayout stay separate from view', async ({ page }) => {
   await page.evaluate(() => (window as any).start());
   await expect(scene(page).locator('rect')).toHaveCount(6);
+  await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await page.getByLabel('Aspect', { exact: true }).selectOption('2:3');
   await expect(scene(page).locator('svg')).toHaveAttribute('height', '180');
   await page.getByRole('button', { name: 'Swap dimensions' }).click();
@@ -238,6 +241,56 @@ test('all eight generator capabilities enable responsive controls; fixed excepti
     await page.evaluate(index => (window as any).start('fixture', index), index);
     await expect(scene(page).locator('rect')).toHaveCount(6);
     await expect(page.getByLabel('Layout', { exact: true })).toHaveCount(capabilities[index].responsive ? 1 : 0);
+  }
+});
+
+test('desktop hierarchy keeps preview dominant and disclosures keyboard reachable without changing design state', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  await expect(scene(page).locator('rect')).toHaveCount(6);
+  const saved = await page.evaluate(() => localStorage.getItem('internal-fixture'));
+  const markup = await scene(page).innerHTML();
+  const artboard = page.locator('summary').filter({ hasText: /^Artboard$/ });
+  const snapshots = page.locator('summary').filter({ hasText: /^Snapshots$/ });
+  const tabTo = async (target: import('@playwright/test').Locator) => {
+    for (let count = 0; count < 80; count++) {
+      await page.keyboard.press('Tab');
+      if (await target.evaluate(element => element === document.activeElement)) break;
+    }
+    await expect(target).toBeFocused();
+    await expect(target).toBeInViewport();
+  };
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 1024, height: 768 }]) {
+    await page.setViewportSize(viewport);
+    const preview = await page.getByRole('region', { name: 'Composition preview', exact: true }).boundingBox();
+    const controls = await page.getByRole('complementary', { name: 'Design controls' }).boundingBox();
+    expect(preview!.width).toBeGreaterThan(controls!.width * 1.5);
+    expect(preview!.y + preview!.height).toBeLessThanOrEqual(viewport.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+    await expect(page.getByRole('combobox', { name: 'Tool', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Internal engine fixture', exact: true })).toBeInViewport();
+    await expect(page.getByLabel('Width', { exact: true })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Save snapshot', exact: true })).toBeHidden();
+    await page.getByRole('combobox', { name: 'Tool', exact: true }).focus();
+    await tabTo(artboard);
+    expect(await artboard.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+    await page.keyboard.press('Space');
+    await tabTo(page.getByLabel('Layout', { exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Swap dimensions', exact: true }));
+    await tabTo(snapshots);
+    await page.keyboard.press('Enter');
+    await tabTo(page.getByLabel('Snapshot name', { exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Save snapshot', exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Export snapshots', exact: true }));
+    await tabTo(page.getByLabel('Import snapshots', { exact: true }));
+    await snapshots.press('Space');
+    await expect(page.getByRole('button', { name: 'Save snapshot', exact: true })).toBeHidden();
+    await tabTo(page.getByLabel('Primary typeface', { exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Clear primary typeface' }));
+    await tabTo(page.getByLabel('Accent typeface', { exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Clear accent typeface' }));
+    await artboard.press('Space');
+    expect(await page.evaluate(() => localStorage.getItem('internal-fixture'))).toBe(saved);
+    expect(await scene(page).innerHTML()).toBe(markup);
   }
 });
 
@@ -318,6 +371,7 @@ test('delayed full-detail evaluations coalesce and never publish stale controls 
   await edit(page, 'Cell size exact', '20');
   await page.waitForFunction(() => (window as any).release);
   await edit(page, 'Cell size exact', '10');
+  await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await edit(page, 'Width', '200');
   await edit(page, 'Cell size exact', '40');
   expect(await scene(page).innerHTML()).toBe(original);
