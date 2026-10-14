@@ -59,8 +59,10 @@ encoders preserve Arrow Maze outputs. Legacy pixel settings migrate once to
 width-relative values; shape/direction selections and unknown saved fields
 remain intact. Website runtime/embed delivery and R12 remain fn-5/.7 work.
 
-Measured: native tool tests 8/8; build-backed generator browser tests 13/13;
-workspace control tests 4/4. Real SVG playback matched baked Wasm frames
+Measured before audit: native tool tests 8/8; build-backed generator browser
+tests 13/13; workspace control tests 4/4. After the audit fix, native Comb
+tests 3/3 and the focused Poster/Comb browser file 11/11 passed against the
+rebuilt Wasm and production build. Real SVG playback matched baked Wasm frames
 across draw-in/loop, linear/ease-out/snap, and zero/default hold. Browser
 checks decoded SVG/PNG/GIF downloads, exercised click/outside-target behavior,
 verified font paths, saved-settings migration, no Wasm fallback, screenshots,
@@ -70,11 +72,19 @@ Formatting used the installed stable rustfmt; rustfmt is absent from the
 pinned 1.98.0 toolchain. Stable rustfmt check and git diff --check passed.
 No separate JavaScript lint/format command is configured.
 
+The two-axis quality audit found one correctness Should Fix: single-arrow
+left/down bands lost their only anchor at extreme aspect ratios. A failing
+Rust regression reproduced it; keeping an interior anchor fixes it. The
+browser regression verifies four arrows and visible text-free PNG artwork
+at 8000×100. Two optional standards refactors remain follow-ups: extracting
+Comb profile helpers and moving the shared font Outline out of Maze.
+
+stage: quality-audit - ran (model: openai-codex/gpt-6.1-sol)
 stage: impl-review - skipped(config: review.backend=none)
 stage: completion-review - skipped(policy: other spec tasks remain unfinished)
 
 stage: plan-sync - skipped(config: planSync.enabled != true)
 ## Evidence
-- Commits:
-- Tests:
+- Commits: 5598cb15a1a99a329698fe481fd9ac571c21909b, 5b8ba2a4d0036686dc651048bc5abdd868f89e18, aa477486ba3bf263adea5fde972a732bc4abf1e3
+- Tests: cargo +1.98.0 test --locked --manifest-path crates/spielwerk-engine/Cargo.toml tools (8 passed before audit fix), npm run test:generators (13 passed before audit fix; builds actual Wasm), npx playwright test tests/workspace/controls.test.ts (4 passed), cargo +1.98.0 test --locked --manifest-path crates/spielwerk-engine/Cargo.toml arrow_comb (3 passed after audit fix), npm run build (passed after audit fix), npx playwright test tests/generators/arrow-poster-arrow-comb.test.ts --grep arrow-comb --workers=1 (11 passed after audit fix), rustfmt +stable --check --edition 2021 --config skip_children=true crates/spielwerk-engine/src/lib.rs crates/spielwerk-engine/src/tools/mod.rs crates/spielwerk-engine/src/tools/arrow_path.rs crates/spielwerk-engine/src/tools/arrow_poster.rs crates/spielwerk-engine/src/tools/arrow_comb.rs (passed; changed Comb file rechecked after fix), git diff --check (passed)
 - PRs:
