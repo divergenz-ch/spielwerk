@@ -20,10 +20,12 @@ export type EditorTool = {
     handles: readonly Handle[];
   };
   accent: boolean;
+  prepareSettings?(saved: Parameters): Parameters;
   playback?: boolean;
   interaction?: {
-    hit(frame: Frame<any>, x: number, y: number): { key: string; center: number[] } | undefined;
-    drag(params: Parameters, key: string, x: number, y: number): Parameters;
+    hit(frame: Frame<any>, x: number, y: number, target?: EventTarget | null): { key: string; center: number[] } | undefined;
+    drag?(params: Parameters, key: string, x: number, y: number): Parameters;
+    click?(params: Parameters, key: string): Parameters;
   };
 };
 export type CatalogEntry = PendingTool | EditorTool;

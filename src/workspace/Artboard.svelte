@@ -12,8 +12,9 @@
 
   let { tool, persistence, handlers, destination }: { tool: EditorTool; persistence: Persistence; handlers: ExportHandlers; destination: ExportDestination } = $props();
   const store = untrack(() => settingsStore(tool.id, persistence));
-  const initial = untrack(() => store.load(tool.adapter.defaults));
-  let params = $state<Parameters>(untrack(() => controlSettings(tool.adapter.controls, tool.adapter.defaults, initial.params)));
+  const initial = untrack(() => store.load());
+  const settings = (saved: Parameters) => controlSettings(tool.adapter.controls, tool.adapter.defaults, tool.prepareSettings?.(saved) ?? saved);
+  let params = $state<Parameters>(untrack(() => settings(initial.params)));
   let view = $state<Parameters>(initial.view);
   let assets = $state<Asset[]>([]);
   let displayed = $state<Frame<unknown>>();
@@ -136,11 +137,14 @@
     if (event.button !== 0) return;
     if (!handle && !space && displayed && tool.interaction) {
       const point = scenePoint(event);
-      const hit = tool.interaction.hit(displayed, point.x, point.y);
+      const hit = tool.interaction.hit(displayed, point.x, point.y, event.target);
       if (hit) {
         event.preventDefault(); event.stopPropagation();
-        wordDrag = { id: event.pointerId, key: hit.key, center: hit.center, x: point.x, y: point.y, original: $state.snapshot(params) };
-        (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+        if (tool.interaction.click) { params = tool.interaction.click(params, hit.key); persist(); }
+        if (tool.interaction.drag) {
+          wordDrag = { id: event.pointerId, key: hit.key, center: hit.center, x: point.x, y: point.y, original: $state.snapshot(params) };
+          (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+        }
       }
       return;
     }
@@ -151,7 +155,7 @@
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   function move(event: PointerEvent) {
-    if (wordDrag && event.pointerId === wordDrag.id && tool.interaction) {
+    if (wordDrag && event.pointerId === wordDrag.id && tool.interaction?.drag) {
       const point = scenePoint(event);
       params = tool.interaction.drag(params, wordDrag.key,
         clamp((wordDrag.center[0] + point.x - wordDrag.x) / dimensions.width, 0, 1),
@@ -202,7 +206,7 @@
     </fieldset>
     <ExportPanel adapter={tool.adapter} {handlers} {input} {destination} />
     <SnapshotsPanel slug={tool.id} {persistence} accent={tool.accent} onfontchange={fontChange}
-      onload={saved => { params = controlSettings(tool.adapter.controls, tool.adapter.defaults, saved.params); persist(); }} />
+      onload={saved => { params = settings(saved.params); persist(); }} />
   </aside>
   <section aria-label="Composition preview">
     <label>Zoom<select aria-label="Zoom" value={view.zoom ?? 'fit'} onchange={event => setView({ zoom: event.currentTarget.value === 'fit' ? 'fit' : Number(event.currentTarget.value) })}>

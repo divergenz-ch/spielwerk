@@ -91,11 +91,11 @@ impl Rng {
 fn overlaps(a: [f64; 4], b: [f64; 4]) -> bool {
     a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1]
 }
-struct Outline {
-    d: String,
-    x: f64,
-    y: f64,
-    scale: f64,
+pub(super) struct Outline {
+    pub(super) d: String,
+    pub(super) x: f64,
+    pub(super) y: f64,
+    pub(super) scale: f64,
 }
 impl ttf_parser::OutlineBuilder for Outline {
     fn move_to(&mut self, x: f32, y: f32) {
