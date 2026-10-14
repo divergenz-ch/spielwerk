@@ -1,0 +1,46 @@
+{
+  "name": "spielwerk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.12.0 || >=24.0.0"
+  },
+  "scripts": {
+    "setup:engine": "rustup toolchain install 1.98.0 --profile minimal --target wasm32-unknown-unknown && cargo +1.98.0 install wasm-bindgen-cli --version 0.2.129 --locked",
+    "build:engine": "node src/engine/build.mjs --wasm-only",
+    "dev": "npm run build:engine && vite --host 127.0.0.1",
+    "build": "node src/engine/build.mjs",
+    "test:engine": "npm run build && npm run test:rust && playwright test tests/workspace/engine.test.ts",
+    "test:rust": "cargo +1.98.0 test --locked --manifest-path crates/spielwerk-engine/Cargo.toml workspace",
+    "preview": "vite preview --host 127.0.0.1",
+    "test:bootstrap": "npm run build && playwright test tests/workspace/bootstrap.test.ts",
+    "test:workspace": "npm run build && playwright test tests/workspace",
+    "test:generators": "npm run build && playwright test tests/generators",
+    "test:embeds": "npm run build:engine && playwright test tests/embeds",
+    "test:integration": "playwright test tests/integration"
+  },
+  "spielwerk": {
+    "setup": "npm ci && npx playwright install chromium && npm run setup:engine",
+    "engineProof": "After build, open /src/engine/probe.html on the static host or Vite server. This internal Svelte fixture exercises actual Wasm, not a named tool. See src/engine/README.md for the sibling adapter contract.",
+    "development": "npm run dev; open the printed local URL.",
+    "staticHosting": "npm run build; serve or publish dist/ using any static HTTP host, including a subdirectory. npm run preview serves dist/ locally. No backend or file:// support is required.",
+    "testContracts": {
+      "test:engine": "Build the app and Wasm, run focused native Rust tests and Chromium boundary tests on development/static root/static subdirectory hosts.",
+      "test:rust": "Run the engine's native workspace-filtered tests using the pinned Rust toolchain and Cargo.lock.",
+      "test:bootstrap": "Build and run Chromium mount/asset smoke tests against Vite development and plain static HTTP hosting (Python 3 required).",
+      "test:workspace": "Build and run tests/workspace; later foundation tasks add focused tests here.",
+      "test:generators": "Build actual Wasm and run focused Chromium generator user-surface cases; empty collection fails.",
+      "test:embeds": "Build actual Wasm and run independent-host resize and visual playback cases for all eight tools.",
+      "test:integration": "Reserved for tests/integration, supplied by final integration. Fails with no tests until that task lands; not a bootstrap acceptance gate."
+    }
+  },
+  "dependencies": {
+    "svelte": "5.57.2"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@playwright/test": "1.64.1",
+    "vite": "8.3.4"
+  }
+}

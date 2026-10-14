@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-13T12:55:02.167373Z",
+  "depends_on": [
+    "fn-3-spielwerk-logo-extrusion.1"
+  ],
+  "id": "fn-3-spielwerk-logo-extrusion.2",
+  "priority": null,
+  "spec": "fn-3-spielwerk-logo-extrusion",
+  "spec_path": ".flow/tasks/fn-3-spielwerk-logo-extrusion.2.md",
+  "status": "todo",
+  "title": "Integrate extrusion materials, lighting, and explicit-time motion",
+  "updated_at": "2026-10-13T12:55:02.167373Z"
+}

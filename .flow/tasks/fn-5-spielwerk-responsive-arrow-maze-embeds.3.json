@@ -1,0 +1,16 @@
+{
+  "assignee": null,
+  "claim_note": "",
+  "claimed_at": null,
+  "created_at": "2026-10-13T12:55:02.913081Z",
+  "depends_on": [
+    "fn-5-spielwerk-responsive-arrow-maze-embeds.2"
+  ],
+  "id": "fn-5-spielwerk-responsive-arrow-maze-embeds.3",
+  "priority": null,
+  "spec": "fn-5-spielwerk-responsive-arrow-maze-embeds",
+  "spec_path": ".flow/tasks/fn-5-spielwerk-responsive-arrow-maze-embeds.3.md",
+  "status": "todo",
+  "title": "Verify website embed delivery and downstream handoff receipts",
+  "updated_at": "2026-10-14T19:01:39.450908Z"
+}

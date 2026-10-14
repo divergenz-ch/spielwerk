@@ -1,0 +1,32 @@
+{
+  "branch_name": "fn-1-spielwerk-shared-design-workspace",
+  "completion_review_status": "unknown",
+  "completion_reviewed_at": null,
+  "created_at": "2026-10-13T08:16:09.936372Z",
+  "default_impl": null,
+  "default_review": null,
+  "default_sync": null,
+  "depends_on_epics": [],
+  "id": "fn-2-spielwerk-parametric-graphic-generators",
+  "impl_review_rounds": {},
+  "next_task": 1,
+  "no_plan": false,
+  "plan_review_rounds": 0,
+  "plan_review_status": "unknown",
+  "plan_reviewed_at": null,
+  "spec_path": ".flow/specs/fn-2-spielwerk-parametric-graphic-generators.md",
+  "status": "done",
+  "title": "Spielwerk parametric graphic generators",
+  "tracker": {
+    "baseHashFlow": null,
+    "baseHashTracker": null,
+    "depRelations": [],
+    "id": null,
+    "identifier": null,
+    "lastSyncedAt": null,
+    "mergeBaseFlow": null,
+    "mergeBaseTracker": null,
+    "url": null
+  },
+  "updated_at": "2026-10-14T19:23:22.616415Z"
+}
