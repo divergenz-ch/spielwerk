@@ -262,12 +262,16 @@ pub fn evaluate(input: Input, font: &[u8], accent: &[u8]) -> Result<Frame, &'sta
             gw / fixed
         } else {
             density * (gw / gh).sqrt()
-        }).round().max(2.0) as usize;
+        })
+        .round()
+        .max(2.0) as usize;
         let rows = (if fixed > 0.0 {
             gh / fixed
         } else {
             density * (gh / gw).sqrt()
-        }).round().max(2.0) as usize;
+        })
+        .round()
+        .max(2.0) as usize;
         (gw, gh, cols, rows)
     };
     let (basis, fixed) = if let Some(requested) = input.host_cell {
@@ -889,7 +893,10 @@ mod tools {
         assert_ne!(auto.scene.columns, wide.scene.columns);
         assert_eq!(original, evaluate(input(), &[], &[]).unwrap());
         i.host_cell = Some(-1.0);
-        assert_eq!(evaluate(i, &[], &[]).unwrap_err(), "Invalid Arrow Maze host cell");
+        assert_eq!(
+            evaluate(i, &[], &[]).unwrap_err(),
+            "Invalid Arrow Maze host cell"
+        );
     }
     #[test]
     fn dimensions_relayout_manual_word_layers_and_boundaries() {
