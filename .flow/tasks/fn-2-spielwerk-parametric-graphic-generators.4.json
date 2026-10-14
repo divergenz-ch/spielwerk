@@ -10,7 +10,7 @@
   "priority": null,
   "spec": "fn-2-spielwerk-parametric-graphic-generators",
   "spec_path": ".flow/tasks/fn-2-spielwerk-parametric-graphic-generators.4.md",
-  "status": "todo",
+  "status": "done",
   "title": "Deliver Switchboard Rust widget state, wiring, and motion",
   "updated_at": "2026-10-14T16:37:40.253889Z"
 }

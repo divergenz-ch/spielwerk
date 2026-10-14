@@ -12,7 +12,7 @@
   "priority": null,
   "spec": "fn-2-spielwerk-parametric-graphic-generators",
   "spec_path": ".flow/tasks/fn-2-spielwerk-parametric-graphic-generators.7.md",
-  "status": "todo",
+  "status": "done",
   "title": "Verify the complete generator catalog with delivered website embeds",
   "updated_at": "2026-10-14T19:21:08.384925Z"
 }

@@ -1,5 +1,5 @@
 {
-  "branch_name": "fn-2-spielwerk-parametric-graphic-generators",
+  "branch_name": "fn-1-spielwerk-shared-design-workspace",
   "completion_review_status": "unknown",
   "completion_reviewed_at": null,
   "created_at": "2026-10-13T08:16:09.936372Z",
@@ -15,7 +15,7 @@
   "plan_review_status": "unknown",
   "plan_reviewed_at": null,
   "spec_path": ".flow/specs/fn-2-spielwerk-parametric-graphic-generators.md",
-  "status": "open",
+  "status": "done",
   "title": "Spielwerk parametric graphic generators",
   "tracker": {
     "baseHashFlow": null,
@@ -28,5 +28,5 @@
     "mergeBaseTracker": null,
     "url": null
   },
-  "updated_at": "2026-10-13T13:11:32.826146Z"
+  "updated_at": "2026-10-14T19:23:22.616415Z"
 }

@@ -10,7 +10,7 @@
   "priority": null,
   "spec": "fn-2-spielwerk-parametric-graphic-generators",
   "spec_path": ".flow/tasks/fn-2-spielwerk-parametric-graphic-generators.3.md",
-  "status": "todo",
+  "status": "done",
   "title": "Deliver the Arrow Field Rust layout and workspace pointer adapter",
   "updated_at": "2026-10-13T12:55:01.798875Z"
 }

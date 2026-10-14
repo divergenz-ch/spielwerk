@@ -10,7 +10,7 @@
   "priority": null,
   "spec": "fn-2-spielwerk-parametric-graphic-generators",
   "spec_path": ".flow/tasks/fn-2-spielwerk-parametric-graphic-generators.5.md",
-  "status": "todo",
+  "status": "done",
   "title": "Deliver Truchet Tiles and Imprint primitive-based Rust adapters",
   "updated_at": "2026-10-14T16:59:42.781094Z"
 }
