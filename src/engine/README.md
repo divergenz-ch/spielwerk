@@ -1,9 +1,19 @@
 # Rust/browser boundary
 
-This foundation proves an internal Svelte caller can evaluate real Rust/Wasm.
-It does not implement any of the ten design tools. Their identities and intended
-capabilities live in `../workspace/registry.ts`; every entry remains `pending`
-with a null adapter. The root workspace still says tools are unavailable.
+The internal probe proves a Svelte caller can evaluate real Rust/Wasm. The
+current workspace also registers eight real generators in
+`src/tools/registry.ts`: Arrow Maze, Arrow Poster, Arrow Comb, Arrow Field,
+Switchboard, Truchet Tiles, Imprint, and Stripe Marquee. `src/main.ts` merges
+these ready registrations with `src/workspace/registry.ts` metadata. Logo
+Extruder and Font Remixer still have null adapters and unavailable catalog
+entries. The eight generators include artwork handlers and website packages;
+the probe's rectangles are a separate boundary fixture.
+
+See the [workspace workflow](../../README.md) for choosing, editing, previewing,
+and exporting, and the [control decision](../../CLAUDE.md#control-library-decision)
+for the Tweakpane editing mirror, public-API maintenance boundary, and historical
+stock evaluation. Svelte retains canonical state. Final ten-tool integration remains
+with `fn-1-spielwerk-shared-design-workspace.1`.
 
 ## Build and inspect the proof
 
@@ -27,7 +37,9 @@ asset with an `application/wasm` response; no application backend is required.
 `test:engine` builds both entries, runs three native Rust tests, and exercises
 the Svelte proof through Chromium on Vite, static root, and static subdirectory
 hosts. It also checks that blocking the Wasm asset prevents computation.
-`test:integration` remains unavailable until real sibling engines land.
+`test:integration` currently exercises the eight generators' downloaded
+website packages in `tests/integration/generators.spec.ts`. That coverage does
+not complete the pending extrusion/font work or the final ten-tool gate.
 
 Rust 1.98.0, wasm-bindgen 0.2.129, serde 1.0.229, serde_json 1.0.154, and
 `ttf-parser` 0.25.1 are pinned. Cargo.lock locks transitive dependencies.
@@ -71,7 +83,8 @@ not a universal representation for font outlines or 3D meshes.
 ## Sibling handoffs
 
 Each owner supplies a real adapter before changing its registration to ready.
-The intended formats are limits, not working export implementations.
+Pending metadata's intended formats remain limits, not available exports.
+Delivered registrations and handlers determine the formats shown in the UI.
 
 | Owner | Inputs to Rust | Rust outputs and browser responsibility |
 | --- | --- | --- |
@@ -81,11 +94,12 @@ The intended formats are limits, not working export implementations.
 | Website runtimes (fn-5) | Generator design/asset inputs, containing dimensions, and explicit playback time | Reuse the applicable fn-2 Rust calculation and scene contract; supply independent visual-only runtimes and embed packaging, not editor UI. |
 | Workspace storage/controls/export (fn-1 .4–.6) | Maintain design/view separation; supply controls from actual adapters and validate their declared limits | Call the adapter at selected dimensions/time; render or encode its output. Do not claim pending tool formats as available exports. |
 
-SVG/PNG/GIF are not universal: Truchet Tiles and Imprint have SVG/PNG artwork;
-Logo Extruder has PNG/GIF; Font Remixer has SVG/PNG and font outputs. The eight
-generators additionally require embeds from fn-5. Export encoders and final
-3D/font renderers remain with the owning implementations; native SVG rendering
-is the selected and exercised foundation renderer, not a claim of those engines.
+SVG/PNG/GIF are not universal. Truchet Tiles and Imprint have SVG/PNG artwork;
+the other six delivered generators also offer GIF. All eight have website
+embeds through fn-5. Logo Extruder's intended PNG/GIF and Font Remixer's
+intended SVG/PNG and font outputs remain pending with their engines and
+renderers. Native SVG is the exercised foundation renderer; the probe does
+not establish 3D rendering or font transformation support.
 
 ## Binding, rendering, and font-input proof
 

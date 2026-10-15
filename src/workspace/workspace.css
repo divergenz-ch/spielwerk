@@ -1,0 +1,68 @@
+:root {
+  color-scheme: light;
+  --ui-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ui-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --ui-panel: #f8f8f6;
+  --ui-canvas: #e9e9e6;
+  --ui-field: #eaeae7;
+  --ui-hover: #e0e0dc;
+  --ui-active: #d5d5d0;
+  --ui-line: #ddddd8;
+  --ui-ink: #30312e;
+  --ui-muted: #6b6c66;
+  --ui-focus: #52759b;
+  --ui-danger: #a13e32;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: var(--ui-ink);
+  background: var(--ui-canvas);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+body { margin: 0; background: var(--ui-canvas); }
+* { box-sizing: border-box; }
+button, input, select { font: inherit; }
+button, summary, select { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+button:disabled, input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+.ui-button, .ui-select, .ui-input, .ui-file {
+  min-width: 0;
+  max-width: 100%;
+  height: 26px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--ui-field);
+  color: var(--ui-ink);
+}
+.ui-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; font-weight: 500; cursor: pointer; text-decoration: none; }
+.ui-button:hover, .ui-select:hover, .ui-input:hover, .ui-file:hover { background-color: var(--ui-hover); }
+.ui-button:active { background-color: var(--ui-active); }
+.ui-button svg { width: 14px; height: 14px; flex: none; }
+.ui-button.quiet { background: transparent; color: var(--ui-muted); }
+.ui-button.quiet:hover { background: var(--ui-field); color: var(--ui-ink); }
+.ui-button.icon { width: 28px; padding: 0; }
+.ui-select { appearance: none; padding: 0 24px 0 8px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236b6c66' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 5 2 2 2-2'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 6px center; }
+.ui-input { width: 100%; padding: 0 8px; }
+.ui-input[type=number] { font-family: var(--ui-mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+.ui-row { display: grid; grid-template-columns: minmax(0, 1fr) 156px; align-items: center; gap: 8px; min-height: 26px; color: var(--ui-muted); }
+.ui-row > :last-child { min-width: 0; }
+.ui-row input[type=checkbox] { appearance: none; margin: 0; width: 26px; height: 26px; border-radius: 4px; background: var(--ui-field); cursor: pointer; }
+.ui-row input[type=checkbox]:checked { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='26' height='26' fill='none' stroke='%2330312e' stroke-width='1.5'%3E%3Cpath d='m8 13 3 3 7-7'/%3E%3C/svg%3E"); }
+.ui-section { border-top: 1px solid var(--ui-line); }
+.ui-section > summary { display: flex; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 16px; color: var(--ui-ink); font-weight: 600; cursor: pointer; list-style: none; }
+.ui-section > summary::-webkit-details-marker { display: none; }
+.ui-section > summary::after { content: ''; width: 5px; height: 5px; margin-right: 3px; border-right: 1px solid var(--ui-muted); border-bottom: 1px solid var(--ui-muted); transform: rotate(-45deg); }
+.ui-section[open] > summary::after { transform: rotate(45deg); }
+.ui-section > summary:hover { background: var(--ui-field); }
+.ui-section-body { display: grid; gap: 5px; margin: 0; padding: 2px 16px 14px; border: 0; min-width: 0; }
+.ui-note { color: var(--ui-muted); font-size: 11px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
+.ui-alert { color: var(--ui-danger); font-size: 11px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
+.ui-file { width: 100%; padding: 0; font-size: 11px; line-height: 26px; }
+.ui-file::file-selector-button { height: 26px; border: 0; border-right: 1px solid var(--ui-line); margin-right: 7px; padding: 0 8px; background: transparent; color: var(--ui-ink); font: inherit; cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0s !important; animation-duration: 0s !important; }
+}

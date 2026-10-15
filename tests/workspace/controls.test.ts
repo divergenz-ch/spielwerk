@@ -14,19 +14,37 @@ const pageErrors = new WeakMap<object, string[]>();
 test.beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'spielwerk-controls-'));
   const entry = join(directory, 'entry.js');
+  const harness = join(directory, 'ControlsHarness.svelte');
+  await writeFile(harness, `
+    <script>
+      import { untrack } from ${JSON.stringify(resolve('node_modules/svelte/src/index-client.js'))};
+      import Controls from ${JSON.stringify(resolve('src/workspace/Controls.svelte'))};
+      let { controls, defaults } = $props();
+      let params = $state(untrack(() => ({ ...defaults })));
+      let expandedGroups = $state(['Geometry', 'Appearance']);
+      window.edits = [];
+      window.restoreControls = (values, groups = expandedGroups) => { params = { ...values }; expandedGroups = groups; };
+      window.folds = [];
+    </script>
+    <Controls {controls} {params} {defaults} {expandedGroups}
+      onchange={(key, value) => { window.edits.push({ key, value }); params = { ...params, [key]: value }; }}
+      onexpand={(group, open) => { window.folds.push({ group, open }); expandedGroups = open ? [...new Set([...expandedGroups, group])] : expandedGroups.filter(g => g !== group); }} />
+  `);
   await writeFile(entry, `
     import { mount, unmount } from ${JSON.stringify(resolve('node_modules/svelte/src/index-client.js'))};
     import App from ${JSON.stringify(resolve('src/workspace/App.svelte'))};
+    import ControlsHarness from ${JSON.stringify(harness)};
     import { tools } from ${JSON.stringify(resolve('src/workspace/registry.ts'))};
     import { evaluateFixture } from ${JSON.stringify(resolve('src/engine/client.ts'))};
     window.catalog = tools;
     window.calls = [];
     const fixture = {
-      id: 'internal-fixture', name: 'Internal engine fixture', description: 'Not a named design tool', status: 'ready', accent: true,
+      id: 'internal-fixture', name: 'Internal engine fixture', description: 'Not a named design tool', status: 'ready', accent: true, playback: true,
       adapter: {
-        id: '__fixture__', defaults: { cellSize: 40, ink: '#112233', text: 'proof', enabled: true, style: 'solid' },
+        id: '__fixture__', defaults: { cellSize: 40, fraction: 0.35, ink: '#112233', text: 'proof', enabled: true, style: 'solid' },
         controls: [
           { key: 'cellSize', label: 'Cell size', group: 'Geometry', type: 'number', min: 10, max: 80, step: 5 },
+          { key: 'fraction', label: 'Fraction', group: 'Geometry', type: 'number', min: 0.15, max: 1.15, step: 0.2 },
           { key: 'style', label: 'Style', group: 'Appearance', type: 'choice', options: ['solid', 'outline'] },
           { key: 'ink', label: 'Ink', group: 'Appearance', type: 'color' },
           { key: 'text', label: 'Text', group: 'Appearance', type: 'text' },
@@ -38,11 +56,15 @@ test.beforeAll(async () => {
           window.calls.push(input);
           const frame = await evaluateFixture(input);
           if (window.hold === input.design.params.cellSize) await new Promise(resolve => window.release = resolve);
+          window.finished = (window.finished ?? 0) + 1;
+          if (window.failEvaluation) throw Error('fixture evaluation failure');
           return frame;
         },
       },
       artboard: { initial: { width: 120, height: 80 }, dimensions: true, presets: ['1:1', '2:3'], swap: true, ratioLock: true, handles: ['n','ne','e','se','s','sw','w','nw'] },
       renderer: { render(frame, target) {
+        if (window.failRender) throw Error('fixture renderer failure');
+        window.rendered = (window.rendered ?? 0) + 1;
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         svg.setAttribute('width', frame.dimensions.width); svg.setAttribute('height', frame.dimensions.height);
         svg.setAttribute('viewBox', '0 0 ' + frame.dimensions.width + ' ' + frame.dimensions.height);
@@ -61,6 +83,10 @@ test.beforeAll(async () => {
     let app;
     window.start = async (mode = 'fixture', capabilityIndex) => {
       if (app) await unmount(app);
+      if (mode === 'controls') {
+        app = mount(ControlsHarness, { target: document.body, props: { controls: fixture.adapter.controls, defaults: fixture.adapter.defaults } });
+        return;
+      }
       let catalog = mode === 'catalog' ? tools : [fixture, fixed];
       if (capabilityIndex !== undefined) catalog = [{ ...fixture, adapter: { ...fixture.adapter, capabilities: tools[capabilityIndex].intendedCapabilities } }];
       app = mount(App, { target: document.body, props: { catalog } });
@@ -114,25 +140,28 @@ test('catalog navigation and grouped controls use registered metadata, reset, ra
   await page.evaluate(() => { location.hash = 'internal-fixture'; return (window as any).start(); });
   await expect(scene(page).locator('rect')).toHaveCount(6);
   await edit(page, 'Cell size exact', '999');
-  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveValue('80');
+  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveAttribute('aria-valuenow', '80');
   await edit(page, 'Cell size exact', '-9');
-  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveValue('10');
+  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveAttribute('aria-valuenow', '10');
   await edit(page, 'Cell size exact', '43');
-  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveValue('45');
+  await expect(page.getByRole('slider', { name: 'Cell size', exact: true })).toHaveAttribute('aria-valuenow', '45');
   await page.getByRole('button', { name: 'Reset Cell size' }).click();
   await expect(scene(page).locator('rect')).toHaveCount(6);
   const slider = page.getByRole('slider', { name: 'Cell size', exact: true });
   await slider.press('ArrowRight');
-  await expect(slider).toHaveValue('45');
+  await expect(slider).toHaveAttribute('aria-valuenow', '45');
   await slider.dblclick();
-  await expect(slider).toHaveValue('40');
+  await expect(slider).toHaveAttribute('aria-valuenow', '40');
   await page.getByLabel('Style', { exact: true }).selectOption('outline');
   await page.getByLabel('Text', { exact: true }).fill('changed');
-  await page.getByLabel('Enabled', { exact: true }).uncheck();
+  await expect(page.getByLabel('Enabled', { exact: true })).toBeChecked();
+  await page.getByLabel('Enabled', { exact: true }).locator('..').click();
+  await expect(page.getByLabel('Enabled', { exact: true })).not.toBeChecked();
   await page.getByLabel('Ink', { exact: true }).fill('#abcdef');
   await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params)).toMatchObject({ cellSize: 40, style: 'outline', text: 'changed', enabled: false, ink: '#abcdef' });
   await page.getByLabel('Zoom', { exact: true }).selectOption('200');
   await page.getByText('Appearance', { exact: true }).click();
+  await page.locator('summary').filter({ hasText: /^Snapshots$/ }).click();
   await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Load snapshot 1', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('internal-fixed-fixture');
@@ -141,10 +170,11 @@ test('catalog navigation and grouped controls use registered metadata, reset, ra
   await expect(page.getByRole('button', { name: /^Resize artboard/ })).toHaveCount(0);
   await page.evaluate(() => { location.hash = 'internal-fixture'; });
   await expect(page.getByLabel('Zoom', { exact: true })).toHaveValue('200');
-  await expect(page.locator('details').filter({ has: page.getByText('Appearance', { exact: true }) })).not.toHaveAttribute('open');
+  await expect(page.getByRole('button', { name: 'Appearance', exact: true })).toHaveAttribute('aria-expanded', 'false');
   await page.getByText('Appearance', { exact: true }).click();
   await expect(page.getByLabel('Text', { exact: true })).toHaveValue('changed');
   await page.getByLabel('Text', { exact: true }).fill('later');
+  await page.locator('summary').filter({ hasText: /^Snapshots$/ }).click();
   await page.getByRole('button', { name: 'Load snapshot 1', exact: true }).click();
   await expect(page.getByLabel('Text', { exact: true })).toHaveValue('changed');
   await expect(page.getByLabel('Zoom', { exact: true })).toHaveValue('200');
@@ -153,6 +183,7 @@ test('catalog navigation and grouped controls use registered metadata, reset, ra
 test('artboard dimensions, presets, ratio, handles and observed responsive relayout stay separate from view', async ({ page }) => {
   await page.evaluate(() => (window as any).start());
   await expect(scene(page).locator('rect')).toHaveCount(6);
+  await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await page.getByLabel('Aspect', { exact: true }).selectOption('2:3');
   await expect(scene(page).locator('svg')).toHaveAttribute('height', '180');
   await page.getByRole('button', { name: 'Swap dimensions' }).click();
@@ -174,13 +205,21 @@ test('artboard dimensions, presets, ratio, handles and observed responsive relay
   await page.mouse.move(box.x + 6, box.y + 6); await page.mouse.down(); await page.mouse.move(box.x + 46, box.y + 26); await page.mouse.up();
   await expect(page.getByLabel('Width', { exact: true })).toHaveValue('166');
   await expect(page.getByLabel('Height', { exact: true })).toHaveValue('102');
+  const resizedBox = (await handle.boundingBox())!;
+  await handle.focus();
+  await page.mouse.move(resizedBox.x + 6, resizedBox.y + 6); await page.mouse.down();
+  await page.mouse.move(resizedBox.x + 26, resizedBox.y + 16);
+  await expect(page.getByLabel('Width', { exact: true })).toHaveValue('186');
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  await expect(page.getByLabel('Width', { exact: true })).toHaveValue('166');
+  await expect(page.getByLabel('Height', { exact: true })).toHaveValue('102');
   await expect(page.getByRole('status')).not.toContainText('Updating');
   const before = await page.evaluate(() => (window as any).calls.length);
   const markup = await scene(page).innerHTML();
   await page.getByLabel('Zoom', { exact: true }).selectOption('200');
   const stage = page.getByRole('region', { name: 'Pan preview with Space and drag' });
   const stageBox = (await stage.boundingBox())!;
-  await page.keyboard.press('Tab');
+  await stage.click({ position: { x: 8, y: 8 } });
   await page.keyboard.down('Space');
   await page.mouse.move(stageBox.x + 200, stageBox.y + 200); await page.mouse.down(); await page.mouse.move(stageBox.x + 230, stageBox.y + 220); await page.mouse.up(); await page.keyboard.up('Space');
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('internal-fixture')!).pan)).toEqual({ x: 30, y: 20 });
@@ -212,6 +251,205 @@ test('all eight generator capabilities enable responsive controls; fixed excepti
   }
 });
 
+test('desktop hierarchy keeps preview dominant and disclosures keyboard reachable without changing design state', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  await expect(scene(page).locator('rect')).toHaveCount(6);
+  const saved = await page.evaluate(() => localStorage.getItem('internal-fixture'));
+  const markup = await scene(page).innerHTML();
+  const artboard = page.locator('summary').filter({ hasText: /^Artboard$/ });
+  const snapshots = page.locator('summary').filter({ hasText: /^Snapshots$/ });
+  const tabTo = async (target: import('@playwright/test').Locator) => {
+    for (let count = 0; count < 80; count++) {
+      await page.keyboard.press('Tab');
+      if (await target.evaluate(element => element === document.activeElement)) break;
+    }
+    await expect(target).toBeFocused();
+    await expect(target).toBeInViewport();
+  };
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 1024, height: 768 }]) {
+    await page.setViewportSize(viewport);
+    const preview = await page.getByRole('region', { name: 'Composition preview', exact: true }).boundingBox();
+    const controls = await page.getByRole('complementary', { name: 'Design controls' }).boundingBox();
+    expect(preview!.width).toBeGreaterThan(controls!.width * 1.5);
+    expect(preview!.y + preview!.height).toBeLessThanOrEqual(viewport.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
+    await expect(page.getByRole('combobox', { name: 'Tool', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'Internal engine fixture', exact: true })).toBeInViewport();
+    await expect(page.getByLabel('Width', { exact: true })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Save snapshot', exact: true })).toBeHidden();
+    await page.getByRole('combobox', { name: 'Tool', exact: true }).focus();
+    await tabTo(artboard);
+    expect(await artboard.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+    await page.keyboard.press('Space');
+    await tabTo(page.getByLabel('Layout', { exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Swap dimensions', exact: true }));
+    await tabTo(snapshots);
+    await page.keyboard.press('Enter');
+    await tabTo(page.getByLabel('Snapshot name', { exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Save snapshot', exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Export snapshots', exact: true }));
+    await tabTo(page.getByLabel('Import snapshots', { exact: true }));
+    await snapshots.press('Space');
+    await expect(page.getByRole('button', { name: 'Save snapshot', exact: true })).toBeHidden();
+    await tabTo(page.getByLabel('Primary typeface', { exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Clear primary typeface' }));
+    await tabTo(page.getByLabel('Accent typeface', { exact: true }));
+    await tabTo(page.getByRole('button', { name: 'Clear accent typeface' }));
+    await artboard.press('Space');
+    expect(await page.evaluate(() => localStorage.getItem('internal-fixture'))).toBe(saved);
+    expect(await scene(page).innerHTML()).toBe(markup);
+  }
+});
+
+test('numeric boundaries retain valid values, minimum-relative precision and immediate keyboard steps', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  await expect(scene(page).locator('rect')).toHaveCount(6);
+  const fraction = page.getByRole('spinbutton', { name: 'Fraction exact', exact: true });
+  for (const [value, expected] of [['0.46', '0.55'], ['-1', '0.15'], ['9', '1.15'], ['0.35', '0.35'], ['', '0.35'], ['1e309', '0.35'], ['NaN', '0.35'], ['Infinity', '0.35'], ['12px', '0.35']]) {
+    await fraction.fill(value); await fraction.press('Tab');
+    await expect(fraction).toHaveValue(expected);
+    await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.fraction)).toBe(Number(expected));
+  }
+  await fraction.press('ArrowUp'); await fraction.press('Tab');
+  await expect(fraction).toHaveValue('0.55');
+  const slider = page.getByRole('slider', { name: 'Fraction', exact: true });
+  await slider.press('ArrowRight');
+  await expect(slider).toHaveAttribute('aria-valuenow', '0.75');
+  await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.fraction)).toBe(0.75);
+});
+
+test('numeric keyboard steps use the uncommitted draft and retain last-valid fallback', async ({ page }) => {
+  await page.evaluate(() => (window as any).start('controls'));
+  const cell = page.getByRole('spinbutton', { name: 'Cell size exact', exact: true });
+  for (const [draft, key, expected] of [['60', 'ArrowUp', '65'], ['60', 'ArrowDown', '55'], ['', 'ArrowUp', '60'], ['Infinity', 'ArrowDown', '55']]) {
+    await cell.fill(draft); await cell.press(key);
+    await expect(cell).toHaveValue(expected);
+    expect(await page.evaluate(() => (window as any).edits.at(-1))).toEqual({ key: 'cellSize', value: Number(expected) });
+  }
+  const fraction = page.getByRole('spinbutton', { name: 'Fraction exact', exact: true });
+  await fraction.fill('0.55'); await fraction.press('ArrowUp');
+  await expect(fraction).toHaveValue('0.75');
+  expect(await page.evaluate(() => (window as any).edits.at(-1))).toEqual({ key: 'fraction', value: 0.75 });
+});
+
+test('color typing preserves incomplete drafts and previews complete values before blur', async ({ page }) => {
+  await page.evaluate(() => (window as any).start('controls'));
+  const ink = page.getByLabel('Ink', { exact: true });
+  await ink.fill('');
+  for (const [character, draft] of [['#', '#'], ['a', '#a'], ['b', '#ab'], ['c', '#abc'], ['d', '#abcd'], ['e', '#abcde']]) {
+    await ink.pressSequentially(character);
+    await expect(ink).toHaveValue(draft);
+    expect(await page.evaluate(() => (window as any).edits)).toEqual([]);
+  }
+  await ink.pressSequentially('f');
+  await expect(ink).toBeFocused();
+  await expect(ink).toHaveValue('#abcdef');
+  expect(await page.evaluate(() => (window as any).edits)).toEqual([{ key: 'ink', value: '#abcdef' }]);
+  await ink.press('Backspace');
+  await expect(ink).toHaveValue('#abcde');
+  expect(await page.evaluate(() => (window as any).edits)).toHaveLength(1);
+  await ink.pressSequentially('0');
+  await expect(ink).toHaveValue('#abcde0');
+  expect(await page.evaluate(() => (window as any).edits.at(-1))).toEqual({ key: 'ink', value: '#abcde0' });
+  await ink.fill('#abc'); await ink.press('Tab');
+  await expect(ink).toHaveValue('#aabbcc');
+  await ink.fill('#not-a-color'); await ink.press('Tab');
+  await expect(ink).toHaveValue('#aabbcc');
+  expect(await page.evaluate(() => (window as any).edits.at(-1))).toEqual({ key: 'ink', value: '#aabbcc' });
+});
+
+test('Space activates reset and disclosures without panning while text editing keeps its keys', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  await expect(scene(page).locator('rect')).toHaveCount(6);
+  await edit(page, 'Cell size exact', '60');
+  const reset = page.getByRole('button', { name: 'Reset Cell size', exact: true });
+  await page.getByRole('spinbutton', { name: 'Cell size exact', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  await expect(reset).toBeFocused();
+  expect(await reset.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  await reset.press('Space');
+  await expect(page.getByRole('spinbutton', { name: 'Cell size exact', exact: true })).toHaveValue('40');
+  const summary = page.getByRole('button', { name: 'Appearance', exact: true });
+  await summary.press('Space');
+  await expect(page.getByLabel('Text', { exact: true })).toBeHidden();
+  await summary.press('Space');
+  const text = page.getByLabel('Text', { exact: true });
+  await text.fill('#aabbcc'); await text.press('End'); await text.press('Space');
+  await expect(text).toHaveValue('#aabbcc ');
+  const stage = page.getByRole('region', { name: 'Pan preview with Space and drag' });
+  const box = (await stage.boundingBox())!;
+  for (const target of [reset, summary, text, page.getByRole('slider', { name: 'Fraction', exact: true }), page.getByRole('button', { name: 'Choose Ink color', exact: true })]) {
+    await target.focus(); await page.keyboard.down('Space');
+    await page.mouse.move(box.x + 200, box.y + 200); await page.mouse.down();
+    await page.mouse.move(box.x + 230, box.y + 220); await page.mouse.up(); await page.keyboard.up('Space');
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('internal-fixture')!).pan)).toBeUndefined();
+  }
+});
+
+test('public-element labels and focus cover Tweakpane fields and color picker channels', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  for (const [role, name] of [['spinbutton', 'Fraction exact'], ['slider', 'Fraction'], ['combobox', 'Style'], ['textbox', 'Text'], ['button', 'Choose Ink color']] as const) {
+    const control = page.getByRole(role, { name, exact: true });
+    await control.focus();
+    await expect(control).toBeFocused();
+    expect(await control.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  }
+  const toggle = page.getByLabel('Enabled', { exact: true });
+  await toggle.focus();
+  expect(await toggle.locator('..').evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none');
+  await toggle.press('Space');
+  await expect(toggle).not.toBeChecked();
+  await page.getByRole('button', { name: 'Choose Ink color', exact: true }).click();
+  const red = page.getByLabel('Ink red', { exact: true });
+  await red.fill('128'); await red.press('Tab');
+  await expect(page.getByLabel('Ink', { exact: true })).toHaveValue('#802233');
+  await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.ink)).toBe('#802233');
+  for (const [format, channels] of [['hsl', ['hue', 'saturation', 'lightness']], ['hsv', ['hue', 'saturation', 'value']], ['hex', ['hex']], ['rgb', ['red', 'green', 'blue']]] as const) {
+    await page.getByLabel('Ink color format').selectOption(format);
+    for (const channel of channels) await expect(page.getByLabel(`Ink ${channel}`, { exact: true })).toBeVisible();
+  }
+  await page.getByRole('button', { name: 'Choose Ink color', exact: true }).click();
+});
+
+test('restores and repeated mounts do not emit edits; invalid values keep canonical controls', async ({ page }) => {
+  for (let mount = 0; mount < 3; mount++) {
+    await page.evaluate(() => {
+      (window as any).detachedInput = document.querySelector('input[aria-label="Text"]');
+      return (window as any).start('controls');
+    });
+    await page.evaluate(() => {
+      const old = (window as any).detachedInput;
+      if (old) { old.value = 'disposed edit'; old.dispatchEvent(new Event('input', { bubbles: true })); old.dispatchEvent(new Event('change', { bubbles: true })); }
+    });
+    await expect(page.getByRole('group', { name: 'Tool parameters', exact: true })).toHaveCount(1);
+    await expect(page.getByLabel('Text', { exact: true })).toHaveValue('proof');
+    await page.getByText('Appearance', { exact: true }).click();
+    await page.evaluate(() => (window as any).restoreControls({ cellSize: 45, fraction: 0.75, text: '#aabbcc', ink: '#abcdef', enabled: false, style: 'outline' }));
+    await expect(page.getByLabel('Fraction exact', { exact: true })).toHaveValue('0.75');
+    await expect(page.getByLabel('Text', { exact: true })).toBeHidden();
+    await page.getByText('Appearance', { exact: true }).click();
+    await expect(page.getByLabel('Text', { exact: true })).toHaveValue('#aabbcc');
+    await expect(page.getByLabel('Text', { exact: true })).toHaveAttribute('type', 'text');
+    await expect(page.getByLabel('Ink', { exact: true })).toHaveValue('#abcdef');
+    await expect(page.getByLabel('Enabled', { exact: true })).not.toBeChecked();
+    const choice = page.getByLabel('Style', { exact: true });
+    await choice.evaluate((element: HTMLSelectElement) => { element.value = 'invalid'; element.dispatchEvent(new Event('change', { bubbles: true })); });
+    await expect(choice).toHaveValue('outline');
+    await edit(page, 'Cell size exact', '');
+    await edit(page, 'Cell size exact', '1e309');
+    expect(await page.evaluate(() => (window as any).edits)).toEqual([]);
+    expect(await page.evaluate(() => (window as any).folds)).toEqual([{ group: 'Appearance', open: false }, { group: 'Appearance', open: true }]);
+    await page.evaluate(() => (window as any).restoreControls({ cellSize: 45, fraction: 0.75, text: '#aabbcc', ink: '#abcdef', enabled: false, style: 'outline' }, ['Geometry']));
+    await expect(page.getByRole('button', { name: 'Appearance', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    expect(await page.evaluate(() => (window as any).folds)).toHaveLength(2);
+    await page.getByRole('button', { name: 'Appearance', exact: true }).click();
+    await page.getByLabel('Text', { exact: true }).fill('one edit');
+    expect(await page.evaluate(() => (window as any).edits)).toEqual([{ key: 'text', value: 'one edit' }]);
+    await page.getByRole('slider', { name: 'Fraction', exact: true }).press('ArrowRight');
+    expect(await page.evaluate(() => (window as any).edits)).toEqual([{ key: 'text', value: 'one edit' }, { key: 'fraction', value: 0.95 }]);
+  }
+});
+
 test('delayed full-detail evaluations coalesce and never publish stale controls or dimensions', async ({ page }) => {
   await page.evaluate(() => (window as any).start());
   await expect(scene(page).locator('rect')).toHaveCount(6);
@@ -219,7 +457,9 @@ test('delayed full-detail evaluations coalesce and never publish stale controls 
   await page.evaluate(() => { (window as any).hold = 20; });
   await edit(page, 'Cell size exact', '20');
   await page.waitForFunction(() => (window as any).release);
+  await expect(page.getByTestId('preview-status')).toContainText('Updating full-detail preview — showing previous artwork');
   await edit(page, 'Cell size exact', '10');
+  await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await edit(page, 'Width', '200');
   await edit(page, 'Cell size exact', '40');
   expect(await scene(page).innerHTML()).toBe(original);
@@ -231,10 +471,76 @@ test('delayed full-detail evaluations coalesce and never publish stale controls 
   });
   await expect(scene(page).locator('rect')).toHaveCount(10);
   await expect(page.getByRole('status')).toContainText('200 × 80');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  await expect(page.getByTestId('preview-status')).not.toContainText('previous');
   expect(await page.evaluate(() => (window as any).counts)).toEqual([10]);
   const calls = await page.evaluate(() => (window as any).calls);
   expect(calls.slice(-2).map((call: any) => call.design.params.cellSize)).toEqual([20, 40]);
   expect(calls.at(-1).design.params.cellSize).toBe(40);
   expect(calls.at(-1).design.artboard.dimensions).toEqual({ width: 200, height: 80 });
   expect(calls.every((call: any) => !('zoom' in call.design.params) && !('pan' in call.design.params) && call.timeSeconds === 0)).toBe(true);
+  const slider = page.getByRole('slider', { name: 'Cell size', exact: true });
+  const box = (await slider.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width, box.y + box.height / 2);
+  await expect(slider).toHaveAttribute('aria-valuenow', '80');
+  await expect.poll(() => page.evaluate(() => (window as any).calls.at(-1).design.params.cellSize)).toBe(80);
+  await expect(scene(page).locator('rect')).toHaveCount(2);
+  await page.mouse.up();
+});
+
+for (const failure of ['failEvaluation', 'failRender']) {
+  test(`${failure} retains artwork until a successful current render and navigation disposes pending work`, async ({ page }, testInfo) => {
+    await page.evaluate(() => (window as any).start());
+    await expect(scene(page).locator('rect')).toHaveCount(6);
+    const original = await scene(page).innerHTML();
+    await page.evaluate(failure => { (window as any)[failure] = true; }, failure);
+    await edit(page, 'Cell size exact', '20');
+    await expect(page.getByRole('alert')).toContainText(failure === 'failEvaluation' ? 'fixture evaluation failure' : 'fixture renderer failure');
+    await expect(page.getByTestId('preview-status')).toContainText('Preview failed — showing previous artwork');
+    if (failure === 'failRender') await page.screenshot({ path: testInfo.outputPath('failed-preview.png') });
+    expect(await scene(page).innerHTML()).toBe(original);
+    await page.evaluate(failure => { (window as any)[failure] = false; (window as any).hold = 10; }, failure);
+    await edit(page, 'Cell size exact', '10');
+    await page.waitForFunction(() => (window as any).release);
+    await expect(page.getByTestId('preview-status')).toContainText('Updating full-detail preview — showing previous artwork');
+    await expect(page.getByRole('alert')).toBeVisible();
+    if (failure === 'failRender') await page.screenshot({ path: testInfo.outputPath('pending-preview.png') });
+    expect(await scene(page).innerHTML()).toBe(original);
+    await page.evaluate(() => (window as any).release());
+    await expect(scene(page).locator('rect')).toHaveCount(96);
+    await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.evaluate(() => { (window as any).hold = 20; (window as any).release = undefined; });
+    await edit(page, 'Cell size exact', '20');
+    await page.waitForFunction(() => (window as any).release);
+    await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('internal-fixed-fixture');
+    await expect(scene(page).locator('rect')).toHaveCount(6);
+    const rendered = await page.evaluate(() => (window as any).rendered);
+    const finished = await page.evaluate(() => (window as any).finished);
+    await page.evaluate(() => (window as any).release());
+    await expect.poll(() => page.evaluate(() => (window as any).finished)).toBe(finished + 1);
+    expect(await page.evaluate(() => (window as any).rendered)).toBe(rendered);
+    await expect(scene(page).locator('rect')).toHaveCount(6);
+    await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  });
+}
+
+test('playback renders full detail without frame-by-frame live announcements', async ({ page }) => {
+  await page.evaluate(() => (window as any).start());
+  await expect(scene(page).locator('rect')).toHaveCount(6);
+  await page.getByRole('button', { name: 'Play motion' }).click();
+  await expect(page.getByRole('status', { name: 'Preview status' })).toHaveText('Motion playing. Full-detail preview updates continuously.');
+  const rendered = await page.evaluate(() => {
+    (window as any).announcements = [];
+    const live = document.querySelector('[role=status][aria-label="Preview status"]')!;
+    new MutationObserver(() => (window as any).announcements.push(live.textContent)).observe(live, { childList: true, characterData: true, subtree: true });
+    return (window as any).rendered;
+  });
+  await expect.poll(() => page.evaluate(() => (window as any).rendered)).toBeGreaterThan(rendered + 10);
+  expect(await page.evaluate(() => (window as any).announcements)).toEqual([]);
+  await page.getByRole('button', { name: 'Pause motion' }).click();
+  await expect(page.getByRole('status', { name: 'Preview status' })).toContainText('Preview current');
+  await expect(scene(page).locator('rect')).toHaveCount(6);
 });

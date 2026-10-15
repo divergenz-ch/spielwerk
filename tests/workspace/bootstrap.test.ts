@@ -83,7 +83,7 @@ for (const mode of ['development', 'static root', 'static subdirectory'] as cons
     await expect(page.getByRole('region', { name: 'Workspace foundation' })).toHaveCount(0);
     await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('arrow-maze');
     await expect(page.getByTestId('scene').locator('svg')).toBeVisible();
-    await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(233, 231, 226)');
+    await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(233, 233, 230)');
     await page.waitForLoadState('networkidle');
     // Initial Maze, delivered Poster, then Maze each discover snapshot storage.
     expect(discovery).toHaveLength(3);
@@ -91,6 +91,7 @@ for (const mode of ['development', 'static root', 'static subdirectory'] as cons
       expect(response.status).toBe(mode === 'development' ? 200 : 404);
       expect(await response.body).not.toBe('"ok"');
     }
+    await page.locator('summary').filter({ hasText: /^Snapshots$/ }).click();
     await page.getByLabel('Snapshot name', { exact: true }).fill('local bootstrap');
     await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Load local bootstrap', exact: true })).toBeVisible();

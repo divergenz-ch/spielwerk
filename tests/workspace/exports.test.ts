@@ -63,7 +63,14 @@ test.beforeAll(async () => {
         } };
       } : undefined });
       mount(App, { target: document.body, props: { exporters: { 'internal-export-fixture': handlers }, catalog: [{
-        id: 'internal-export-fixture', name: 'Internal export fixture', description: 'Contract files, not delivered SVG/PNG/GIF encoders', status: 'ready', accent: true, adapter,
+        id: 'internal-export-fixture', name: 'Internal export fixture', description: 'Contract files, not delivered SVG/PNG/GIF encoders', status: 'ready', accent: true, adapter, playback: true,
+        async preview(input) {
+          window.previewInput = input;
+          const frame = await adapter.evaluate(input);
+          if (window.failPreview) throw Error('fixture preview failure');
+          if (window.holdPreview === input.design.params.cellSize) await new Promise(resolve => window.releasePreview = resolve);
+          return frame;
+        },
         artboard: { initial: { width: 120, height: 80 }, dimensions: true, presets: [], swap: false, ratioLock: false, handles: [] },
         renderer: { render(frame, target) { target.textContent = frame.scene.rectangles.length + ' full-detail rectangles'; } }
       }] } });
@@ -110,6 +117,7 @@ for (const hosting of ['static', 'service']) {
     await expect(page.getByRole('button', { name: 'Choose export folder' })).toHaveCount(0);
     expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['svg', 'png', 'gif']);
     await expect(page.evaluate(() => (window as any).rejectUnsupported())).rejects.toThrow('This output format is not available');
+    await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
     await page.getByLabel('Layout', { exact: true }).selectOption('responsive');
     await edit(page, 'Container width', '200'); await edit(page, 'Container height', '120');
     await edit(page, 'Cell size exact', '20');
@@ -124,7 +132,7 @@ for (const hosting of ['static', 'service']) {
       const file = await downloaded;
       expect(file.suggestedFilename()).toBe('internal-' + format + '-contract.json');
       records.push(JSON.parse(await readFile((await file.path())!, 'utf8')));
-      await expect(page.getByRole('status', { name: 'Export progress' })).toContainText('browser downloads');
+      await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText(`Download started: internal-${format}-contract.json (browser downloads).`);
     }
     for (const record of records) {
       expect(record.input).toEqual(preview);
@@ -135,6 +143,7 @@ for (const hosting of ['static', 'service']) {
       expect(record.input.design.params).not.toHaveProperty('zoom');
       expect(record.frame).toEqual(records[0].frame); expect(record.later).toEqual(records[0].later);
     }
+    await page.locator('summary').filter({ hasText: /^Snapshots$/ }).click();
     await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Load snapshot 1', exact: true })).toBeVisible();
     if (hosting === 'service') {
@@ -146,7 +155,48 @@ for (const hosting of ['static', 'service']) {
   });
 }
 
-test('progress, visible encoder failure, original typeface bytes, and immutable in-flight fixed request', async ({ page }) => {
+test('built app edit, restore and actual SVG download retain deterministic artwork and embed guidance', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(staticUrl + 'app/#arrow-maze');
+  await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
+  await edit(page, 'Seed exact', '84');
+  await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
+  await edit(page, 'Width', '640');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  const artwork = await page.getByTestId('scene').innerHTML();
+  await page.locator('summary').filter({ hasText: /^Snapshots$/ }).click();
+  await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Load snapshot 1', exact: true })).toBeEnabled();
+  await edit(page, 'Seed exact', '126');
+  await page.getByRole('button', { name: 'Load snapshot 1', exact: true }).click();
+  await expect(page.getByLabel('Seed exact', { exact: true })).toHaveValue('84');
+  await expect(page.getByTestId('scene')).toHaveJSProperty('innerHTML', artwork);
+  await expect(page.getByLabel('Output format')).toHaveValue('svg');
+  const downloaded = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
+  const file = await downloaded;
+  expect(file.suggestedFilename()).toMatch(/\.svg$/);
+  await file.saveAs(testInfo.outputPath('arrow-maze.svg'));
+  const text = await readFile((await file.path())!, 'utf8');
+  const comparison = await page.evaluate(text => {
+    const exported = new DOMParser().parseFromString(text, 'image/svg+xml');
+    const preview = document.querySelector('[data-testid=scene] svg')!;
+    const geometry = (root: ParentNode) => Array.from(root.querySelectorAll('path, rect, text')).map(node => new XMLSerializer().serializeToString(node));
+    return { error: Boolean(exported.querySelector('parsererror')), width: exported.documentElement.getAttribute('width'),
+      exported: geometry(exported), preview: geometry(preview) };
+  }, text);
+  expect(comparison.error).toBe(false);
+  expect(comparison.width).toBe('640');
+  expect(comparison.exported.length).toBeGreaterThan(0);
+  expect(comparison.exported).toEqual(comparison.preview);
+  await expect(page.getByRole('status', { name: 'Export progress' })).toContainText('Download started:');
+  await expect(page.getByRole('status', { name: 'Export progress' })).not.toContainText('Saved');
+  await page.screenshot({ path: testInfo.outputPath('built-export.png') });
+  await page.getByLabel('Output format').selectOption('embed');
+  await expect(page.getByText('Extract the ZIP and serve its demo or copy its website snippet. Keep the included runtime, Wasm, and fonts together.', { exact: true })).toBeVisible();
+});
+
+test('pending preview export captures activation-time settings, assets, dimensions and time; failure can retry', async ({ page }) => {
   await start(page);
   let font: Buffer | undefined;
   for (const path of ['/System/Library/Fonts/Supplemental/Arial.ttf', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'C:/Windows/Fonts/arial.ttf']) {
@@ -155,14 +205,41 @@ test('progress, visible encoder failure, original typeface bytes, and immutable 
   expect(font, 'A real browser-loadable font is required').toBeDefined();
   for (const slot of ['Primary', 'Accent']) await page.getByLabel(`${slot} typeface`, { exact: true }).setInputFiles({ name: `${slot}.ttf`, mimeType: 'font/ttf', buffer: font! });
   await expect.poll(() => page.evaluate(() => (window as any).inputs.at(-1).design.assets.length)).toBe(2);
-  await page.evaluate(() => { (window as any).hold = true; });
+  await page.getByRole('button', { name: 'Play motion' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).previewInput.timeSeconds)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Pause motion' }).click();
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  await page.evaluate(() => { (window as any).hold = true; (window as any).holdPreview = 20; });
+  await edit(page, 'Cell size exact', '20');
+  await page.waitForFunction(() => (window as any).releasePreview);
+  await expect(page.getByTestId('scene')).toHaveText('6 full-detail rectangles');
+  await expect(page.getByText('Preview is updating. Export captures current settings, dimensions, typefaces and time at activation, not the previous artwork.', { exact: true })).toBeVisible();
+  const activated = await page.evaluate(() => (window as any).previewInput);
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Fixture encoding 1/2');
   await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeDisabled();
+  await expect(page.getByLabel('Output format')).toBeDisabled();
+  await page.getByRole('button', { name: 'Export artwork', exact: true }).evaluate((button: HTMLButtonElement) => button.click());
+  await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await edit(page, 'Width', '200');
+  await edit(page, 'Cell size exact', '10');
+  await page.getByRole('button', { name: 'Clear primary typeface' }).click();
+  await page.getByRole('button', { name: 'Play motion' }).click();
   const downloaded = page.waitForEvent('download');
   await page.evaluate(() => (window as any).release());
   const record = JSON.parse(await readFile((await (await downloaded).path())!, 'utf8'));
+  await page.getByRole('button', { name: 'Pause motion' }).click();
+  expect(record.input.design.params).toEqual(activated.design.params);
+  expect(record.input.design.params.cellSize).toBe(20);
+  expect(record.input.timeSeconds).toBe(activated.timeSeconds);
+  expect(record.input.timeSeconds).toBeGreaterThan(0);
+  expect(record.frame.scene.rectangles).toHaveLength(24);
+  expect(await page.evaluate(() => (window as any).encoded.length)).toBe(1);
+  await expect(page.getByTestId('scene')).toHaveText('6 full-detail rectangles');
+  await page.evaluate(() => (window as any).releasePreview());
+  await expect(page.getByTestId('scene')).toHaveText('160 full-detail rectangles');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  await expect(page.getByText('Preview is updating.', { exact: false })).toHaveCount(0);
   expect(record.input.design.artboard).toEqual({ mode: 'fixed', dimensions: { width: 120, height: 80 } });
   expect(record.later.dimensions).toEqual({ width: 120, height: 80 });
   expect(record.input.design.assets.map((a: any) => a.role)).toEqual(['typeface', 'accent-typeface']);
@@ -171,6 +248,23 @@ test('progress, visible encoder failure, original typeface bytes, and immutable 
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveText('Export failed: Error: fixture encoder failure');
   await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeEnabled();
+  await page.evaluate(() => { (window as any).fail = false; });
+  const retry = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
+  const retried = JSON.parse(await readFile((await (await retry).path())!, 'utf8'));
+  expect(retried.input.design.params.cellSize).toBe(10);
+  expect(retried.frame.dimensions).toEqual({ width: 200, height: 80 });
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Download started: internal-svg-contract.json (browser downloads).');
+  await page.evaluate(() => { (window as any).failPreview = true; });
+  await edit(page, 'Cell size exact', '15');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview failed — showing previous artwork');
+  await expect(page.getByText('Preview failed. Export captures current settings, dimensions, typefaces and time at activation, not the previous artwork.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeEnabled();
+  await page.evaluate(() => { (window as any).failPreview = false; });
+  await edit(page, 'Cell size exact', '10');
+  await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  await expect(page.getByText('Preview failed. Export captures', { exact: false })).toHaveCount(0);
 });
 
 test('folder cancellation retains destination; picker/write permissions fall back to downloads', async ({ page }) => {
@@ -192,7 +286,7 @@ test('folder cancellation retains destination; picker/write permissions fall bac
   await pick.click();
   await expect(page.getByText('Destination: Disposable fixture folder', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
-  await expect(page.getByRole('status', { name: 'Export progress' })).toContainText('Disposable fixture folder');
+  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Saved internal-svg-contract.json to Disposable fixture folder.');
   expect(await page.evaluate(() => (window as any).writeClosed)).toBe(true);
   const writes = await page.evaluate(() => (window as any).writes);
   expect(writes).toHaveLength(1); expect(JSON.parse(writes[0].text).frame.scene.rectangles).toHaveLength(6);
@@ -202,5 +296,6 @@ test('folder cancellation retains destination; picker/write permissions fall bac
   await downloaded;
   await expect(page.getByRole('alert')).toContainText('Folder output failed:');
   await expect(page.getByRole('alert')).toContainText('Used browser download instead.');
+  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Download started: internal-svg-contract.json (browser downloads).');
   await expect(page.getByText('Destination: Disposable fixture folder', { exact: true })).toBeVisible();
 });

@@ -198,6 +198,7 @@ test('package progress, immutable design, runtime fetch failure and recovery thr
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
   await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Collecting embed runtime and fonts…');
   await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeDisabled();
+  await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await page.getByLabel('Width', { exact: true }).fill('700');
   await page.getByLabel('Width', { exact: true }).press('Tab');
   release();

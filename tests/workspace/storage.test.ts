@@ -139,7 +139,11 @@ test('Svelte panel saves, restores, imports, exports and deletes through browser
     localStorage.setItem('imprint', JSON.stringify({ text: 'original', zoom: 2 }));
     (window as any).mountPanel('imprint');
   });
-  const save = page.getByRole('button', { name: 'Save snapshot', exact: true });
+  const disclosure = page.locator('summary').filter({ hasText: /^Snapshots$/ });
+  await expect(page.getByLabel('Primary typeface', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Accent typeface', { exact: true })).toBeVisible();
+  await disclosure.press('Enter');
+  const save = page.getByRole('button', { name: 'Save snapshot', exact: true, includeHidden: true });
   await expect(save).toBeEnabled();
   await save.click();
   await expect(page.getByRole('button', { name: 'Load snapshot 1', exact: true })).toBeVisible();
@@ -155,6 +159,8 @@ test('Svelte panel saves, restores, imports, exports and deletes through browser
   await expect(save).toBeEnabled();
   await page.getByRole('button', { name: 'Load snapshot 1', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).loaded.params.text)).toBe('imported');
+  await disclosure.press('Space');
+  await expect(save).toBeHidden();
   await page.getByLabel('Primary typeface', { exact: true }).setInputFiles({ name: 'invalid.ttf', mimeType: 'font/ttf', buffer: Buffer.from('not a font') });
   await expect(page.getByRole('alert')).toBeVisible();
   expect(await page.evaluate(async () => { const a = (window as any).api; return a.typefaces('imprint', a.browserPersistence()).load('primary'); })).toBeNull();
@@ -168,6 +174,7 @@ test('Svelte panel saves, restores, imports, exports and deletes through browser
     await expect(save).toBeEnabled();
     await expect.poll(() => page.evaluate(slot => (window as any).fontChanges[slot.toLowerCase()]?.file, slot)).toBe(`${slot}.ttf`);
   }
+  await disclosure.press('Enter');
   await page.getByLabel('Snapshot name', { exact: true }).fill('with fonts');
   await save.click();
   await expect(page.getByRole('button', { name: 'Load with fonts', exact: true })).toBeVisible();

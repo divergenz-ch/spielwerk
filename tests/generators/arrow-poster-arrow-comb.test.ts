@@ -85,7 +85,8 @@ for (const tool of ['arrow-poster', 'arrow-comb']) {
     if (tool === 'arrow-poster') {
       expect(stored.cwidth).toBeCloseTo(0.67); await expect(page.getByLabel('Use block', { exact: true })).toBeChecked(); await expect(page.getByLabel('Use hook', { exact: true })).not.toBeChecked();
       await expect(page.getByTestId('scene').locator('[data-arrow]:not([data-profile="block"])')).toHaveCount(0);
-      await page.getByLabel('Use hook', { exact: true }).check();
+      await page.getByLabel('Use hook', { exact: true }).locator('..').click();
+      await expect(page.getByLabel('Use hook', { exact: true })).toBeChecked();
       await expect(page.getByTestId('scene').locator('[data-profile="hook"]')).not.toHaveCount(0);
     } else {
       expect(stored.textpx).toBe(12); await expect(page.getByLabel('From left', { exact: true })).toBeChecked(); await expect(page.getByLabel('From up', { exact: true })).not.toBeChecked();

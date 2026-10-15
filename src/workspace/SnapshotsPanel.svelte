@@ -91,34 +91,56 @@
 </script>
 
 <section aria-label="Snapshots and typefaces">
-  <fieldset disabled={busy}>
-    <legend>Snapshots</legend>
-    <form onsubmit={event => { event.preventDefault(); void run(save); }}>
-      <label>Snapshot name <input bind:value={name} placeholder="name" /></label>
-      <button type="submit">Save snapshot</button>
-    </form>
-    {#each entries as snap (snap.name)}
-      <div>
-        <span>{snap.name}</span>
-        <button type="button" aria-label={`Load ${snap.name}`} onclick={() => run(() => load(snap))}>Load</button>
-        <button type="button" aria-label={`Delete ${snap.name}`} onclick={() => run(async () => { await library.remove(snap.name); entries = await library.list(); })}>Delete</button>
-      </div>
-    {:else}<p>Nothing saved yet</p>{/each}
-    <button type="button" onclick={() => run(exportFile)}>Export snapshots</button>
-    <label>Import snapshots <input type="file" accept=".json,application/json" onchange={importFile} /></label>
-    {#each (accent ? ['primary', 'accent'] : ['primary']) as slot}
-      <label>{slot === 'primary' ? 'Primary typeface' : 'Accent typeface'}
-        <input type="file" accept=".ttf,.otf,.woff,.woff2" onchange={event => upload(slot as FontSlot, event)} />
-      </label>
-      <span>{labels[slot as FontSlot]}</span>
-      <button type="button" aria-label={`Clear ${slot} typeface`} onclick={() => run(async () => { await fonts.save(slot as FontSlot, null); await apply(slot as FontSlot, null); })}>System default</button>
-    {/each}
-  </fieldset>
-  {#if error}<p role="alert">{error}</p>{/if}
+  <details class="ui-section">
+    <summary>Snapshots</summary>
+    <fieldset class="ui-section-body" disabled={busy} aria-label="Snapshot management">
+      <form onsubmit={event => { event.preventDefault(); void run(save); }}>
+        <label class="sr-only" for={`snapshot-name-${slug}`}>Snapshot name</label>
+        <input class="ui-input" id={`snapshot-name-${slug}`} bind:value={name} placeholder="Name this version…" />
+        <button class="ui-button" type="submit" aria-label="Save snapshot">Save</button>
+      </form>
+      {#each entries as snap (snap.name)}
+        <div class="snapshot-row">
+          <span title={snap.name}>{snap.name}</span>
+          <button class="ui-button quiet" type="button" aria-label={`Load ${snap.name}`} onclick={() => run(() => load(snap))}>Load</button>
+          <button class="ui-button quiet icon" type="button" aria-label={`Delete ${snap.name}`} title={`Delete ${snap.name}`} onclick={() => run(async () => { await library.remove(snap.name); entries = await library.list(); })}>
+            <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="m5 5 6 6m0-6-6 6"/></svg>
+          </button>
+        </div>
+      {:else}<p class="ui-note empty">Nothing saved yet</p>{/each}
+      <button class="ui-button" type="button" onclick={() => run(exportFile)}>Export snapshots</button>
+      <label class="file-label">Import snapshots <input class="ui-file" type="file" accept=".json,application/json" onchange={importFile} /></label>
+    </fieldset>
+  </details>
+  <details class="ui-section" open>
+    <summary>Typefaces</summary>
+    <fieldset class="ui-section-body" aria-label="Typefaces" disabled={busy}>
+      {#each (accent ? ['primary', 'accent'] : ['primary']) as slot}
+        <div class="typeface">
+          <label class="file-label">{slot === 'primary' ? 'Primary typeface' : 'Accent typeface'}
+            <input class="ui-file" type="file" accept=".ttf,.otf,.woff,.woff2" onchange={event => upload(slot as FontSlot, event)} />
+          </label>
+          <div class="font-status">
+            <span title={labels[slot as FontSlot]}>{labels[slot as FontSlot]}</span>
+            <button class="ui-button quiet" type="button" aria-label={`Clear ${slot} typeface`} onclick={() => run(async () => { await fonts.save(slot as FontSlot, null); await apply(slot as FontSlot, null); })}>Reset</button>
+          </div>
+        </div>
+      {/each}
+    </fieldset>
+  </details>
+  {#if error}<p class="ui-alert error" role="alert">{error}</p>{/if}
 </section>
 
 <style>
-  fieldset { display: grid; gap: 0.5rem; }
-  form, label { display: flex; gap: 0.5rem; align-items: center; }
-  input { min-width: 0; }
+  form { display: flex; align-items: center; gap: 5px; }
+  form input { flex: 1; }
+  .snapshot-row { display: flex; gap: 4px; align-items: center; min-width: 0; }
+  .snapshot-row > span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .snapshot-row button { flex: none; font-size: 11px; }
+  .empty { padding: 8px 0; }
+  .file-label { display: grid; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--ui-muted); }
+  .font-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ui-muted); font-size: 10px; }
+  .font-status span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .font-status button { flex: none; font-size: 10px; height: 24px; }
+  .error { padding: 0 16px 14px; }
 </style>
