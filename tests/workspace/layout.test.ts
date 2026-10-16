@@ -19,7 +19,7 @@ for (const viewport of [
   test(`integrated workspace fits ${viewport.width} × ${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto(url);
-    await expect(page.getByTestId('scene').locator('svg')).toBeVisible();
+    await expect(page.getByTestId('scene').locator('canvas')).toBeVisible();
     await expect(page.getByTestId('preview-status')).toContainText('Preview current');
     const stage = page.getByRole('region', { name: 'Pan preview with Space and drag' });
     const artwork = page.getByTestId('scene');
@@ -75,7 +75,7 @@ test('numeric resets stay in their binding row and remain keyboard accessible', 
 });
 
 test('native panels share the parameter theme and stay usable when expanded', async ({ page }) => {
-  await page.goto(url);
+  await page.goto(url + '#arrow-maze');
   await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   const width = page.getByRole('spinbutton', { name: 'Width', exact: true });
   const seed = page.getByRole('spinbutton', { name: 'Seed exact', exact: true });

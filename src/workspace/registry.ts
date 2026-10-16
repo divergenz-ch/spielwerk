@@ -22,6 +22,12 @@ const generator = (
 });
 
 export const tools: readonly PendingTool[] = [
+  {
+    id: 'liquid-gradients', name: 'Liquid Gradients',
+    description: 'Flowing GPU color fields with soft transitions and fine grain.',
+    owner: 'generators', status: 'pending', adapter: null,
+    intendedCapabilities: { responsive: true, motion: true, formats: ['png', 'embed'] },
+  },
   generator('arrow-maze', 'Arrow Maze', 'Interlocking arrows on a grid, with text and draw-in motion.'),
   generator('arrow-poster', 'Arrow Poster', 'Parametric arrow compositions with stacked contours and draw-in motion.'),
   generator('arrow-comb', 'Arrow Comb', 'Bands of combed arrows with curved tails and optional text rows.'),

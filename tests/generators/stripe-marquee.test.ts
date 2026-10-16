@@ -35,7 +35,7 @@ test('Stripe: uploaded outlines carry lettering, column/shear/direction controls
   const font = await letterFont();
   const result = await page.evaluate(async bytes => {
     const { adapter, stripeMarquee } = await import('/src/tools/stripe-marquee.ts');
-    const input = { design: { toolId: adapter.id, params: { ...adapter.defaults, text: 'A', rows: 40, depth: 5, motion: 'up', secs: 1 }, seed: 42, artboard: { mode: 'responsive', dimensions: { width: 400, height: 300 } }, assets: [{ id:'face', role:'typeface', mediaType:'font/ttf', bytes:Uint8Array.from(bytes) }] }, timeSeconds: 0.2 };
+    const input = { design: { toolId: adapter.id, params: { ...adapter.defaults, text: 'A', fontsize: 20, fit: 'free', lineh: 110, gapx: 40, rowgap: 0, rows: 40, depth: 5, motion: 'up', secs: 1 }, seed: 42, artboard: { mode: 'responsive', dimensions: { width: 400, height: 300 } }, assets: [{ id:'face', role:'typeface', mediaType:'font/ttf', bytes:Uint8Array.from(bytes) }] }, timeSeconds: 0.2 };
     const first=await adapter.evaluate(input), repeat=await adapter.evaluate(input);
     const changed=[];
     for (const [key,value] of Object.entries({ text:'', depth:3, skew:-20, xscale:150, rowphase:15, rowlag:10 })) changed.push((await adapter.evaluate({...input,design:{...input.design,params:{...input.design.params,[key]:value}}})).scene.svg);

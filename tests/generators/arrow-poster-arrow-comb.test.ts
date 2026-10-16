@@ -11,7 +11,7 @@ for (const tool of ['arrow-poster', 'arrow-comb']) {
     await page.goto(url + '#' + tool);
     const result = await page.evaluate(async tool => {
       const { adapter } = await import(`/src/tools/${tool}.ts`);
-      const input = { design: { toolId: tool, params: { ...adapter.defaults, motion: 'draw loop', timing: 'linear', stagger: 0 }, seed: 42, artboard: { mode: 'responsive', dimensions: { width: 400, height: 300 } }, assets: [] }, timeSeconds: 0.8 };
+      const input = { design: { toolId: tool, params: { ...adapter.defaults, motion: 'draw loop', speed: 3, hold: 35, timing: 'linear', stagger: 0 }, seed: 42, artboard: { mode: 'responsive', dimensions: { width: 400, height: 300 } }, assets: [] }, timeSeconds: 0.8 };
       const first = await adapter.evaluate(input);
       const repeat = await adapter.evaluate(input);
       input.design.seed = 99; const seeded = await adapter.evaluate(input); input.design.seed = 42;
@@ -34,7 +34,7 @@ for (const tool of ['arrow-poster', 'arrow-comb']) {
     await page.goto(url + '#' + tool);
     const result = await page.evaluate(async () => {
       const { adapter, artwork } = await import('/src/tools/arrow-comb.ts');
-      const frame = await adapter.evaluate({ design: { toolId: adapter.id, params: { ...adapter.defaults, count: 4, nest: 0, dir_up: false, dir_down: false, dir_left: true, dir_right: false, textTop: '', textMid: '', textBot: '', motion: 'none' }, seed: 42, artboard: { mode: 'responsive', dimensions: { width: 8000, height: 100 } }, assets: [] }, timeSeconds: 0 });
+      const frame = await adapter.evaluate({ design: { toolId: adapter.id, params: { ...adapter.defaults, bands: 4, count: 4, nest: 0, dir_up: false, dir_down: false, dir_left: true, dir_right: false, textTop: '', textMid: '', textBot: '', motion: 'none' }, seed: 42, artboard: { mode: 'responsive', dimensions: { width: 8000, height: 100 } }, assets: [] }, timeSeconds: 0 });
       const png = await artwork.png!({ frame } as any);
       const image = await createImageBitmap(png.blob);
       const canvas = Object.assign(document.createElement('canvas'), { width: image.width, height: image.height });

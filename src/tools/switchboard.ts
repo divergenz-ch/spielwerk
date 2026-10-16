@@ -12,7 +12,14 @@ export type SwitchboardScene = {
 export const act = (input: EvaluationInput<Parameters>, action: { kind: 'click' | 'swap'; id: number; x?: number; y?: number }): Promise<Frame<SwitchboardScene>> => evaluateSwitchboard(input, action);
 export const adapter: ToolAdapter<Parameters, SwitchboardScene> = {
   id: 'switchboard',
-  defaults: { seed: 42, cols: 5, rows: 7, gap: 24, jitter: 0, buttons: true, dials: true, lights: true, form: true, labels: 'ON,OFF,SEND,OK,RUN,A,B,MUTE,ARM,SYNC', rel: 1, stroke: 0.4, radius: 0.53, shadow: 0.67, paper: '#f4f1ea', ink: '#111111', on: '#ffd400', accent: '#ff4d2e', links: 12, effect: 'colour + size', strength: 70, propagate: 'copy', wires: true, wire: 'curve', wirepx: 0.27, motion: 'flow', secs: 4, fps: 20, gifpx: 600, wpx: 1500, hpx: 2000, st: [], order: [] },
+  // A softly rounded, live instrument panel in sage, citron and apricot.
+  defaults: {
+    seed: 42, cols: 5, rows: 7, gap: 20, jitter: 15, buttons: true, dials: true, lights: true, form: true,
+    labels: 'ON,OFF,SEND,OK,RUN,A,B,MUTE,ARM,SYNC', rel: 1, stroke: 0.3, radius: 1.1, shadow: 0.6,
+    paper: '#e8eddf', ink: '#203c3a', on: '#d7ed77', accent: '#fa7951',
+    links: 16, effect: 'colour + size', strength: 55, propagate: 'copy', wires: true, wire: 'curve', wirepx: 0.25,
+    motion: 'flow', secs: 6, fps: 20, gifpx: 600, wpx: 1500, hpx: 2000, st: Array(35).fill(1), order: [],
+  },
   dimensions, capabilities: { responsive: true, motion: true, formats: ['svg', 'png', 'gif'] },
   controls: [
     numeric('seed', 'Seed', 'Grid', 1, 9999), numeric('cols', 'Columns', 'Grid', 2, 12), numeric('rows', 'Rows', 'Grid', 2, 16), numeric('gap', 'Gap %', 'Grid', 0, 60, 2), numeric('jitter', 'Size jitter %', 'Grid', 0, 100, 5),
@@ -32,6 +39,8 @@ export const switchboard: EditorTool = {
   artboard: { ...artboard, initial: { width: 1500, height: 2000 } }, accent: false, playback: true,
   prepareSettings(saved) {
     const params = { ...saved };
+    // Empty legacy state meant the untouched default; start with live wires.
+    if (Array.isArray(params.st) && params.st.length === 0) delete params.st;
     if (params.rel !== 1) {
       const basis = Math.max(100, Math.min(8000, Number(params.wpx) || 1500));
       for (const key of ['stroke', 'radius', 'shadow', 'wirepx']) {

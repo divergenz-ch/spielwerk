@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "spielwerk",
+  "account_id": "9e26efe93c9e5965ffba55cf27561028",
+  "compatibility_date": "2026-10-15",
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist",
+    // Tools use URL hashes, so missing assets and /snaps/* must stay 404s.
+    "not_found_handling": "none"
+  },
+  "routes": [
+    { "pattern": "spielwerk.net", "custom_domain": true }
+  ]
+}

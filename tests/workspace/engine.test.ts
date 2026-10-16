@@ -115,7 +115,7 @@ test('a missing Wasm asset cannot succeed through a JavaScript proxy', async ({ 
 test('catalog separates planned tool capabilities from delivered engines', async () => {
   const { tools } = await import('../../src/workspace/registry');
   expect(tools.map(tool => tool.id)).toEqual([
-    'arrow-maze', 'arrow-poster', 'arrow-comb', 'switchboard', 'truchet-tiles',
+    'liquid-gradients', 'arrow-maze', 'arrow-poster', 'arrow-comb', 'switchboard', 'truchet-tiles',
     'arrow-field', 'imprint', 'logo-extruder', 'stripe-marquee', 'font-remixer',
   ]);
   for (const tool of tools) {

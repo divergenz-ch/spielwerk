@@ -1,6 +1,7 @@
 # Spielwerk authoring boundaries
 
 The current workspace uses Svelte for UI and Rust/Wasm for geometry and timing.
+Liquid Gradients adds WebGL2 shading from Rust-evaluated uniforms.
 Start with the [current-app workflow](README.md) and
 [engine contract](src/engine/README.md). The single-file conventions below
 apply only to retained legacy pages in `tools/`.
@@ -8,11 +9,18 @@ apply only to retained legacy pages in `tools/`.
 ## Current workspace
 
 `src/main.ts` merges delivered registrations from `src/tools/registry.ts` with
-pending metadata in `src/workspace/registry.ts`. Eight generators and their
-website packages are delivered. Logo Extruder and Font Remixer remain pending.
+pending metadata in `src/workspace/registry.ts`. The eight SVG generators,
+Liquid Gradients, and their website packages are delivered. Logo Extruder and Font Remixer remain pending.
 Final ten-tool verification and broader integration documentation belong to
 `fn-1-spielwerk-shared-design-workspace.1`; this UI refinement doesn't release
 that gate or authorize publication.
+
+Liquid Gradients is the first catalog entry and the default for empty or
+unknown hashes. Explicit tool links retain their selection. Delivered animated
+tools enable motion and start playback after the first successful frame;
+reduced-motion preferences suppress autoplay, not explicit Play. Reopening
+replaces saved `motion: 'none'` with the tool's moving default, while snapshot
+restores retain their selected motion. Dispose playback on navigation.
 
 Svelte owns canonical parameters, assets, playback, and view preferences.
 `Controls.svelte` mounts adapter-defined Tweakpane folders and bindings through
@@ -24,7 +32,21 @@ edit/persistence loop. Remounting must not duplicate listeners or edits.
 Keep reset keyboard-reachable and focus visible; editing keys must not trigger
 workspace panning.
 
-Rust owns computation. `latestEvaluation` publishes only the latest full-detail
+Rust owns geometry, seeded random draws, and timing. Liquid Gradients returns
+validated shader uniforms; GLSL computes pixel colors on the GPU. Its renderer
+has no autonomous clock. Persistent renderers opt into target reuse and must
+dispose GPU resources on navigation and embed teardown. Keep SVG's
+replace-on-success behavior. Shader PNG exports render an independent,
+activation-time frame, not a capture of the workspace canvas.
+
+Liquid Gradients accepts one optional raster image. `src/engine/images.ts`
+validates and freezes its first frame; the adapter attaches decoded pixels to
+Rust's scene. Do not move image mixing, fitting, or warp calculations into the
+UI. Treat asset byte buffers as immutable and retain their identity across
+playback frames, so decoding and GPU uploads happen only on replacement or
+context recovery. Snapshots include image data; old snapshots clear it.
+
+`latestEvaluation` publishes only the latest full-detail
 result; retain its disposal boundary on navigation. Artboard reports updating,
 current, or failed preview state, including retained artwork. Avoid per-frame
 live announcements during playback. Zoom, pan, and disclosure state remain
@@ -37,7 +59,7 @@ column. Dimensions live under **Artboard**, snapshot actions under
 failure. Offer only formats with both adapter support and a handler. Keep
 folder selection secondary, preserve download fallback warnings, and report
 browser download initiation separately from a completed folder write.
-Website ZIP guidance must retain runtime, Wasm, and fonts together.
+Website ZIP guidance must retain runtime, Wasm, fonts, and images together.
 
 ## Control-library decision
 

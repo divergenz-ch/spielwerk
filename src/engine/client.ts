@@ -1,4 +1,4 @@
-import init, { evaluate_fixture, evaluate_arrow_maze, evaluate_arrow_poster, evaluate_arrow_comb, evaluate_arrow_field, evaluate_switchboard, evaluate_truchet_tiles, evaluate_imprint, evaluate_stripe_marquee, inspect_font } from './pkg/spielwerk_engine.js';
+import init, { evaluate_fixture, evaluate_arrow_maze, evaluate_arrow_poster, evaluate_arrow_comb, evaluate_arrow_field, evaluate_switchboard, evaluate_truchet_tiles, evaluate_imprint, evaluate_stripe_marquee, evaluate_liquid_gradients, inspect_font } from './pkg/spielwerk_engine.js';
 import wasmUrl from './pkg/spielwerk_engine_bg.wasm?url';
 import type { EvaluationInput, FixtureParams, FixtureScene, Frame } from './contracts';
 
@@ -85,6 +85,15 @@ export async function evaluateStripeMarquee(input: EvaluationInput<any>) {
     dimensions: input.design.artboard.dimensions, seed: input.design.seed,
     params: input.design.params, timeSeconds: input.timeSeconds,
   }), font));
+}
+
+export async function evaluateLiquidGradients(input: EvaluationInput<any>) {
+  await initialize();
+  if (input.design.toolId !== 'liquid-gradients') throw new Error('Not a Liquid Gradients design');
+  return JSON.parse(evaluate_liquid_gradients(JSON.stringify({
+    dimensions: input.design.artboard.dimensions, seed: input.design.seed,
+    params: input.design.params, timeSeconds: input.timeSeconds,
+  })));
 }
 
 export async function inspectFont(bytes: Uint8Array): Promise<{

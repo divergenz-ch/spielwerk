@@ -1,0 +1,10 @@
+{
+  "packages": [
+    {
+      "source": "npm:@janvitos/pi-plan-build",
+      "extensions": [],
+      "skills": [],
+      "prompts": []
+    }
+  ]
+}

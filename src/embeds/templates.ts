@@ -22,20 +22,26 @@ export function templates(design: DesignState<Parameters>, assets: { id: string;
   const instructions = `Serve this extracted folder over HTTP (not file://). Open index.html for the demo.
 Copy snippet.html into your website. Point its module script src to the runtime.js
 in this folder; keep the module script immediately before its artwork element,
-and keep assets/ and fonts/ beside runtime.js. This preserves separate font bases
+and keep assets/, fonts/, and images/ (when present) beside runtime.js.
+This preserves separate asset bases
 when multiple exported packages share a page. No editor, backend,
 CDN, or build tool is needed on your website. Your host CSS controls the artwork
 box; without a height it keeps the exported artboard proportions.
 
 The spielwerk-artwork element exposes play(), pause(), restart(), seek(seconds),
-and setConfig(design). Its ready promise resolves after the first visual frame.
+and setConfig(design). Its ready promise resolves after the first visual frame
+or rejects on initial rendering failure. Listen for spielwerk:error for failures.
 Playback: loop, once, in-view, static (omitted: use the design's motion).
 Optional attributes: pause-offscreen="false", reduced-motion="ignore".
 Arrow Maze only: fit="regenerate|contain|cover|fixed", cell="40" (CSS pixels).
+Liquid Gradients requires WebGL2; maximum box size is 4096 pixels per axis,
+subject to GPU limits. Keep hardware acceleration enabled.
 You can use config-src="config.json" instead of inline application/json;
-font URLs in external configuration resolve relative to that configuration URL.
+asset URLs in external configuration resolve relative to that configuration URL.
 Visual playback only: no visitor editing, dragging, widget clicks, or attraction.
-Uploaded fonts are original bytes; ensure you have permission to host them.
+Uploaded fonts and images are included as original bytes; ensure you have
+permission to host them. Liquid Gradients images must be PNG, JPEG, or WebP,
+at most 10 MB and 4096 pixels per axis. Transparent pixels reveal the palette.
 `;
   return { snippet, demo, instructions };
 }

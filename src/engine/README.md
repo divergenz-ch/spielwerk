@@ -1,12 +1,12 @@
 # Rust/browser boundary
 
 The internal probe proves a Svelte caller can evaluate real Rust/Wasm. The
-current workspace also registers eight real generators in
+current workspace also registers nine real generators in
 `src/tools/registry.ts`: Arrow Maze, Arrow Poster, Arrow Comb, Arrow Field,
-Switchboard, Truchet Tiles, Imprint, and Stripe Marquee. `src/main.ts` merges
+Switchboard, Truchet Tiles, Imprint, Stripe Marquee, and Liquid Gradients. `src/main.ts` merges
 these ready registrations with `src/workspace/registry.ts` metadata. Logo
 Extruder and Font Remixer still have null adapters and unavailable catalog
-entries. The eight generators include artwork handlers and website packages;
+entries. The nine generators include artwork handlers and website packages;
 the probe's rectangles are a separate boundary fixture.
 
 See the [workspace workflow](../../README.md) for choosing, editing, previewing,
@@ -34,7 +34,7 @@ page works under a hosting subdirectory. The Wasm binary is a separate emitted
 asset with an `application/wasm` response; no application backend is required.
 `file://` loading is not supported. A host's CSP must permit WebAssembly.
 
-`test:engine` builds both entries, runs three native Rust tests, and exercises
+`test:engine` builds both entries, runs the native workspace tests, and exercises
 the Svelte proof through Chromium on Vite, static root, and static subdirectory
 hosts. It also checks that blocking the Wasm asset prevents computation.
 `test:integration` currently exercises the eight generators' downloaded
@@ -72,6 +72,8 @@ Generated glue (`pkg/`), Cargo targets, and `dist/` remain ignored.
   seconds (zero for still artwork), and engine-produced scene data.
   `Renderer<Scene, Target>` paints it; rendering must not recompute layout or
   substitute reduced-detail geometry. Browser rasterization may vary.
+  A renderer can declare `persistent: true` to reuse its target and implement
+  `dispose(target)` to release GPU resources. SVG keeps replace-on-success.
 
 For a fixed board, send its selected dimensions. For a responsive board,
 send the chosen preview container dimensions, not a scaled fixed scene.
@@ -100,6 +102,38 @@ embeds through fn-5. Logo Extruder's intended PNG/GIF and Font Remixer's
 intended SVG/PNG and font outputs remain pending with their engines and
 renderers. Native SVG is the exercised foundation renderer; the probe does
 not establish 3D rendering or font transformation support.
+
+## Shader rendering
+
+Liquid Gradients is a standalone shader generator, separate from the eight
+SVG generators. `tools/liquid_gradients.rs` validates dimensions, colors, and
+settings, then evaluates seeded offsets and a periodic animation orbit.
+`src/tools/liquid-renderer.ts` uses those uniforms in a WebGL2 fragment shader.
+The GPU owns pixel shading; Rust still owns random draws and explicit time.
+
+The adapter can attach one browser-decoded image to the scene. `images.ts`
+validates original PNG/JPEG/WebP bytes (10 MB, 4096 pixels per axis), freezes the
+first frame into a canvas, and releases the decoding bitmap. Its weak cache
+uses immutable asset byte identity, so playback does not decode every frame.
+Rust validates image mixing and fitting settings; GLSL performs the fit, warp,
+and alpha compositing. Images remain optional and do not change the gradient
+when absent or mixed at zero. The renderer uploads a texture only when the
+image changes, releases replaced textures, and rebuilds them after context loss.
+
+The workspace and embed keep a canvas/program alive across frames and resizes,
+recover from context loss, and dispose resources on teardown. PNG uses a
+separate canvas with the immutable export frame. Only PNG and website embeds
+are advertised. The maximum size is 4096 pixels per axis, subject to GPU
+limits. WebGL2 failures are explicit; there is no SVG or CPU fallback.
+
+`tests/generators/liquid-gradients.test.ts` covers real Wasm/GPU output,
+controls, snapshots, canvas reuse, PNG parity, context recovery, and unsupported
+GPUs. `tests/generators/liquid-images.test.ts` covers raster formats, validation,
+orientation, alpha, fitting, texture reuse, persistence, and snapshot round trips.
+The Liquid Gradients cases in `tests/embeds/packages.test.ts` exercise a
+downloaded package on an independent nested host, including offscreen pausing
+and reduced motion. An embed's `ready` promise rejects on initial render
+failure, and `spielwerk:error` reports runtime errors.
 
 ## Binding, rendering, and font-input proof
 

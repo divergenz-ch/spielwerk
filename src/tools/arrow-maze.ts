@@ -15,8 +15,9 @@ const numeric = (key: string, label: string, group: string, min: number, max: nu
 const choice = (key: string, label: string, group: string, options: string[]): Control => ({ key, label, group, type: 'choice', options });
 export const adapter: ToolAdapter<Parameters, MazeScene> = {
   id: 'arrow-maze',
-  defaults: { seed: 42, cols: 14, amount: 75, length: 14, turn: 40, fork: 30, shaft: 40, style: 'arc', panels: 4, invert: 40, words: '', textmin: 40, tgap: 15, tblock: true, margin: 2,
-    motion: 'none', speed: 3, hold: 35, stagger: 50, timing: 'ease out', paper: '#f4f1ea', ink: '#111111', arrow: '#111111', wpx: 600, hpx: 800, fps: 10, gifpx: 600,
+  // A dense cobalt route map, broken into alternating paper and ink panels.
+  defaults: { seed: 127, cols: 20, amount: 90, length: 24, turn: 55, fork: 40, shaft: 32, style: 'arc', panels: 6, invert: 45, words: '', textmin: 40, tgap: 15, tblock: true, margin: 4,
+    motion: 'draw loop', speed: 5, hold: 50, stagger: 35, timing: 'ease out', paper: '#f4efdf', ink: '#263bcb', arrow: '#263bcb', wpx: 600, hpx: 800, fps: 10, gifpx: 600,
     show_paper: true, show_panels: true, show_arrows: true, show_text: true },
   dimensions: { width: { min: 100, max: 8000 }, height: { min: 100, max: 8000 } },
   capabilities: { responsive: true, motion: true, formats: ['svg', 'png', 'gif'] },

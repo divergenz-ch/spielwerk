@@ -7,7 +7,13 @@ import { svgArtwork } from './svg-artwork';
 export type StripeScene = { svg: string; staticSvg: string; columns: number; tile: number[] };
 export const adapter: ToolAdapter<Parameters, StripeScene> = {
   id: 'stripe-marquee',
-  defaults: { text: 'NEXUM', fontsize: 20, fit: 'free', lineh: 110, xscale: 100, yscale: 100, basex: 0, basey: 0, track: 0, gapx: 40, motion: 'up', secs: 12, rows: 64, rowgap: 0, rowphase: 0, rowlag: 0, skew: 8, stagger: 0, seed: 42, depth: 7, jitter: 45, minw: 4 / 1500 * 100, scale: 'uniform', ink0: 12, ink1: 95, contrast: 150, levels: 1, paper: '#000000', c1: '#e8112d', c2: '#ff2ec4', c3: '#e8112d', blend: 'normal', fps: 20, gifpx: 600, rel: 1, wpx: 600, hpx: 800 },
+  // Large, readable PLAY lettering woven from peach, lilac and butter stripes.
+  defaults: {
+    text: 'PLAY', fontsize: 32, fit: 'fit width', lineh: 145, xscale: 100, yscale: 100, basex: 0, basey: 0, track: 0, gapx: 18,
+    motion: 'up', secs: 16, rows: 88, rowgap: 8, rowphase: 0, rowlag: 0, skew: -12, stagger: 0,
+    seed: 219, depth: 7, jitter: 25, minw: 0.3, scale: 'uniform', ink0: 5, ink1: 100, contrast: 180, levels: 1,
+    paper: '#201b32', c1: '#ff8761', c2: '#e9b8e8', c3: '#f8db8a', blend: 'normal', fps: 20, gifpx: 600, rel: 1, wpx: 600, hpx: 800,
+  },
   dimensions, capabilities: { responsive: true, motion: true, formats: ['svg', 'png', 'gif'] },
   controls: [
     { key: 'text', label: 'Text', group: 'Type', type: 'text' },

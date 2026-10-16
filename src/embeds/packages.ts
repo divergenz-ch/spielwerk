@@ -7,14 +7,15 @@ import { zip } from './zip';
 
 export async function packageEmbed({ input, progress }: Parameters<NonNullable<ExportHandlers['embed']>>[0]) {
   const design = input.design;
-  progress('Collecting embed runtime and fonts…');
+  progress('Collecting embed runtime and assets…');
   const files = await Promise.all(runtimeFiles.map(async ({ name, url }) => {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Embed asset unavailable: ${name} (${response.status})`);
     return { name, bytes: new Uint8Array(await response.arrayBuffer()) };
   }));
   const assets = design.assets.map((asset, i) => {
-    const url = `fonts/${i}.bin`;
+    const extensions: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+    const url = asset.role === 'image' ? `images/${i}.${extensions[asset.mediaType] ?? 'bin'}` : `fonts/${i}.bin`;
     files.push({ name: url, bytes: asset.bytes });
     const { bytes: _bytes, ...metadata } = asset;
     return { ...metadata, url };

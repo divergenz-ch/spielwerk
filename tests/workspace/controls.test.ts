@@ -127,9 +127,9 @@ const scene = (page: import('@playwright/test').Page) => page.getByTestId('scene
 
 test('catalog navigation and grouped controls use registered metadata, reset, ranges and tool-local saved state', async ({ page }) => {
   await page.evaluate(() => { location.hash = 'unknown'; return (window as any).start('catalog'); });
-  await expect(page.getByRole('combobox', { name: 'Tool', exact: true })).toHaveValue('arrow-maze');
+  await expect(page.getByRole('combobox', { name: 'Tool', exact: true })).toHaveValue('liquid-gradients');
   const catalog = await page.evaluate(() => (window as any).catalog);
-  expect(catalog).toHaveLength(10);
+  expect(catalog).toHaveLength(11);
   for (const tool of catalog) {
     await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption(tool.id);
     await expect(page.getByRole('heading', { name: tool.name, exact: true })).toBeVisible();
@@ -240,9 +240,9 @@ test('artboard dimensions, presets, ratio, handles and observed responsive relay
   await expect(page.getByLabel('Height', { exact: true })).toHaveValue('102');
 });
 
-test('all eight generator capabilities enable responsive controls; fixed exceptions do not', async ({ page }) => {
+test('all generator capabilities enable responsive controls; fixed exceptions do not', async ({ page }) => {
   const capabilities = await page.evaluate(() => (window as any).catalog.map((t: any) => ({ id: t.id, responsive: t.intendedCapabilities.responsive })));
-  expect(capabilities.filter((t: any) => t.responsive).map((t: any) => t.id).sort()).toEqual(['arrow-maze','arrow-poster','arrow-comb','arrow-field','switchboard','truchet-tiles','imprint','stripe-marquee'].sort());
+  expect(capabilities.filter((t: any) => t.responsive).map((t: any) => t.id).sort()).toEqual(['arrow-maze','arrow-poster','arrow-comb','arrow-field','switchboard','truchet-tiles','imprint','stripe-marquee','liquid-gradients'].sort());
   expect(capabilities.filter((t: any) => !t.responsive).map((t: any) => t.id)).toEqual(['logo-extruder','font-remixer']);
   for (let index = 0; index < capabilities.length; index++) {
     await page.evaluate(index => (window as any).start('fixture', index), index);

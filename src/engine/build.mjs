@@ -13,7 +13,7 @@ execFileSync('wasm-bindgen', [
   'crates/spielwerk-engine/target/wasm32-unknown-unknown/release/spielwerk_engine.wasm',
   '--target', 'web', '--out-dir', 'src/engine/pkg',
 ], { stdio: 'inherit' });
-// A separate entry tree-shakes editor registrations, renderers and artwork encoders.
+// A separate entry tree-shakes editor registrations and artwork encoders.
 await build({
   configFile: false,
   base: './',

@@ -7,7 +7,13 @@ import { svgArtwork } from './svg-artwork';
 const kinds = ['block', 'round', 'roof', 'tri', 'hook'];
 export const adapter: ToolAdapter<Parameters, ArrowPathScene> = {
   id: 'arrow-poster',
-  defaults: { ...motionDefaults, seed: 42, count: 6, cols: 2, rows: 3, size: 100, jitter: 20, snap: '45°', headL: 40, headW: 95, shaftW: 42, shaftL: 100, variety: 25, color: '#e84f5e', paper: '#f4f1ea', rel: 1, cwidth: 0.67, gradA: '#f3b7c0', gradB: '#654fa0', steps: 4, ...Object.fromEntries(kinds.map(kind => [`kind_${kind}`, true])), wpx: 600, hpx: 800 },
+  // Dark silhouettes with generous, sunset-to-lilac contour bands.
+  defaults: {
+    ...motionDefaults, seed: 24, count: 7, cols: 2, rows: 3, size: 75, jitter: 35, snap: '45°',
+    headL: 45, headW: 85, shaftW: 32, shaftL: 110, variety: 30,
+    color: '#292146', paper: '#f8d9ba', rel: 1, cwidth: 1.2, gradA: '#ff7548', gradB: '#8e83d8', steps: 6,
+    ...Object.fromEntries(kinds.map(kind => [`kind_${kind}`, !['roof', 'tri'].includes(kind)])), wpx: 600, hpx: 800,
+  },
   dimensions, capabilities: { responsive: true, motion: true, formats: ['svg', 'png', 'gif'] },
   controls: [
     numeric('seed', 'Seed', 'Arrows', 1, 9999), numeric('count', 'Arrows', 'Arrows', 1, 15), numeric('size', 'Scale %', 'Arrows', 40, 200, 5), numeric('cols', 'Grid columns', 'Arrows', 1, 5), numeric('rows', 'Grid rows', 'Arrows', 1, 6), numeric('jitter', 'Jitter', 'Arrows', 0, 100, 5), choice('snap', 'Rotation', 'Arrows', ['free', '45°', '90°']),

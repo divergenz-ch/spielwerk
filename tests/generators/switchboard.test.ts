@@ -10,7 +10,7 @@ test('switchboard: Rust state transitions, linked influence, order, responsive l
   await page.goto(url + '#switchboard');
   const result = await page.evaluate(async () => {
     const { adapter, act } = await import('/src/tools/switchboard.ts');
-    const input = { design: { toolId: adapter.id, params: { ...adapter.defaults, cols: 12, rows: 16, links: 60 }, seed: 42, artboard: { mode: 'responsive', dimensions: { width: 600, height: 800 } }, assets: [] }, timeSeconds: 0 };
+    const input = { design: { toolId: adapter.id, params: { ...adapter.defaults, cols: 12, rows: 16, links: 60, st: [] }, seed: 42, artboard: { mode: 'responsive', dimensions: { width: 600, height: 800 } }, assets: [] }, timeSeconds: 0 };
     const first = await adapter.evaluate(input), repeat = await adapter.evaluate(input);
     const transitions = [];
     for (const cell of first.scene.cells) {

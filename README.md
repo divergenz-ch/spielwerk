@@ -1,13 +1,13 @@
 # Spielwerk
 
-Spielwerk is a desktop workspace for parametric artwork, with a Svelte UI and
-Rust/WebAssembly computation. Choose a tool, edit its parameters, preview the
-result, and export it from one control column.
+Spielwerk is a desktop workspace for parametric artwork, with a Svelte UI,
+Rust/WebAssembly computation, and GPU shader rendering. Choose a tool, edit its
+parameters, preview the result, and export it from one control column.
 
 The current app delivers Arrow Maze, Arrow Poster, Arrow Comb, Arrow Field,
-Switchboard, Truchet Tiles, Imprint, and Stripe Marquee, including website
-embed packages. Logo Extruder and Font Remixer remain pending; their catalog
-entries show an unavailable message. This is not ten-tool completion. Final
+Switchboard, Truchet Tiles, Imprint, Stripe Marquee, and Liquid Gradients,
+including website embed packages. Logo Extruder and Font Remixer remain pending;
+their catalog entries show an unavailable message. This is not ten-tool completion. Final
 integration remains with `fn-1-spielwerk-shared-design-workspace.1`.
 
 ## Run the current app
@@ -22,9 +22,10 @@ npm run setup:engine
 npm run dev
 ```
 
-Open the printed local URL. The root page is the workspace; `/#arrow-maze`
-opens Arrow Maze directly. The **Link to** action preserves the selected tool
-in the URL. An unknown tool hash falls back to Arrow Maze.
+Open the printed local URL. Liquid Gradients opens first and starts playing.
+Links such as `/#arrow-maze` still open that tool directly. The **Link to**
+action preserves the selected tool in the URL. An unknown tool hash falls back
+to Liquid Gradients.
 
 To build and inspect the static app locally:
 
@@ -38,10 +39,40 @@ The app needs no backend, but it cannot load through `file://`. Serve `.wasm`
 assets as `application/wasm`, and permit WebAssembly in the host's CSP. Serving
 this repository's source root alone does not build the Svelte app.
 
+## Deploy to Cloudflare
+
+The production app uses Cloudflare Workers Static Assets at
+[spielwerk.net](https://spielwerk.net). `wrangler.jsonc` pins the account,
+Worker name, and custom domain. Cloudflare manages the domain's DNS and TLS.
+
+After installing the dependencies and engine tools above, authenticate with
+an account that can deploy Workers and manage the domain:
+
+```sh
+npx wrangler login
+npm run deploy:check
+npm run deploy
+```
+
+Both deployment commands rebuild the app and Wasm. `deploy:check` validates
+without uploading; `deploy` publishes `dist/` and attaches `spielwerk.net`.
+Only the built app is published, not the source repository or legacy tools.
+`public/_headers` adds basic response headers and immutable caching for
+hashed assets. Tool links use URL hashes, so missing paths return 404 rather
+than the app shell.
+
+This deployment has no snapshot backend. Snapshots, uploaded typefaces, and
+images stay in the visitor's browser; export snapshot JSON to transfer them.
+
 ## Choose, edit, preview, and export
 
 The header contains one **Tool** selector, the tool name, and its short purpose.
-The preview sits beside a scrollable **Design controls** column.
+The preview sits beside a scrollable **Design controls** column. Every delivered
+animation-capable tool starts playing when opened. Older saved **Motion → none**
+settings use the tool's moving default on opening; other saved settings stay
+intact. You can pause or turn motion off while editing. Loading a still snapshot
+keeps it still. Autoplay respects reduced-motion preferences; **Play** remains
+available for explicit playback.
 
 1. Select a delivered tool. Open its Tweakpane parameter folders and adjust a
    slider or exact numeric field. **Reset …** restores that parameter's default.
@@ -70,8 +101,50 @@ to browser download and leaves a warning; a completed folder write reports
 **Saved … to …**.
 
 For **Website embed (ZIP)**, extract the ZIP and serve its demo or copy its
-website snippet. Keep the included runtime, Wasm, and fonts together. These
+website snippet. Keep the included runtime, Wasm, fonts, and images together. These
 current-app packages are separate from the legacy p5 embed described below.
+
+## Liquid gradients
+
+Open `/#liquid-gradients` or select **Liquid Gradients** to create standalone
+flowing color fields. This tool requires WebGL2; if it's unavailable, the app
+reports an error instead of substituting a different renderer.
+
+- Adjust **Scale**, **Distortion**, **Softness**, **Grain %**, and **Seed**.
+  Set the four colors under **Palette**. Snapshots retain these settings.
+- Animation starts automatically. **Pause** holds the current frame, and
+  **Play** restarts it. **Speed** controls the loop duration: 1 is a 24-second
+  cycle. **Motion → none** selects a still field.
+- Set fixed or responsive dimensions under **Artboard**, up to 4096 pixels
+  per axis, subject to GPU limits. Zoom changes the view, not output resolution.
+- Export **PNG** for the selected instant or **Website embed (ZIP)** for
+  responsive animation. SVG, GIF, and video export aren't offered for shaders.
+  Embeds pause offscreen and respect reduced-motion preferences by default.
+
+Rust validates settings and evaluates seeded, periodic shader uniforms. A
+persistent WebGL2 canvas shades each frame without recreating its GPU context.
+Identical inputs reproduce the image on the same renderer; small pixel
+variations across GPUs and browsers are possible. No font upload is needed.
+
+### Use an image
+
+Under **Image**, choose **Upload image** to apply the liquid distortion to a
+PNG, JPEG, or WebP. Files must be at most 10 MB and 4096 pixels per axis.
+Processing happens in your browser; on the production static site, no image
+is sent to a server. Animated sources use their first frame in the shader.
+
+- Adjust **Distortion**, **Scale**, **Seed**, and **Speed** to shape the motion.
+  Set **Distortion** and **Grain %** to zero for an unwarped image.
+- **Image mix %** blends the image with the gradient: 100 uses the image,
+  and 0 shows only the gradient. Transparent pixels reveal the palette.
+- **Image fit → cover** fills the artboard with a centered crop. **Contain**
+  preserves the whole image, with the gradient behind unused space.
+- **Remove** returns to gradients. Images persist across reloads and are
+  included in saved snapshots, snapshot JSON, PNG artwork, and website ZIPs.
+  Loading an older snapshot without an image clears the current image.
+
+Website packages include the original image in `images/`. Keep that directory
+beside `runtime.js`, and only publish images you have permission to use.
 
 ## Snapshots and typefaces
 

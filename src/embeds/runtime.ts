@@ -8,12 +8,14 @@ import { adapter as switchboard } from '../tools/switchboard';
 import { adapter as tiles } from '../tools/truchet-tiles';
 import { adapter as imprint } from '../tools/imprint';
 import { adapter as stripe } from '../tools/stripe-marquee';
+import { adapter as liquid } from '../tools/liquid-gradients';
+import { liquidRenderer, type LiquidScene } from '../tools/liquid-renderer';
 import { PlaybackClock, type PlaybackOptions } from './playback';
 import { observeSize, fitSvg, type Fit } from './resize';
 
-type VisualScene = { svg: string; staticSvg: string };
+type VisualScene = { svg: string; staticSvg: string } | LiquidScene;
 export const adapters: Record<string, ToolAdapter<Parameters, VisualScene>> = Object.fromEntries(
-  [maze, poster, comb, field, switchboard, tiles, imprint, stripe].map(adapter => [adapter.id, adapter]),
+  [maze, poster, comb, field, switchboard, tiles, imprint, stripe, liquid].map(adapter => [adapter.id, adapter]),
 );
 export type EmbedOptions = PlaybackOptions & { fit?: Fit; cell?: number };
 
@@ -30,6 +32,7 @@ export class EmbedRuntime {
   private disposed = false;
   private surface: HTMLDivElement;
   private visual: ShadowRoot;
+  private shaderSurface?: HTMLDivElement;
   private initialStyle: { position: string; overflow: string; aspectRatio: string };
   frame?: Frame<VisualScene>;
   constructor(private host: HTMLElement, design: DesignState<Parameters>, private options: EmbedOptions = {}) {
@@ -43,12 +46,13 @@ export class EmbedRuntime {
     this.surface.style.pointerEvents = 'none';
     this.surface.setAttribute('aria-hidden', 'true');
     this.visual = this.surface.attachShadow({ mode: 'open' });
+    this.visual.addEventListener('webglcontextrestored', this.graphicsRestored, true);
     host.append(this.surface);
     this.stopResize = observeSize(host, design.artboard.dimensions, size => {
-      this.box = size; void this.redraw();
+      this.box = size; this.requestRedraw();
     });
     this.intersection = new IntersectionObserver(([entry]) => {
-      this.clock.visibility(entry.isIntersecting); void this.redraw();
+      this.clock.visibility(entry.isIntersecting); this.requestRedraw();
     });
     this.intersection.observe(host);
     this.media.addEventListener('change', this.motionChanged);
@@ -58,7 +62,7 @@ export class EmbedRuntime {
     return !adapters[this.design.toolId].capabilities.motion || !motion || motion === 'none' ? 'static'
       : motion === 'draw in' || motion === 'grow in' ? 'once' : 'loop';
   }
-  private motionChanged = () => { this.clock.reducedMotion(this.media.matches); void this.redraw(); };
+  private motionChanged = () => { this.clock.reducedMotion(this.media.matches); this.requestRedraw(); };
   private get fit(): Fit { return this.design.toolId === maze.id ? this.options.fit ?? 'regenerate' : 'regenerate'; }
   private input(timeSeconds: number) {
     const params = { ...this.design.params };
@@ -75,10 +79,29 @@ export class EmbedRuntime {
     const dimensions = this.fit === 'regenerate' ? this.box! : this.design.artboard.dimensions;
     return { design: { ...this.design, params, artboard: { mode: 'responsive' as const, dimensions } }, timeSeconds };
   }
+  private graphicsRestored = () => {
+    // Capture runs before the canvas rebuilds its program. Resume on the next
+    // frame, after the renderer's restoration listener has completed.
+    cancelAnimationFrame(this.raf);
+    this.raf = requestAnimationFrame(() => { this.requestRedraw(); });
+  };
+  private requestRedraw() { void this.redraw().catch(() => {}); }
   async redraw() {
     cancelAnimationFrame(this.raf);
     const revision = ++this.revision;
     if (this.disposed || !this.box) return;
+    try { return await this.draw(revision); }
+    catch (error) {
+      if (this.disposed || revision !== this.revision) return;
+      if (!this.frame) {
+        this.disposeShader();
+        this.visual.textContent = `Artwork unavailable: ${String(error)}`;
+      }
+      this.host.dispatchEvent(new CustomEvent('spielwerk:error', { detail: error }));
+      throw error;
+    }
+  }
+  private async draw(revision: number) {
     const time = this.clock.frameTime();
     const input = this.input(time);
     const frame = this.design.toolId === maze.id && this.fit === 'regenerate'
@@ -86,18 +109,28 @@ export class EmbedRuntime {
       : await adapters[this.design.toolId].evaluate(input);
     if (this.disposed || revision !== this.revision) return;
     this.clock.setDuration(frame.durationSeconds);
+    if ('kind' in frame.scene && frame.scene.kind === 'liquid-gradients') {
+      if (!this.shaderSurface) {
+        this.shaderSurface = document.createElement('div');
+        this.shaderSurface.style.cssText = 'position:absolute;inset:0';
+        this.visual.replaceChildren(this.shaderSurface);
+      }
+      liquidRenderer.render(frame as Frame<LiquidScene>, this.shaderSurface);
+    } else if ('svg' in frame.scene) {
+      this.disposeShader();
+      this.visual.innerHTML = frame.scene.svg;
+      const svg = this.visual.querySelector('svg')!;
+      // Explicit engine frames, never a second autonomous SMIL clock.
+      svg.querySelectorAll('animate, animateTransform, animateMotion, set').forEach(node => node.remove());
+      fitSvg(svg, this.fit, frame.dimensions);
+    }
     this.frame = frame;
-    this.visual.innerHTML = frame.scene.svg;
-    const svg = this.visual.querySelector('svg')!;
-    // Explicit engine frames, never a second autonomous SMIL clock.
-    svg.querySelectorAll('animate, animateTransform, animateMotion, set').forEach(node => node.remove());
-    fitSvg(svg, this.fit, frame.dimensions);
     this.host.dispatchEvent(new CustomEvent('spielwerk:frame', { detail: frame }));
     // Evaluation may cross the once-mode deadline while an earlier frame is
     // being computed. Publish the completed frame before stopping the RAF loop.
     const needsFinalFrame = ['once', 'in-view'].includes(this.clock.mode) && !this.clock.static
       && frame.timeSeconds < frame.durationSeconds && this.clock.frameTime() >= frame.durationSeconds;
-    if (this.clock.active || needsFinalFrame) this.raf = requestAnimationFrame(() => { void this.redraw(); });
+    if (this.clock.active || needsFinalFrame) this.raf = requestAnimationFrame(() => { this.requestRedraw(); });
     return frame;
   }
   play() { this.clock.play(); return this.redraw(); }
@@ -111,13 +144,19 @@ export class EmbedRuntime {
     this.clock.duration = 0;
     this.clock.restart();
     this.host.style.aspectRatio = this.initialStyle.aspectRatio;
-    this.stopResize = observeSize(this.host, design.artboard.dimensions, size => { this.box = size; void this.redraw(); });
+    this.stopResize = observeSize(this.host, design.artboard.dimensions, size => { this.box = size; this.requestRedraw(); });
     return this.redraw();
   }
+  private disposeShader() {
+    if (this.shaderSurface) liquidRenderer.dispose?.(this.shaderSurface);
+    this.shaderSurface = undefined;
+  }
   destroy() {
+    this.disposeShader();
     this.disposed = true; ++this.revision;
     cancelAnimationFrame(this.raf); this.stopResize(); this.intersection.disconnect();
     this.media.removeEventListener('change', this.motionChanged);
+    this.visual.removeEventListener('webglcontextrestored', this.graphicsRestored, true);
     this.surface.remove(); Object.assign(this.host.style, this.initialStyle);
   }
 }

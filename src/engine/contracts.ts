@@ -6,6 +6,7 @@ export type Asset = {
   id: string;
   role: 'typeface' | 'accent-typeface' | 'image' | 'stamp';
   mediaType: string;
+  /** Treat as immutable; replace the buffer when changing an asset. */
   bytes: Uint8Array;
 };
 export type DesignState<P = Settings> = {
@@ -45,7 +46,7 @@ export type Frame<Scene> = {
   durationSeconds: number;
   scene: Scene;
 };
-/** Scene is engine-produced geometry, not a JS layout callback or UI state. */
+/** Scene is engine-produced geometry or shader uniforms, not a JS layout callback or UI state. */
 export interface ToolAdapter<Params, Scene> {
   id: string;
   defaults: Params;
@@ -55,7 +56,10 @@ export interface ToolAdapter<Params, Scene> {
   evaluate(input: EvaluationInput<Params>): Promise<Frame<Scene>>;
 }
 export interface Renderer<Scene, Target> {
+  /** Reuse the target across frames (for GPU resources). SVG remains replace-on-success. */
+  persistent?: boolean;
   render(frame: Frame<Scene>, target: Target): void;
+  dispose?(target: Target): void;
 }
 export type FixtureParams = { cellSize: number };
 export type FixtureScene = {

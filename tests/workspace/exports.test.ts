@@ -89,6 +89,7 @@ test.afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 test.beforeEach(async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const messages: string[] = []; errors.set(page, messages);
   page.on('pageerror', error => messages.push(error.message));
   page.on('console', message => { if (message.type() === 'error' && !message.text().includes('404')) messages.push(message.text()); });
@@ -111,8 +112,8 @@ for (const hosting of ['static', 'service']) {
     await page.goto(base + 'app/');
     await expect(page.getByRole('heading', { name: 'Spielwerk', exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Composition preview' })).toBeVisible();
-    await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
-    expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['svg', 'png', 'gif', 'embed']);
+    await expect(page.getByTestId('scene').locator('canvas')).toBeVisible();
+    expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['png', 'embed']);
     await start(page, false, base);
     await expect(page.getByRole('button', { name: 'Choose export folder' })).toHaveCount(0);
     expect(await page.getByLabel('Output format').locator('option').evaluateAll(nodes => nodes.map(n => (n as HTMLOptionElement).value))).toEqual(['svg', 'png', 'gif']);
@@ -158,6 +159,7 @@ for (const hosting of ['static', 'service']) {
 test('built app edit, restore and actual SVG download retain deterministic artwork and embed guidance', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(staticUrl + 'app/#arrow-maze');
+  await page.getByRole('combobox', { name: 'Motion', exact: true }).selectOption('none');
   await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
   await edit(page, 'Seed exact', '84');
   await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();

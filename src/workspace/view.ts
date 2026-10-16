@@ -20,6 +20,8 @@ export type EditorTool = {
     handles: readonly Handle[];
   };
   accent: boolean;
+  typefaces?: boolean;
+  image?: boolean;
   prepareSettings?(saved: Parameters): Parameters;
   playback?: boolean;
   preview?(input: EvaluationInput<Parameters>, pointer?: { x: number; y: number }): Promise<Frame<any>>;

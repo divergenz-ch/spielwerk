@@ -76,16 +76,18 @@ for (const mode of ['development', 'static root', 'static subdirectory'] as cons
     expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading', { name: 'Spielwerk', exact: true })).toBeVisible();
     await expect(page.getByRole('region', { name: 'Composition preview' })).toBeVisible();
-    await expect(page.getByTestId('scene').locator('[data-arrow]').first()).toBeVisible();
+    await expect(page.getByTestId('scene').locator('canvas')).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Tool', exact: true })).toHaveValue('liquid-gradients');
+    await expect(page.getByRole('button', { name: 'Pause motion', exact: true })).toBeVisible();
     await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('arrow-poster');
     await expect(page.getByRole('heading', { name: 'Arrow Poster', exact: true })).toBeVisible();
-    await expect(page.getByTestId('scene').locator('[data-arrow] path').first()).toBeVisible();
+    await expect(page.getByTestId('scene').locator('[data-arrow] > path').first()).toBeVisible();
     await expect(page.getByRole('region', { name: 'Workspace foundation' })).toHaveCount(0);
     await page.getByRole('combobox', { name: 'Tool', exact: true }).selectOption('arrow-maze');
     await expect(page.getByTestId('scene').locator('svg')).toBeVisible();
     await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(233, 233, 230)');
     await page.waitForLoadState('networkidle');
-    // Initial Maze, delivered Poster, then Maze each discover snapshot storage.
+    // Initial Liquid Gradients, Poster, then Maze each discover snapshot storage.
     expect(discovery).toHaveLength(3);
     for (const response of discovery) {
       expect(response.status).toBe(mode === 'development' ? 200 : 404);

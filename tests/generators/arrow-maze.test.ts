@@ -5,7 +5,7 @@ let server: ViteDevServer;
 let url: string;
 test.beforeAll(async () => {
   server = await createServer({ server: { host: '127.0.0.1', port: 0 } });
-  await server.listen(); url = server.resolvedUrls!.local[0];
+  await server.listen(); url = server.resolvedUrls!.local[0] + '#arrow-maze';
 });
 test.afterAll(async () => { await server?.close(); });
 

@@ -3,6 +3,7 @@
   import type { Asset, Dimensions, EvaluationInput, Frame } from '../engine/contracts';
   import { settingsStore, type Parameters, type Persistence } from './storage';
   import type { FontSlot, Typeface } from './fonts';
+  import { imageAsset, type UploadedImage } from './images';
   import Controls from './Controls.svelte';
   import SnapshotsPanel from './SnapshotsPanel.svelte';
   import { boundedSize, clamp, controlSettings, latestEvaluation, resize, type EditorTool, type Handle } from './view';
@@ -14,9 +15,18 @@
   const store = untrack(() => settingsStore(tool.id, persistence));
   const initial = untrack(() => store.load());
   const settings = (saved: Parameters) => controlSettings(tool.adapter.controls, tool.adapter.defaults, tool.prepareSettings?.(saved) ?? saved);
-  let params = $state<Parameters>(untrack(() => settings(initial.params)));
+  let params = $state<Parameters>(untrack(() => {
+    const params = settings(initial.params);
+    // Opening an animated tool always enables its moving default, including
+    // older saved settings with motion off. Snapshot restores remain literal.
+    if (tool.playback && tool.adapter.capabilities.motion && params.motion === 'none') {
+      params.motion = tool.adapter.defaults.motion;
+    }
+    return params;
+  }));
   let view = $state<Parameters>(initial.view);
-  let assets = $state<Asset[]>([]);
+  // Replace assets as immutable values; keep byte identity stable across frames.
+  let assets = $state.raw<Asset[]>([]);
   let displayed = $state<Frame<unknown>>();
   let busy = $state(true);
   let error = $state('');
@@ -28,6 +38,7 @@
       : 'Preview current — full detail.')
     + (displayed ? ` · ${displayed.dimensions.width} × ${displayed.dimensions.height}` : ''));
   let surface: HTMLDivElement;
+  let renderTarget: HTMLDivElement | undefined;
   let container: HTMLDivElement;
   let stage: HTMLDivElement;
   let stageSize = $state({ width: 800, height: 600 });
@@ -36,20 +47,33 @@
   let timeSeconds = $state(0);
   let playing = $state(false);
   let playbackHandle = 0;
+  let autoplayPending = untrack(() => Boolean(tool.playback && tool.adapter.capabilities.motion));
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let wordDrag: { id: number; key: string; x: number; y: number; center: number[]; original: Parameters; moved: boolean } | undefined;
   function scenePoint(event: PointerEvent) {
     const rect = surface.getBoundingClientRect();
     return { x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom };
   }
-  function play() {
-    playing = !playing;
+  function pause() {
+    playing = false;
     cancelAnimationFrame(playbackHandle);
-    if (!playing) return;
+  }
+  function play() {
+    autoplayPending = false;
+    if (playing) { pause(); return; }
+    if (params.motion === 'none') {
+      params = { ...params, motion: tool.adapter.defaults.motion };
+      persist();
+    }
+    playing = true;
     timeSeconds = 0;
     const origin = performance.now();
     const tick = (now: number) => {
       timeSeconds = (now - origin) / 1000;
-      if (params.motion === 'draw in' && displayed && timeSeconds >= displayed.durationSeconds) playing = false;
+      if (['draw in', 'grow in'].includes(String(params.motion)) && displayed && timeSeconds >= displayed.durationSeconds) {
+        timeSeconds = displayed.durationSeconds;
+        playing = false;
+      }
       if (playing) playbackHandle = requestAnimationFrame(tick);
     };
     playbackHandle = requestAnimationFrame(tick);
@@ -118,24 +142,38 @@
     }
     assets = remaining;
   }
+  function imageChange(image: UploadedImage | null) {
+    assets = [...assets.filter(asset => asset.role !== 'image'), ...(image ? [imageAsset(image)] : [])];
+  }
   const evaluator = untrack(() => latestEvaluation<{ input: EvaluationInput<Parameters>; pointer?: { x: number; y: number } }, Frame<unknown>>(
     request => tool.preview ? tool.preview(request.input, request.pointer) : tool.adapter.evaluate(request.input),
     frame => {
+      const target = tool.renderer.persistent && renderTarget ? renderTarget : document.createElement('div');
       try {
-        const target = document.createElement('div');
         tool.renderer.render(frame, target);
-        surface.replaceChildren(target);
+        if (target !== renderTarget) {
+          if (renderTarget) tool.renderer.dispose?.(renderTarget);
+          surface.replaceChildren(target);
+          renderTarget = target;
+        }
         displayed = frame;
         error = '';
         busy = false;
-      } catch (cause) { error = String(cause); busy = false; }
+        if (autoplayPending) {
+          autoplayPending = false;
+          if (frame.durationSeconds > 0 && !reducedMotion.matches) play();
+        }
+      } catch (cause) {
+        if (target !== renderTarget) tool.renderer.dispose?.(target);
+        error = String(cause); busy = false;
+      }
     },
     cause => { error = String(cause); busy = false; },
   ));
   const input: EvaluationInput<Parameters> = $derived.by(() => {
     return {
       design: { toolId: tool.adapter.id, params: $state.snapshot(params), seed: Number(params.seed) >>> 0,
-        artboard: { mode: responsive ? 'responsive' : 'fixed', dimensions: { ...dimensions } }, assets: $state.snapshot(assets) },
+        artboard: { mode: responsive ? 'responsive' : 'fixed', dimensions: { ...dimensions } }, assets },
       timeSeconds,
     };
   });
@@ -143,8 +181,13 @@
     const request = { input, pointer };
     untrack(() => { busy = true; evaluator.request(request); });
   });
+  $effect(() => {
+    if (params.motion === 'none') untrack(() => { pause(); timeSeconds = 0; });
+  });
   onMount(() => {
     persist();
+    const motionPreferenceChanged = () => { if (reducedMotion.matches) pause(); };
+    reducedMotion.addEventListener('change', motionPreferenceChanged);
     const observer = new ResizeObserver(entries => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
@@ -157,7 +200,21 @@
     });
     observer.observe(stage);
     observer.observe(container);
-    return () => { observer.disconnect(); evaluator.dispose(); cancelAnimationFrame(playbackHandle); };
+    let restoreHandle = 0;
+    const restored = () => {
+      cancelAnimationFrame(restoreHandle);
+      restoreHandle = requestAnimationFrame(() => {
+        busy = true; evaluator.request({ input, pointer });
+      });
+    };
+    surface.addEventListener('webglcontextrestored', restored, true);
+    return () => {
+      observer.disconnect(); evaluator.dispose(); cancelAnimationFrame(playbackHandle);
+      reducedMotion.removeEventListener('change', motionPreferenceChanged);
+      cancelAnimationFrame(restoreHandle);
+      surface.removeEventListener('webglcontextrestored', restored, true);
+      if (renderTarget) tool.renderer.dispose?.(renderTarget);
+    };
   });
   function start(event: PointerEvent, handle?: Handle) {
     if (event.button !== 0) return;
@@ -248,7 +305,7 @@
         {#if tool.artboard.ratioLock}<label class="ui-row">Lock ratio<input type="checkbox" checked={Boolean(params.lock)} onchange={event => setParam('lock', event.currentTarget.checked)} /></label>{/if}
       </div>
     </details>
-    <SnapshotsPanel slug={tool.id} {persistence} accent={tool.accent} prepareSettings={tool.prepareSettings} onfontchange={fontChange}
+    <SnapshotsPanel slug={tool.id} {persistence} accent={tool.accent} showTypefaces={tool.typefaces !== false} showImage={tool.image === true} prepareSettings={tool.prepareSettings} onfontchange={fontChange} onimagechange={imageChange}
       onload={saved => { params = settings(saved.params); persist(); }} />
     </div>
     <ExportPanel adapter={tool.adapter} {handlers} {input} {destination} {previewStatus} />

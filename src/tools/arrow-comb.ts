@@ -7,7 +7,13 @@ import { svgArtwork } from './svg-artwork';
 const directions = ['up', 'down', 'left', 'right'];
 export const adapter: ToolAdapter<Parameters, ArrowPathScene> = {
   id: 'arrow-comb',
-  defaults: { ...motionDefaults, seed: 42, bands: 4, count: 22, size: 100, profile: 'mixed', nest: 60, swing: 100, curve: 1.8, len: 85, thick: 40, taper: 1, headL: 85, headW: 95, variety: 35, textTop: '29.11.25|09–17h', textMid: 'Arrow|Comb|2026', textBot: '', rel: 1, textpx: 12, ink: '#111111', paper: '#ffffff', dir_up: true, dir_down: true, dir_left: false, dir_right: false, wpx: 600, hpx: 800 },
+  // Two sweeping vermilion combs, framed by small editorial type rows.
+  defaults: {
+    ...motionDefaults, seed: 87, bands: 2, count: 36, size: 100, profile: 'swirl', nest: 80,
+    swing: 140, curve: 2.2, len: 95, thick: 45, taper: 1.3, headL: 70, headW: 85, variety: 20,
+    textTop: 'FORM|01', textMid: 'IN|MOTION', textBot: 'SPIELWERK|STUDIES', rel: 1, textpx: 7,
+    ink: '#e54b2c', paper: '#f8eddb', dir_up: true, dir_down: true, dir_left: false, dir_right: false, wpx: 600, hpx: 800,
+  },
   dimensions, capabilities: { responsive: true, motion: true, formats: ['svg', 'png', 'gif'] },
   controls: [
     numeric('seed', 'Seed', 'Bands', 1, 9999), numeric('bands', 'Bands', 'Bands', 1, 8), numeric('count', 'Arrows across', 'Bands', 4, 60), numeric('size', 'Arrow scale %', 'Bands', 25, 400, 5), choice('profile', 'Comb profile', 'Bands', ['mixed', 'fan', 'wave', 'swirl']), numeric('nest', 'Nesting', 'Bands', 0, 100, 5),

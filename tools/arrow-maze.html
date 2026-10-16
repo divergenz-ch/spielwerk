@@ -568,14 +568,16 @@ async function exportGIF(setLabel) {
   await saveAs(`arrow-maze-${p.seed}.gif`, encodeGIF(frames, {width: w, height: h, delay: Math.max(2, Math.round(100 / p.fps))}));
 }
 // embed: a ready-to-paste snippet (in a demo page) plus the runtime next to it
-const UI_ONLY = ["open", "zoom", "lock", "responsive", "vw", "vh", "fps", "gifpx", "outline", "efit", "eplay", "ecellv", "hints"];   // ecell rides along: the embed reads it
+const UI_ONLY = ["open", "zoom", "lock", "responsive", "vw", "vh", "fps", "gifpx", "outline", "efit", "eplay", "ereduced", "ecellv", "hints"];   // ecell rides along: the embed reads it
 async function exportEmbed() {
   const params = Object.fromEntries(Object.entries(p).filter(([k]) => !UI_ONLY.includes(k)));
   const fs = Object.fromEntries(Object.entries(fonts()).filter(([, f]) => f.dataURL).map(([k, f]) => [k, {...f}]));
   // the same file as both faces travels once: the accent just names the main face
   if (fs.accent && fs.accent.dataURL === fs.main?.dataURL) fs.accent = {family: fs.main.family};
   const json = JSON.stringify({params, fonts: fs}).replace(/</g, "\\u003c");   // never closes the <script>
-  const attrs = `fit="${p.efit}"` + (p.eplay === "from motion" ? "" : ` playback="${p.eplay}"`);
+  // only the non-default attributes travel: the runtime's defaults are the design's motion and respecting reduced motion
+  const attrs = `fit="${p.efit}"` + (p.eplay === "from motion" ? "" : ` playback="${p.eplay}"`)
+    + (p.ereduced === "ignore" ? ` reduced-motion="ignore"` : "");
   const element = `<arrow-maze ${attrs}>\n  <script type="application/json">${json}<\/script>\n</arrow-maze>`;
   // the demo page inlines the runtime, so it opens anywhere (file://, previews,
   // any folder) with nothing next to it; arrow-maze.embed.js is saved as well

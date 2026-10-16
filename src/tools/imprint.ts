@@ -7,7 +7,13 @@ import { svgArtwork } from './svg-artwork';
 export type ImprintScene = { svg: string; staticSvg: string; motionSvg: string; rays: { start: number[]; end: number[]; width: number; progress: number; main: boolean }[] };
 export const adapter: ToolAdapter<Parameters, ImprintScene> = {
   id: 'imprint',
-  defaults: { seed: 42, rays: 14, length: 78, vary: 45, scatter: 60, pairs: 45, rel: 1, stroke: 0.2, relief: 'raised', depth: 0.1333, soften: 0.0667, light: 225, shadow: '#000000', shadowO: 20, glow: '#ffffff', glowO: 55, halo: 35, paper: '#e9e7e3', line: '#f1efeb', motion: 'drift', drift: 40, speed: 6, stagger: 60, wpx: 1500, hpx: 1500 },
+  // A sculptural lavender sunburst; relief remains legible when zoomed out.
+  defaults: {
+    seed: 18, rays: 32, length: 90, vary: 20, scatter: 0, pairs: 30, rel: 1, stroke: 1.2,
+    relief: 'raised', depth: 0.5, soften: 0.2, light: 225, shadow: '#65507e', shadowO: 40,
+    glow: '#fff4e5', glowO: 80, halo: 20, paper: '#d8ccdf', line: '#dfd4e5',
+    motion: 'drift', drift: 25, speed: 10, stagger: 60, wpx: 1500, hpx: 1500,
+  },
   dimensions, capabilities: { responsive: true, motion: true, formats: ['svg', 'png'] },
   controls: [
     numeric('seed', 'Seed', 'Rays', 1, 9999), numeric('rays', 'Rays', 'Rays', 3, 40), numeric('length', 'Reach %', 'Rays', 20, 100), numeric('vary', 'Length variation %', 'Rays', 0, 90, 5), numeric('scatter', 'Scatter %', 'Rays', 0, 100, 5), numeric('pairs', 'Pairs %', 'Rays', 0, 100, 5), numeric('stroke', 'Stroke % of artboard width', 'Rays', 0.0001, 12, 0.0001),

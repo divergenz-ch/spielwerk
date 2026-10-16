@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
+import { rasterFile } from '../generators/image-fixture';
 
 let directory: string, appUrl: string, packageUrl: string;
 const servers: Server[] = [];
@@ -43,6 +44,8 @@ test.afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 async function open(page: Page, id: string) {
+  // Keep frame-zero comparisons stable without changing the exported motion settings.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(appUrl + '#' + id);
   await expect(page.getByTestId('scene').locator('svg')).toBeVisible();
   await page.getByLabel('Output format').selectOption('embed');
@@ -52,6 +55,7 @@ async function download(page: Page) {
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
   const file = await waiting;
   await expect(page.getByRole('status', { name: 'Export progress' })).toContainText('browser downloads');
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   return { name: file.suggestedFilename(), bytes: await readFile((await file.path())!) };
 }
 for (const id of tools) test(`${id}: actual workspace ZIP, local fonts, inert inputs, demo and relocated snippet`, async ({ page }) => {
@@ -196,7 +200,7 @@ test('package progress, immutable design, runtime fetch failure and recovery thr
   await page.route('**/runtime-*.js', async route => { await held; await route.continue(); });
   const pending = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export artwork', exact: true }).click();
-  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Collecting embed runtime and fonts…');
+  await expect(page.getByRole('status', { name: 'Export progress' })).toHaveText('Collecting embed runtime and assets…');
   await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeDisabled();
   await page.locator('summary').filter({ hasText: /^Artboard$/ }).click();
   await page.getByLabel('Width', { exact: true }).fill('700');
@@ -212,6 +216,106 @@ test('package progress, immutable design, runtime fetch failure and recovery thr
   await expect(page.getByRole('button', { name: 'Export artwork', exact: true })).toBeEnabled();
   await page.unroute('**/runtime-*.js');
   expect((await download(page)).name).toBe('arrow-maze-42-embed.zip');
+});
+
+for (const withImage of [false, true]) test(`Liquid Gradients${withImage ? ' with image' : ''}: portable GPU package, pixel parity, responsive playback and graceful unsupported GPU`, async ({ page }) => {
+  const errors: string[] = [], requests: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => localStorage.setItem('liquid-gradients', JSON.stringify({ wpx: 320, hpx: 240 })));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(appUrl + '#liquid-gradients');
+  await expect(page.getByTestId('scene').locator('canvas')).toBeVisible();
+  const sourceImage = withImage ? await rasterFile(page) : undefined;
+  if (sourceImage) {
+    await page.getByLabel('Upload image').setInputFiles(sourceImage);
+    await expect(page.getByText(sourceImage.name, { exact: true })).toBeVisible();
+    await expect(page.getByTestId('scene').locator('canvas')).toHaveAttribute('aria-label', 'Liquid image artwork');
+    await expect(page.getByTestId('preview-status')).toContainText('Preview current');
+  }
+  const editorImage = await page.getByTestId('scene').locator('canvas').evaluate((c: HTMLCanvasElement) => c.toDataURL());
+  await page.getByLabel('Output format').selectOption('embed');
+  const exported = await download(page);
+  expect(exported.name).toBe('liquid-gradients-42-embed.zip');
+  const path = join(directory, 'packages', 'nested', 'liquid-gradients');
+  extract(exported.bytes, path);
+  if (sourceImage) expect(await readFile(join(path, 'images/0.png'))).toEqual(sourceImage.buffer);
+  const snippet = await readFile(join(path, 'snippet.html'), 'utf8');
+  await writeFile(join(path, 'host.html'), `<!doctype html><link rel="icon" href="data:,"><style>body{margin:0}spielwerk-artwork{width:320px!important;height:240px}</style>${snippet}`);
+  const runtime = await readFile(join(path, 'runtime.js'), 'utf8');
+  expect(runtime).not.toMatch(/\.svelte|\/src\/|Export artwork|svelte\/internal/);
+  page.on('request', request => requests.push(request.url()));
+  await page.goto(packageUrl + 'nested/liquid-gradients/host.html');
+  const canvas = page.locator('spielwerk-artwork canvas');
+  await expect(canvas).toBeVisible();
+  const image = () => canvas.evaluate((c: HTMLCanvasElement) => c.toDataURL());
+  const time = () => page.evaluate(() => (document.querySelector('spielwerk-artwork') as any).frame.timeSeconds);
+  await page.evaluate(async () => {
+    const el = document.querySelector('spielwerk-artwork') as any;
+    await el.ready; await el.pause(); await el.seek(0);
+    (window as any).liquidCanvas = el.querySelector('div').shadowRoot.querySelector('canvas');
+  });
+  expect((await image()) === editorImage).toBe(true);
+  await page.evaluate(() => (document.querySelector('spielwerk-artwork') as any).seek(3));
+  expect((await image()) !== editorImage).toBe(true);
+  await page.evaluate(() => (document.querySelector('spielwerk-artwork') as any).seek(24));
+  expect((await image()) === editorImage).toBe(true);
+  await page.evaluate(() => (document.querySelector('spielwerk-artwork') as any).play());
+  await expect.poll(time).toBeGreaterThan(24);
+  const beforeLoss = await time();
+  await page.evaluate(async () => {
+    const canvas = (window as any).liquidCanvas as HTMLCanvasElement;
+    const extension = canvas.getContext('webgl2')!.getExtension('WEBGL_lose_context')!;
+    await new Promise<void>(ok => { canvas.addEventListener('webglcontextlost', () => ok(), { once: true }); extension.loseContext(); });
+    setTimeout(() => extension.restoreContext(), 50);
+  });
+  await expect.poll(time).toBeGreaterThan(beforeLoss + 0.1);
+  await page.evaluate(() => { (document.querySelector('spielwerk-artwork') as HTMLElement).style.marginTop = '2000px'; });
+  await page.waitForTimeout(150); const stopped = await time();
+  await page.waitForTimeout(150); expect(await time()).toBe(stopped);
+  await page.evaluate(() => { const el = document.querySelector('spielwerk-artwork') as HTMLElement; el.style.marginTop = '0px'; el.style.setProperty('width', '480px', 'important'); });
+  await expect(canvas).toHaveAttribute('width', '480');
+  await expect.poll(time).toBeGreaterThan(stopped);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect.poll(time).toBe(0);
+  const still = await image(); await page.waitForTimeout(100); expect((await image()) === still).toBe(true);
+  expect(await page.evaluate(() => (window as any).liquidCanvas === document.querySelector('spielwerk-artwork')!.querySelector('div')!.shadowRoot!.querySelector('canvas'))).toBe(true);
+  const context = await page.evaluateHandle(() => (window as any).liquidCanvas.getContext('webgl2'));
+  await page.evaluate(async () => {
+    const el = document.querySelector('spielwerk-artwork') as any;
+    const design = JSON.parse(el.querySelector('script').textContent);
+    await el.setConfig({ ...design, toolId: 'truchet-tiles', params: {} });
+  });
+  await expect(page.locator('spielwerk-artwork svg')).toBeVisible();
+  expect(await context.evaluate(gl => gl.isContextLost())).toBe(true);
+  await page.evaluate(async () => {
+    const el = document.querySelector('spielwerk-artwork') as any;
+    const design = JSON.parse(el.querySelector('script').textContent);
+    design.assets = await Promise.all(design.assets.map(async ({ url, ...asset }) => ({
+      ...asset, bytes: new Uint8Array(await (await fetch(new URL(url, location.href))).arrayBuffer()),
+    })));
+    await el.setConfig(design);
+  });
+  await expect(canvas).toBeVisible();
+  const replacement = await canvas.evaluateHandle(c => c.getContext('webgl2'));
+  await page.evaluate(() => document.querySelector('spielwerk-artwork')!.remove());
+  expect(await replacement.evaluate(gl => gl!.isContextLost())).toBe(true);
+  expect(requests.every(request => request.startsWith(packageUrl) || request.startsWith('blob:' + packageUrl))).toBe(true);
+  if (sourceImage) expect(requests.some(request => request.endsWith('images/0.png'))).toBe(true);
+  expect(requests.some(request => request.endsWith('.wasm'))).toBe(true);
+  expect(requests.some(request => /\.svelte|\/src\/workspace\//.test(request))).toBe(false);
+
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (kind, ...args) { return kind === 'webgl2' ? null : getContext.call(this, kind, ...args); };
+  });
+  await page.reload();
+  await expect(page.locator('spielwerk-artwork')).toContainText('Artwork unavailable');
+  const failure = await page.evaluate(async () => {
+    const el = document.querySelector('spielwerk-artwork') as any;
+    try { await el.ready; return 'unexpected success'; } catch (error) { return String(error); }
+  });
+  expect(failure).toContain('requires WebGL2');
+  expect(errors).toEqual([]);
 });
 
 test('actual package folder write, retained destination on cancel, and denied-write download fallback', async ({ page }) => {

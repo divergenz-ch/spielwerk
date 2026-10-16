@@ -7,12 +7,13 @@ import { switchboard, artwork as switchboardArtwork } from './switchboard';
 import { truchetTiles, artwork as truchetArtwork } from './truchet-tiles';
 import { imprint, artwork as imprintArtwork } from './imprint';
 import { stripeMarquee, artwork as stripeArtwork } from './stripe-marquee';
+import { liquidGradients, artwork as liquidArtwork } from './liquid-gradients';
 
 /** Delivered editor registrations; independent embeds import computation adapters only. */
-export const generators = [arrowMaze, arrowPoster, arrowComb, arrowField, switchboard, truchetTiles, imprint, stripeMarquee].map(withEmbed);
+export const generators = [liquidGradients, arrowMaze, arrowPoster, arrowComb, arrowField, switchboard, truchetTiles, imprint, stripeMarquee].map(withEmbed);
 const artwork = {
   'arrow-maze': mazeArtwork, 'arrow-poster': posterArtwork, 'arrow-comb': combArtwork,
   'arrow-field': fieldArtwork, switchboard: switchboardArtwork,
-  'truchet-tiles': truchetArtwork, imprint: imprintArtwork, 'stripe-marquee': stripeArtwork,
+  'truchet-tiles': truchetArtwork, imprint: imprintArtwork, 'stripe-marquee': stripeArtwork, 'liquid-gradients': liquidArtwork,
 };
 export const exporters = Object.fromEntries(Object.entries(artwork).map(([id, handlers]) => [id, { ...handlers, embed: packageEmbed }]));

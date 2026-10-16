@@ -75,7 +75,8 @@ const DEFS = [
   ["gifpx",  "range", {min: 200, max: 1000, step: 50, value: 600, label: "gif px"}],
   ["efit",   "select", {options: ["regenerate", "contain", "cover"], value: "regenerate", label: "embed resize", hint: "regenerate: the maze re-lays itself out for any box, arrows keep their size — contain / cover: this artboard, scaled"}],
   ["ecell",  "range", {min: 0, max: 200, step: 1, value: 60, label: "embed cell px", hint: "regenerate: grid cell on the website in CSS px — 0 = the artboard's own cell (artboard px = CSS px, huge on a big artboard)"}],
-  ["eplay",  "select", {options: ["from motion", "loop", "once", "in-view", "static"], value: "from motion", label: "embed playback", hint: "in-view replays the draw-in whenever it scrolls into view; visitors asking for reduced motion get the still picture"}]
+  ["eplay",  "select", {options: ["from motion", "loop", "once", "in-view", "static"], value: "from motion", label: "embed playback", hint: "in-view replays the draw-in whenever it scrolls into view"}],
+  ["ereduced", "select", {options: ["respect", "ignore"], value: "respect", label: "reduced motion", hint: "embed: respect gives visitors asking for reduced motion the still picture — ignore animates for them too (sets reduced-motion=\"ignore\" on the element)"}]
 ];
 const LAYERS = ["paper", "panels", "arrows", "dots", "text"];
 const BLENDS = ["normal", "multiply", "screen", "overlay", "difference"];

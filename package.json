@@ -11,6 +11,8 @@
     "build:engine": "node src/engine/build.mjs --wasm-only",
     "dev": "npm run build:engine && vite --host 127.0.0.1",
     "build": "node src/engine/build.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:check": "npm run build && wrangler deploy --dry-run",
     "test:engine": "npm run build && npm run test:rust && playwright test tests/workspace/engine.test.ts",
     "test:rust": "cargo +1.98.0 test --locked --manifest-path crates/spielwerk-engine/Cargo.toml workspace",
     "preview": "vite preview --host 127.0.0.1",
@@ -31,7 +33,7 @@
       "test:bootstrap": "Build and run Chromium mount/asset smoke tests against Vite development and plain static HTTP hosting (Python 3 required).",
       "test:workspace": "Build and run tests/workspace; later foundation tasks add focused tests here.",
       "test:generators": "Build actual Wasm and run focused Chromium generator user-surface cases; empty collection fails.",
-      "test:embeds": "Build actual Wasm and run independent-host resize and visual playback cases for all eight tools.",
+      "test:embeds": "Build actual Wasm and run independent-host resize and visual playback cases, including the Liquid Gradients GPU package.",
       "test:integration": "Reserved for tests/integration, supplied by final integration. Fails with no tests until that task lands; not a bootstrap acceptance gate."
     }
   },
@@ -40,9 +42,10 @@
     "tweakpane": "4.0.5"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@playwright/test": "1.64.1",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
     "@tweakpane/core": "2.0.5",
-    "vite": "8.3.4"
+    "vite": "8.3.4",
+    "wrangler": "4.151.0"
   }
 }

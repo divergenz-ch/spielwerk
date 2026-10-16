@@ -7,7 +7,8 @@ export type ArrowPathScene = {
 };
 export const numeric = (key: string, label: string, group: string, min: number, max: number, step = 1): Control => ({ key, label, group, type: 'number', min, max, step });
 export const choice = (key: string, label: string, group: string, options: string[]): Control => ({ key, label, group, type: 'choice', options });
-export const motionDefaults = { motion: 'none', speed: 3, hold: 35, stagger: 50, timing: 'ease out', fps: 10, gifpx: 600 };
+// Let the completed composition linger between calmer, staggered reveals.
+export const motionDefaults = { motion: 'draw loop', speed: 5, hold: 55, stagger: 35, timing: 'ease out', fps: 10, gifpx: 600 };
 export const motionControls = [
   choice('motion', 'Motion', 'Motion', ['none', 'draw in', 'draw loop']), numeric('speed', 'Cycle seconds', 'Motion', 0.5, 20, 0.5), numeric('hold', 'Hold', 'Motion', 0, 90, 5), numeric('stagger', 'Stagger', 'Motion', 0, 100, 5), choice('timing', 'Timing', 'Motion', ['ease out', 'linear', 'snap']),
   numeric('fps', 'GIF fps', 'Output', 5, 30), numeric('gifpx', 'GIF pixels', 'Output', 200, 1000, 50),

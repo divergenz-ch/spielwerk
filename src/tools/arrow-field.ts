@@ -7,7 +7,12 @@ import { svgArtwork } from './svg-artwork';
 export type FieldScene = { svg: string; staticSvg: string; motionSvg: string; cells: { x: number; y: number; angle: number }[] };
 export const adapter: ToolAdapter<Parameters, FieldScene> = {
   id: 'arrow-field',
-  defaults: { seed: 42, cols: 14, field: 'noise', scale: 8, turns: 2, snap: 0, shape: 'solid', len: 55, stroke: 12, head: 40, jitter: 0, motion: 'wave', secs: 8, pull: 100, reach: 70, grav: 100, ink: '#ffffff', ink2: '#e84f5e', duo: 0, paper: '#0d0d0d', fps: 20, gifpx: 600, wpx: 1500, hpx: 2000 },
+  // A luminous two-ink vortex with enough weight to read at fit-to-screen size.
+  defaults: {
+    seed: 318, cols: 18, field: 'swirl', scale: 8, turns: 2, snap: 0, shape: 'solid', len: 85, stroke: 16, head: 55, jitter: 10,
+    motion: 'spin', secs: 14, pull: 100, reach: 70, grav: 100,
+    ink: '#d5ed80', ink2: '#8eaff0', duo: 30, paper: '#172b2b', fps: 20, gifpx: 600, wpx: 1500, hpx: 2000,
+  },
   dimensions, capabilities: { responsive: true, motion: true, formats: ['svg', 'png', 'gif'] },
   controls: [
     numeric('seed', 'Seed', 'Field', 1, 9999), numeric('cols', 'Arrows across', 'Field', 2, 60), choice('field', 'Field arrangement', 'Field', ['noise', 'swirl', 'radial', 'grid']), numeric('scale', 'Field scale', 'Field', 1, 40), numeric('turns', 'Turns', 'Field', 1, 8), numeric('snap', 'Snap directions', 'Field', 0, 12),
